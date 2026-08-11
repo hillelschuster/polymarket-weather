@@ -1,182 +1,340 @@
-# Data quality traps
+# Alpha integrity — preserving real forecasting edge in data
 
 Snapshot: **2026-08-11**
 
-Weather trading is unusually vulnerable to subtle target-definition errors. Several public projects already contain examples where the strategy looked valid until the data mapping was corrected.
+A forecasting edge only becomes money if the research dataset represents the same information, resolver and executable market state that existed at trade time. Data fidelity is therefore part of alpha generation: it prevents false signals from displacing genuine ones and reveals source-specific edges other traders may miss.
 
-## 1. `WEATHER` category is not a clean meteorological universe
+The design principle is simple:
 
-Polymarket's WEATHER leaderboard is useful for discovering accounts, but the category/tag is not sufficient for research filtering.
+> Every row should answer: **what could we have known, when could we have known it, what exactly would the contract have paid, and what price could we actually have traded?**
 
-Observed example: a recent WEATHER monthly leaderboard page listed `England-Mexico game rescheduled to different time?` among the category's biggest wins.
+---
 
-Therefore:
+# 1. Four clocks per weather datum
 
-- category-level PnL is evidence about the platform category, not automatically daily-temperature PnL;
-- identify actual meteorological contracts from event title + series + resolution rules;
-- build daily-temperature and climate datasets separately.
+For each forecast/observation store separate times:
 
-## 2. All-time WEATHER PnL is heavily influenced by climate contracts
+1. **reference time** — model initialization or observation time;
+2. **source publication/availability time** — when provider made it accessible;
+3. **our receipt time** — when collector obtained it;
+4. **decision time** — when a fair-value calculation/trade could use it.
 
-The all-time leaderboard's largest wins include:
+These timestamps allow direct measurement of information lead and system latency.
 
-- `2024 July hottest on record?`;
-- global/January temperature-increase markets;
-- hottest-year / hottest-month contracts;
-- several large daily-airport-temperature wins.
+Example:
 
-So the six-figure leaders prove weather/climate markets can produce large profits, but their leaderboard totals do **not** by themselves prove a six-figure repeatable daily-high strategy.
+- ECMWF cycle nominal 12:00 UTC;
+- file/member becomes available later;
+- collector receives at 19:06:14;
+- probability calculation completes 19:06:16;
+- order reaches CLOB 19:06:17.
 
-Daily-high profitability must be measured independently.
+The economic latency is from **source availability to executable order**, not from nominal model initialization.
 
-## 3. Resolution station can differ from what a city name suggests
+---
 
-Examples in 2026 rules:
+# 2. Forecast vintage is a first-class key
 
-- NYC -> LaGuardia (`KLGA`);
-- London -> London City Airport (`EGLC`);
-- Milan -> Malpensa (`LIMC`);
-- Paris -> Paris-Le Bourget (`LFPB`).
+Never collapse a target date to one “forecast.” Store every vintage.
 
-Using a consumer forecast for “Paris” or the nearest obvious large airport can solve the wrong problem.
+Primary key concept:
 
-A public bot has explicitly documented a historical wrong-Paris-station bug. That is enough reason to treat station mapping as immutable event data, not hard-coded city folklore.
+`(source, model, run_time, valid_time, station/location, variable, member)`.
 
-## 4. Resolver display is not identical to raw meteorological truth
+For derived daily extrema:
 
-Contracts often reference a particular public historical page such as Wunderground and specify whole °F/°C outcomes. The value we forecast is the value that page will finalize under the event rules.
+`(source, model, run_time, resolver_event, member) -> member_daily_max/min`.
 
-Potential differences from raw METAR/reanalysis include:
+This enables:
 
-- integer reporting/rounding;
-- special 6-hour maximum groups;
-- local-day boundaries;
-- late/revised station reports;
-- source processing conventions.
+- run-to-run forecast shock studies;
+- point-in-time backtests;
+- lead-time calibration;
+- detection of stale data;
+- market response alignment.
 
-Empirically learn the raw-observation -> resolver-display map.
+---
 
-## 5. Local date must be station-local
+# 3. Resolver truth has versions
 
-A UTC-date implementation can attach the wrong day's observations to US/Asia markets. This is a concrete failure mode visible in public bot code comments/fixes.
+For each contract store three separate objects where available:
 
-Every event needs:
+### Physical/source observation
 
-- station timezone;
-- settlement local date;
-- exact cutoff for which observation belongs to which day.
+The raw authoritative or upstream measurement stream.
 
-## 6. Historical forecast != historical weather
+### First resolver-published value
 
-Reanalysis/ERA5 is an estimate of what happened. It is not what the model predicted at trade time.
+The value that current Polymarket rules may specify as decisive, especially when later revisions are explicitly ignored.
 
-For strategy research distinguish:
+### Final/revised climatological value
 
-- **forecast issued before trade** — valid predictor input;
-- **observation known before trade** — valid predictor input;
-- **reanalysis / final observation after event** — outcome/evaluation only.
+Useful for meteorological analysis but potentially different from the contractual settlement value.
 
-Using the latter as a forecast input is look-ahead leakage.
+This distinction matters in markets whose rules say the first published value after a specified date/time controls resolution.
 
-## 7. “Historical forecast API” timestamps need scrutiny
+---
 
-Aggregators can expose old model runs conveniently, but we still need to know:
+# 4. Resolver registry versioning
 
-- model cycle time;
-- first public availability time;
-- data processing delay;
-- whether values were later corrected/reprocessed;
-- exact model version.
+Key each rule set by event, not city alone.
 
-This is critical for forecast-release latency studies.
+Store:
 
-## 8. Open-Meteo `best_match` is not a stable research model identity
+- event ID/slug;
+- city/market family;
+- target date/period;
+- station/source name;
+- station identifier;
+- resolver URL;
+- source family;
+- local timezone/civil day;
+- native unit;
+- source precision;
+- bucket boundaries;
+- rounding rule;
+- revision window;
+- rule text hash / captured text.
 
-`best_match` is useful operationally, but it can select/compose model sources according to provider logic. For a scientific comparison, store named model outputs separately.
+This turns source changes into measurable regimes instead of hidden errors.
 
-We need to know whether an edge came from ECMWF, GFS/NBM, a local model, or an aggregator change.
+Potential alpha: if a resolver switches source family and the market still prices using old participant habits, early correct mapping can be directly profitable.
 
-## 9. Ensemble member counts are not comparable across models
+---
 
-Fifty ECMWF members plus thirty-ish GFS members does not mean ECMWF deserves 5/8 of the predictive weight. Member count is a numerical design choice, not evidence weight.
+# 5. Native-unit probability calculation
 
-Calibrate per model, then blend distributions.
+Calculate settlement in the contract's native resolver unit before bucketization.
 
-## 10. CLOB midpoint is not fill price
+For US Fahrenheit markets, preserve Fahrenheit semantics through:
 
-Polymarket's UI/display can use midpoint; a real buyer pays asks. Historical midpoint backtests systematically overstate edge when spreads are wide.
+- raw station/source reconstruction;
+- maximum/minimum calculation;
+- official precision/rounding;
+- 2°F bucket mapping.
 
-For every economic result label which price was used:
+Repeated °C↔°F conversions around integer boundaries can move probability mass into the wrong contract.
 
+For international whole-°C markets, apply the source's actual display precision and rounding behavior.
+
+---
+
+# 6. Exact station versus grid proxy
+
+Store both:
+
+- resolver station observation;
+- model/gridpoint value.
+
+The difference is not noise to discard; it is a feature:
+
+`station_basis = resolver_station - model_gridpoint`.
+
+Learn station basis by:
+
+- model;
+- cycle;
+- season;
+- wind regime;
+- cloud regime;
+- time of day.
+
+Airports near coasts, urban heat islands, elevation differences and local terrain can create persistent forecast basis that a generic city-coordinate model misses.
+
+---
+
+# 7. Observation completeness for daily extrema
+
+A daily maximum/minimum reconstructed from routine hourly reports can miss brief extrema.
+
+Preserve where available:
+
+- routine METAR;
+- SPECI;
+- T-group precision;
+- 6-hour max/min groups;
+- daily summary/DSM/CLI products;
+- national-agency extrema feeds.
+
+For each reconstructed daily high/low attach a provenance/coverage flag rather than silently substituting a gridded reanalysis value.
+
+The flag can be used as a feature in resolver-discrepancy probability.
+
+---
+
+# 8. Market price provenance
+
+For every model decision store:
+
+- best bid;
+- best ask;
+- depth levels;
 - last trade;
 - midpoint;
-- best bid/ask;
-- depth-walked fill estimate;
-- actual fill.
+- fee rate;
+- book timestamp;
+- collection timestamp.
 
-Only the latter two are executable proxies.
+Also store the precise hypothetical/actual order expression:
 
-## 11. Current fee regime is market-specific
+- side;
+- limit price;
+- size;
+- maker/taker intention;
+- effective fill price;
+- filled size;
+- fee/rebate.
 
-Current docs define Weather taker fees and maker rebates, but fee applicability is per market (`feesEnabled`) and the platform's fee structure changed in 2026.
+This prevents later analysis from turning a midpoint signal into fictional executable PnL.
 
-Do not retroactively charge today's schedule to older markets without checking their actual regime.
+---
 
-## 12. Negative-risk transaction logs are easy to misread
+# 9. Full event snapshot
 
-Current CTF Exchange V2 can settle complementary, mint and merge matches involving many orders. The exchange contract can appear as a counterparty in emitted events.
+For temperature ladders, save all outcomes together under one event timestamp.
 
-The user-supplied `0xbddc...55d4f` wallet is a concrete example: public Polygon transactions contain aggregate negative-risk settlements where the address appears in different maker/taker contexts inside one transaction.
+Required fields:
 
-For wallet strategy inference:
+- outcome/bucket definition;
+- YES token ID;
+- NO token ID if applicable;
+- bid/ask/depth;
+- weather probability;
+- coherent market probability;
+- negative-risk group/metadata.
 
-- decode the whole match;
-- distinguish signed taker order from maker fills;
-- do not infer “market maker” from one log field.
+This allows reconstruction of:
 
-## 13. Off-chain quotes are not all in the blockchain archive
+- probability sum;
+- basket opportunities;
+- neighboring-bucket relative value;
+- full-ladder shifts after forecasts.
 
-Polymarket matches orders off-chain and settles fills on-chain. Resting order placements and cancellations are therefore not fully recoverable from fill logs alone.
+Independent outcome snapshots collected at widely different times can create fake arbitrage, so event-level synchronization has direct economic value.
 
-Historical wallet classification can confidently use executed behavior, but not reconstruct every quote the wallet posted.
+---
 
-## 14. Public bot PnL is self-reported until reproduced
+# 10. Wallet data normalization
 
-GitHub README claims can be useful hypothesis generators. They are not evidence equivalent to:
+For each fill record:
 
-- public wallet realized PnL;
-- raw resolved market data;
-- point-in-time forecasts;
-- executable price reconstruction.
+- wallet;
+- timestamp;
+- side;
+- outcome/token;
+- price;
+- shares/notional;
+- taker/maker inclusion mode/source;
+- event family;
+- resolver date;
+- horizon at trade time;
+- market state at nearest timestamp.
 
-Keep those evidence classes separate in every research note.
+Normalize size by wallet's own historical distribution:
 
-## 15. Profile/proxy/address identity can be messy
+`size_z = notional / median_or_scale(wallet recent notionals)`.
 
-Polymarket APIs commonly use the user's profile/proxy wallet. On-chain settlement can involve proxy/safe/base addresses and exchange adapters. A username can also change.
+A $500 trade means something different for a $50 typical wallet versus a $50k typical wallet.
 
-Canonical research key should be the **proxy wallet returned by Polymarket for the profile/leaderboard**, with aliases recorded separately.
+---
 
-The user's example profile suffix `-1774968947489` is presentation/account naming; the underlying address is the 40-hex wallet portion.
+# 11. Historical forecast source quality
 
-## 16. Resolved PnL and cash flow are different
+Historical weather products can represent different things:
 
-Do not estimate wallet profitability by summing trade cash flows alone. Polymarket now exposes closed positions with realized PnL, positions and accounting snapshots; use those where appropriate and reconcile with trades/on-chain fills.
+- archived operational forecast exactly as available then;
+- hindcast/reforecast produced later with a current model;
+- reanalysis assimilating future observations;
+- historical API that reconstructs weather rather than stores old forecasts.
 
-## Research rule
+Label these explicitly.
 
-Every result table should carry these provenance columns where relevant:
+For trading research, archived operational forecasts have the strongest causal relevance. Reforecasts are valuable for model-error estimation but should be marked as such.
 
-`source, observed_at, issue_time, valid_time, resolver_station, resolver_rule_version, price_type, fee_regime`
+---
 
-That is enough to prevent most silent false edges without building a heavyweight data-governance system.
+# 12. Source outages and fallback as regimes
 
-## References
+If the primary source is absent and the system uses a fallback, store:
 
-- Polymarket WEATHER leaderboard: https://polymarket.com/leaderboard/weather/all/profit
-- Leaderboard API docs: https://docs.polymarket.com/api-reference/core/get-trader-leaderboard-rankings
-- Closed positions: https://docs.polymarket.com/api-reference/core/get-closed-positions-for-a-user
-- Accounting snapshot: https://docs.polymarket.com/api-reference/misc/download-an-accounting-snapshot-zip-of-csvs
-- CLOB orderbook: https://docs.polymarket.com/trading/orderbook
-- Fees: https://docs.polymarket.com/trading/fees
-- CTF Exchange V2: https://github.com/Polymarket/ctf-exchange-v2
+- primary source status;
+- fallback source;
+- age of fallback;
+- expected resolver-basis error.
+
+Then measure PnL separately.
+
+A fallback may remain profitable with a larger required edge, while a pristine direct source can justify more aggressive pricing. The data should let the model learn the difference.
+
+---
+
+# 13. Weather-rule parser validation as economic measurement
+
+For each discovered market, automatically derive a normalized resolver specification and compare it with known city/source mappings.
+
+When the parser sees a new station/source/rule regime, capture it as a new feature/regime immediately.
+
+This is not process ceremony; source novelty can itself create the largest edge because other automated systems may continue targeting stale assumptions.
+
+---
+
+# 14. Calibration dataset design
+
+One row per forecast decision point should include:
+
+### Identity
+
+- event/outcome;
+- station;
+- target period;
+- bucket.
+
+### Weather state
+
+- forecast vintage(s);
+- member extrema distribution;
+- observations to date;
+- current max/min/accumulation;
+- forecast revision;
+- local meteorological features.
+
+### Market state
+
+- bid/ask/depth;
+- coherent ladder probabilities;
+- recent flow;
+- specialist-wallet factors.
+
+### Outcome
+
+- first resolver value;
+- winning bucket;
+- settlement timestamp.
+
+### Execution outcome
+
+- simulated/actual fill at observed book;
+- fee/rebate;
+- markouts;
+- final PnL.
+
+This one table can support probability calibration, market-residual models, wallet studies and execution analysis without a large framework.
+
+---
+
+# 15. Alpha-integrity checks that directly protect PnL
+
+High-value checks include:
+
+- all bucket probabilities sum to ~1;
+- bucket parser reproduces known resolved events;
+- station/date timezone maps to the correct local day;
+- source availability timestamp precedes every decision using it;
+- market ask/bid comes from the same or earlier timestamp than decision;
+- fee formula matches current market metadata;
+- realized settlement matches captured contract rule;
+- fallback-source trades are identifiable;
+- duplicate fills/positions are not counted twice;
+- maker fills are not misclassified as taker price observations.
+
+Each catches a defect that can materially alter measured or realized money.
