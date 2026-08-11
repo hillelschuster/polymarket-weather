@@ -20,6 +20,7 @@ The target is **net executable expected value and realized dollar PnL**, after s
 ## Research map
 
 - [`research/README.md`](research/README.md) — current synthesis and ranked alpha map
+- [`research/profit-evidence.md`](research/profit-evidence.md) — observed leaderboard profits, turnover and capacity clues
 - [`research/edge-thesis.md`](research/edge-thesis.md) — detailed edge hypotheses and persistence mechanisms
 - [`research/weather-math.md`](research/weather-math.md) — probability, extrema and execution math
 - [`research/resolution-alpha.md`](research/resolution-alpha.md) — resolver/station mechanics as tradable information
