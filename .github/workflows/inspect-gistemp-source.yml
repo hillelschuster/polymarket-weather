@@ -9,6 +9,7 @@ on:
 jobs:
   inspect:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Download NASA source
         run: |
@@ -19,11 +20,29 @@ jobs:
           sha256sum /tmp/gistemp4.0.tar.gz
           mkdir -p /tmp/gistemp-src
           tar -xzf /tmp/gistemp4.0.tar.gz -C /tmp/gistemp-src
-      - name: Print source layout and run instructions
+      - name: Print exact inputs and run instructions
         run: |
           set -euxo pipefail
-          find /tmp/gistemp-src -maxdepth 3 -type f -printf '%P\n' | sort
-          echo '--- README_steps.md ---'
-          find /tmp/gistemp-src -name README_steps.md -print -exec cat {} \;
-          echo '--- top-level README files ---'
-          find /tmp/gistemp-src -maxdepth 2 -type f \( -iname 'README*' -o -iname 'requirements*' -o -iname 'setup*' \) -print -exec sh -c 'echo --- "$1"; cat "$1"' sh {} \;
+          cd /tmp/gistemp-src/gistemp4.0
+          echo '--- config/sources.txt ---'
+          cat config/sources.txt
+          echo '--- README_steps running/results ---'
+          sed -n '/## 4. INPUT DATA/,/## A. REFERENCES/p' doc/README_steps.md
+      - name: Run NASA GISTEMP package
+        run: |
+          set -euxo pipefail
+          cd /tmp/gistemp-src/gistemp4.0
+          python -m pip install --disable-pip-version-check --quiet numpy scipy
+          time python tool/run.py
+          echo '--- result files ---'
+          find tmp/result -maxdepth 2 -type f -printf '%p\n' | sort
+          echo '--- current target rows ---'
+          grep -R -nE '(^|[^0-9])2026([^0-9]|$)' tmp/result | tail -80 || true
+          echo '--- likely global tables ---'
+          for f in tmp/result/*; do
+            if [ -f "$f" ]; then
+              case "$f" in
+                *.csv|*.txt) echo "--- $f"; tail -25 "$f" ;;
+              esac
+            fi
+          done
