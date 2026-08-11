@@ -28,6 +28,7 @@ The target is **net executable expected value and realized dollar PnL**, after s
 - [`research/city-source-map.md`](research/city-source-map.md) — resolver and direct local-model/feed map for high-value cities
 - [`research/market-families.md`](research/market-families.md) — daily highs/lows, rainfall, wind maxima and climate-index markets
 - [`research/wallets.md`](research/wallets.md) — profitable weather specialists and reverse-engineering framework
+- [`research/wallet-history-acquisition.md`](research/wallet-history-acquisition.md) — recovered fill-level history for the supplied specialist wallet, exact fees/timestamps/token IDs and full API acquisition path
 - [`research/bots-and-tools.md`](research/bots-and-tools.md) — public project survey
 - [`research/public-bot-code-audit.md`](research/public-bot-code-audit.md) — code-level lessons and exploitable gaps
 - [`research/data-sources.md`](research/data-sources.md) — forecast, observation, market and resolver feeds
