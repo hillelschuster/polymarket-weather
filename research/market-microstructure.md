@@ -1,160 +1,413 @@
-# Weather market microstructure
+# Polymarket weather microstructure
 
 Snapshot: **2026-08-11**
 
-Meteorology creates fair value. Microstructure determines how much of that value becomes money.
+Weather alpha is monetized through a central limit order book. Forecast quality and execution quality therefore multiply each other: the same correct probability can produce excellent PnL, mediocre PnL or negative PnL depending on price, fee, depth, fill timing and adverse selection.
 
-## 1. Displayed probability is not executable probability
+The economic object is:
 
-Polymarket's displayed price is generally the bid/ask midpoint (with a last-trade fallback for wide spreads). A trader buying immediately pays the ask and a seller receives the bid.
+`expected net dollars = Σ fills × (fair settlement value - effective fill cost)`
 
-Therefore never calculate edge from the UI probability alone.
+not `forecast probability - displayed Polymarket percentage`.
 
-For each signal record:
+---
 
-- fair probability;
-- best bid/ask;
-- depth to target size;
-- weighted average fill price;
-- taker fee;
-- expected exit/settlement value.
+# 1. Displayed price versus tradable price
 
-A 10-point midpoint edge can disappear completely in a thin 8-cent spread.
+Polymarket documents the displayed probability as normally the midpoint of best bid and best ask. When the spread exceeds $0.10, the UI can display the last traded price instead.
 
-## 2. Current Weather fee economics
+Therefore collect independently:
 
-Official Polymarket documentation currently specifies, for fee-enabled Weather markets:
+- best bid;
+- best ask;
+- depth at every level;
+- last trade;
+- displayed midpoint only for UI comparison.
 
-`fee = shares * 0.05 * p * (1-p)`
+For a buy, the immediate executable price is the ask. For a sell, it is the bid.
 
-- maker fee rate: 0;
-- taker fee rate: 0.05 in the category formula;
-- Weather maker-rebate allocation: 25% of collected fees;
-- rebate paid from executed maker liquidity, per market;
-- `feesEnabled` and the current market fee parameters should be queried per market.
+Source:
+https://docs.polymarket.com/concepts/prices-orderbook
 
-The fee curve peaks near 50¢ and is smaller in the tails. That means a fixed “minimum edge” is mathematically wrong: the required raw edge depends on price, spread, depth, and route.
+## Effective probability surface
 
-## 3. Maker alpha is potentially first-class
+For each outcome `i`, maintain:
 
-If our weather fair value is superior, crossing the spread is not automatically the best monetization.
+- `bid_i`;
+- `ask_i`;
+- `mid_i`;
+- spread;
+- cumulative depth at 1¢/2¢/5¢ from top;
+- last trade and age;
+- recent signed flow;
+- fee-enabled state.
 
-Approximate maker PnL per fill:
+This lets the strategy distinguish a real 8-point edge at 52¢ ask from a fake 8-point edge against a stale 48¢ last trade.
 
-`fair-value edge + spread capture + rebate - adverse selection`
+---
 
-Weather gives unusually explicit adverse-selection clocks:
+# 2. Current Weather fee curve
 
-- scheduled model cycles;
-- METAR updates;
-- radar/nowcast shocks;
-- local peak-temperature window.
+Polymarket currently lists fee-enabled Weather contracts at taker rate `0.05` and maker rate `0`.
 
-A generic market maker centered on the current midpoint can be systematically picked off by a weather specialist. Conversely, a weather-informed maker can pull or skew quotes before those catalysts and quote more aggressively during quiet periods.
+Per-share taker fee:
 
-Polymarket publishes a current maker-rebate endpoint by maker address/date, which may help verify whether tracked wallets are receiving rebates.
+`f(p) = 0.05 * p * (1-p)`
 
-## 4. Negative-risk ladders are one market, economically
+For a YES bought at ask `a` and held to settlement:
 
-Daily temperature buckets are mutually exclusive and usually exhaustive. In negative-risk events, Polymarket explicitly allows one NO share in outcome `i` to convert into one YES share in every other outcome.
+`EV/share = q - a - f(a)`.
 
-This makes the natural trading object the entire ladder.
+Break-even fair probability:
 
-Monitor:
+`q_BE = a + f(a)`.
 
-- all YES asks and bids;
-- all NO asks and bids;
-- sum of executable YES prices;
-- NO_i versus other-YES basket;
-- depth at each leg;
-- fees on each route;
-- conversion/mint/merge mechanics.
+Examples:
 
-The weather model should output the same object: one probability vector summing to 1.
+| Ask | Fee/share | Fair probability needed to break even |
+|---:|---:|---:|
+| 0.05 | 0.002375 | 0.052375 |
+| 0.10 | 0.004500 | 0.104500 |
+| 0.20 | 0.008000 | 0.208000 |
+| 0.30 | 0.010500 | 0.310500 |
+| 0.40 | 0.012000 | 0.412000 |
+| 0.50 | 0.012500 | 0.512500 |
+| 0.60 | 0.012000 | 0.612000 |
+| 0.80 | 0.008000 | 0.808000 |
+| 0.95 | 0.002375 | 0.952375 |
 
-## 5. Cross-bucket statistical relative value
+The fee is largest in absolute cents near 50¢ and largest relative to token cost in cheap tails.
 
-Even when there is no locked arbitrage, the ladder can be internally implausible.
+Fee schedule source:
+https://docs.polymarket.com/trading/fees
 
-Example shape constraints for a temperature distribution:
+Fee applicability is market-specific and should be read from market/CLOB metadata rather than inferred only from category name.
 
-- probabilities should usually form a locally smooth/unimodal-ish mass function absent a genuinely bimodal weather regime;
-- cumulative probabilities must be monotone;
-- tail probabilities implied by adjacent thresholds should be coherent;
-- the full vector must sum to one.
+---
 
-Fit an arbitrage-free market-implied distribution to executable quotes, then compare it with our calibrated weather CDF. This separates:
+# 3. Maker economics
 
-- `market structure error` — prices inconsistent with one another;
-- `forecast disagreement` — internally coherent market distribution differs from weather model.
+Polymarket currently allocates **25% of collected Weather taker fees** to the maker-rebate pool. Makers pay zero platform trading fee.
 
-Both can make money, but execution differs.
+That means a maker order can earn from three components:
 
-## 6. On-chain maker/taker attribution is subtle
+1. better entry price than crossing the spread;
+2. eventual movement from price to fair value;
+3. maker rebate.
 
-Polymarket CLOB matching is off-chain and settlement is on-chain. The current CTF Exchange V2 supports complementary, mint, and merge settlement paths. In complex negative-risk matches the exchange itself can appear as the counterparty in emitted events while multiple signed orders settle atomically.
+But filled maker orders are selected by other traders, so expected adverse-selection markout matters.
 
-This matters for wallet research. A naive rule like “the address in one `maker` event field is always a passive market maker” is not safe without reconstructing the matching path.
+For a maker buy at `b`:
 
-Concrete example from the user-supplied `0xbddc...55d4f` account:
+`EV_filled = q - b + expected_rebate - expected_adverse_selection`.
 
-- a June 29 Milan 35°C transaction is rendered by PolygonScan as the wallet buying 102.116 YES shares for $30;
-- the transaction contains multiple negative-risk V2 fills and the wallet appears in order-event fields inside that aggregate settlement;
-- another July 12 batch shows the same wallet as the explicit taker against several makers, while also containing a later fill where the wallet is an order maker and the exchange contract is the emitted taker.
+At opportunity level:
 
-Conclusion: reconstruct each signed order/match rather than classifying an account from a single log line.
+`EV = P(fill) * EV_filled - P(no_fill) * missed_opportunity_cost`.
 
-## 7. Historical quote lifecycle is not fully recoverable on-chain
+Source:
+https://docs.polymarket.com/market-makers/maker-rebates
 
-Because order placement/cancellation occurs off-chain, blockchain fills do not reveal every resting order or cancellation. Recent research on Polymarket microstructure explicitly flags this as a limitation for address-level market-maker classification.
+## Forecast-aware quote policy
 
-What can still be measured reliably:
+A compact informed maker policy:
 
-- executed fills;
-- signed-side/fill-side information where contracts expose it;
-- turnover;
-- holding periods from position changes;
-- repeated two-sided executions;
-- markouts after fills;
-- current/historical rebate evidence where endpoint coverage permits.
+- fair value `q` from resolver model;
+- quote bid below `q - required_margin`;
+- quote ask above `q + required_margin` when inventory exists;
+- tighten when spread is wide and information state is quiet;
+- reprice immediately after forecast/observation shocks;
+- skew inventory toward outcomes with positive weather residual;
+- cross only when information half-life is shorter than likely passive fill time.
 
-Going forward, our own WebSocket collector can capture the public book lifecycle at market level even though it cannot assign every quote to a wallet.
+The best execution mode is therefore signal-specific rather than globally “maker” or “taker.”
 
-## 8. Queue/fill value
+---
 
-For a maker order at price `l`, the order has value only if it fills before fair value moves away.
+# 4. Temperature ladders are one event, not independent binaries
 
-Useful empirical statistic:
+If an event has `K` mutually exclusive temperature buckets:
 
-`markout_tau = side * (fair_or_mid_at_t+tau - fill_price)`
+`Σ_i q_i = 1`.
 
-for `tau = 10s, 1m, 5m, 30m`.
+Every quoted binary book should be interpreted as one slice of that joint surface.
 
-If fills just before forecast shocks have strongly negative markouts, the maker needs catalyst-aware quote withdrawal. If quiet-period fills have positive markouts plus rebate, market making may monetize smaller forecast edges that are not worth crossing for.
+Weather information often shifts probability mass locally:
 
-## 9. Capacity is an order-book integral
+Example: a forecast revision from 31.2°C to 32.0°C may:
 
-For a candidate YES trade with fair value `q`, define the maximum profitable size by walking asks until:
+- sharply lower 30°C;
+- lower 31°C;
+- raise 32°C;
+- moderately raise 33°C;
+- barely affect distant tails.
 
-`marginal_ask + marginal_fee >= q`
+Trading each outcome independently discards these conservation relationships.
 
-Expected dollar edge is the integral/sum over profitable levels, not `edge * arbitrary_size`.
+## Coherent market surface
 
-Do the same across every bucket. This will reveal whether the highest-percentage opportunities are too tiny to matter and which cities support scalable PnL.
+Take a price vector based on executable quotes or spread-aware mids and project it to the probability simplex.
 
-## 10. Public market-maker code is implementation reference, not strategy truth
+Weighted least-squares projection:
 
-Polymarket's archived official `poly-market-maker` demonstrates basic quote synchronization around midpoint. More recent public bots add inventory-aware quoting and toxicity logic. These are useful execution references, but our competitive difference should be the weather fair value and catalyst clock, not a generic market-making framework.
+`q_hat = argmin Σ_i w_i(q_i-p_i)^2`
 
-## Primary references
+subject to:
 
-- Polymarket fees: https://docs.polymarket.com/trading/fees
-- Maker rebates: https://docs.polymarket.com/market-makers/maker-rebates
-- Current rebate endpoint: https://docs.polymarket.com/api-reference/rebates/get-current-rebated-fees-for-a-maker
-- Orderbook: https://docs.polymarket.com/trading/orderbook
-- Market WebSocket: https://docs.polymarket.com/market-data/websocket/market-channel
-- Negative risk: https://docs.polymarket.com/advanced/neg-risk
-- CTF Exchange V2: https://github.com/Polymarket/ctf-exchange-v2
-- Archived CTF Exchange matching overview: https://github.com/Polymarket/ctf-exchange/blob/main/docs/Overview.md
-- Polymarket-v1 Database paper: https://arxiv.org/abs/2606.04217
-- Fill-side non-retail microstructure paper: https://arxiv.org/abs/2605.11640
+- `q_i >= 0`;
+- `Σ q_i = 1`.
+
+Weights can be inverse spread or depth-based.
+
+Then calculate local residuals:
+
+`residual_i = q_weather_i - q_market_coherent_i`.
+
+This is cleaner than comparing one model bucket to one noisy binary midpoint.
+
+---
+
+# 5. Negative-risk conversions
+
+Polymarket negative-risk mechanics allow a NO share in one outcome to convert into YES shares in every other outcome in the same event.
+
+Economic identity:
+
+`NO_i ≡ Σ_{j≠i} YES_j`.
+
+At fair probability:
+
+`1 - q_i = Σ_{j≠i} q_j`.
+
+At market prices, continuously compare:
+
+- best executable NO_i expression;
+- executable basket of all other YES outcomes;
+- mint/merge/convert routes when applicable;
+- depth-limited basket cost;
+- fees and gas/operational costs if any.
+
+Source:
+https://docs.polymarket.com/advanced/neg-risk
+
+## Forecast-informed relative value
+
+Pure arbitrage may disappear quickly. More durable relative value can remain when the ladder is coherent in aggregate but probability mass is placed on the wrong neighboring bucket.
+
+Example:
+
+- market: 31°C 35%, 32°C 40%, 33°C 20%, others 5%;
+- resolver model after observation shock: 31°C 10%, 32°C 68%, 33°C 20%, others 2%.
+
+The best trade may be long 32°C versus short/fade 31°C rather than a naked long versus cash.
+
+---
+
+# 6. Order-book response to weather information
+
+Every forecast/observation update produces two timelines:
+
+1. fair-value movement;
+2. market-price movement.
+
+Record around each event:
+
+- `t_source_created` — nominal model/observation timestamp;
+- `t_source_available` — first time our collector could retrieve it;
+- `t_model_parsed` — fair value updated;
+- `t_order_sent`;
+- `t_fill`;
+- order-book snapshots before/after.
+
+Then estimate price response at:
+
+- 1 second;
+- 5 seconds;
+- 10 seconds;
+- 30 seconds;
+- 1 minute;
+- 5 minutes;
+- 30 minutes.
+
+## Information half-life
+
+If fair-value shock is `Δq` and market move by lag `τ` is `Δp(τ)`:
+
+`capture_ratio(τ)=Δp(τ)/Δq`.
+
+Estimate the time until 50% and 80% of the forecast shock is reflected.
+
+This tells us whether a data source belongs to:
+
+- normal polling;
+- WebSocket + immediate execution;
+- direct source push/stream;
+- low-latency colocated execution.
+
+---
+
+# 7. Latency economics and server geography
+
+Polymarket documents its primary CLOB servers in AWS `eu-west-2` (London), and notes direct co-location possibilities for approved professional market makers; `eu-west-1` is the closest unrestricted AWS region it recommends for latency-sensitive infrastructure.
+
+Source:
+https://docs.polymarket.com/market-makers/latency
+
+This only matters when measured information half-life justifies it.
+
+Potential weather-latency hierarchy:
+
+1. data-source availability dominates when source lag is minutes/hours;
+2. parser/model computation dominates if probability update is slow;
+3. network/order latency dominates only when other participants consume the same feed almost instantly.
+
+For global city weather, the first category may be much more important than microseconds.
+
+---
+
+# 8. Fill probability and queue economics
+
+A maker order's expected value is incomplete without fill probability.
+
+Features that can predict fill:
+
+- distance from best bid/ask;
+- queue position proxy;
+- recent trade intensity;
+- signed order flow;
+- spread;
+- time to resolution;
+- fair-value distance;
+- forecast-update schedule;
+- bucket centrality;
+- market volume regime.
+
+Track maker quote episodes with:
+
+- posted price/size;
+- top-of-book when posted;
+- fill fraction;
+- time to first fill;
+- time to complete fill;
+- markout 10s/1m/5m after each fill;
+- eventual settlement PnL;
+- rebate earned.
+
+The useful statistic is **net dollars per posted dollar-second or per unit of capital**, not fill rate by itself.
+
+---
+
+# 9. Taker depth and marginal sizing
+
+Suppose asks are `(p_1,s_1),...,(p_n,s_n)` ascending.
+
+For each level:
+
+`marginal_EV_k = q - p_k - f(p_k)`.
+
+Consume book depth while marginal expected dollars justify the capital versus alternative opportunities.
+
+Total expected PnL for size `S`:
+
+`EV(S) = Σ_k fill_k(S) * marginal_EV_k`.
+
+This produces a natural signal capacity curve:
+
+- first $100 may have 8¢/share edge;
+- next $500 may have 4¢;
+- next $2,000 may have 0.5¢;
+- further size may be inferior to another city.
+
+Rank capital globally by marginal expected return rather than giving every signal a fixed cap.
+
+---
+
+# 10. Cross-city correlation and shared weather regimes
+
+Daily markets are not independent when cities share synoptic systems or the same forecast-model error.
+
+Examples:
+
+- NYC/Philadelphia/other Northeast cities;
+- European heatwave cities;
+- East Asian monsoon/heat regimes;
+- multiple contracts driven by one tropical cyclone.
+
+Correlation matters economically because one forecast error can affect many positions simultaneously.
+
+Estimate historical residual correlation by:
+
+- resolver error;
+- model revision;
+- final bucket outcome residual;
+- trade PnL.
+
+Capital can then be assigned to the portfolio with highest expected compound growth or expected dollars under the actual correlation matrix.
+
+---
+
+# 11. Late-resolution certainty trades
+
+As a physical weather outcome becomes effectively fixed, fair probability can approach 1 while market ask remains below 1 because of:
+
+- stale orders;
+- source uncertainty;
+- capital lock until resolution;
+- participants exiting early;
+- disagreement over resolver mechanics.
+
+For a near-certain outcome at ask `a`:
+
+`annualization` is less relevant than absolute expected dollars per day of capital lock.
+
+Define:
+
+`capital_efficiency = expected_profit / (cash_cost * expected_days_locked)`.
+
+This permits comparison against other same-day opportunities.
+
+Resolver-source knowledge is most valuable here because small uncertainty about the official final value dominates weather-model uncertainty.
+
+---
+
+# 12. Market-making versus directional-trading decision rule
+
+For every forecast signal compute two estimates:
+
+### Cross now
+
+`EV_cross = size_cross * (q - effective_ask - fee - impact)`
+
+### Post maker
+
+`EV_maker = P(fill before edge decay) * size_maker * (q - quote + rebate - adverse_selection)`
+
+Choose the higher expected dollars after considering the information half-life.
+
+The result may vary by state:
+
+- **fresh large forecast shock** → cross;
+- **slow convergence, wide spread** → make;
+- **near resolution, stale opposing quote** → cross aggressively;
+- **uncertain fair value, rich spread** → quote only at substantial margin.
+
+---
+
+# 13. Microstructure research table
+
+For every opportunity store:
+
+- event/outcome/token;
+- resolver city/date/family;
+- fair probability before/after information shock;
+- bid/ask/depth before/after;
+- fee rate;
+- taker EV by depth level;
+- hypothetical maker quote EV;
+- actual fill(s);
+- 10s/1m/5m/30m markouts;
+- rebate;
+- settlement PnL;
+- capital lock time.
+
+This table connects meteorological alpha directly to realized execution economics.
