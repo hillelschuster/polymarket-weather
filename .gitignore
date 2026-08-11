@@ -1,0 +1,3 @@
+data/gistemp-inputs/
+__pycache__/
+*.pyc
