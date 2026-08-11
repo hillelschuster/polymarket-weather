@@ -23,6 +23,7 @@ The target is **net executable expected value and realized dollar PnL**, after s
 - [`research/minimal-logic-material.md`](research/minimal-logic-material.md) — current wallet/live-ladder evidence distilled into the smallest useful trading logic and data requirements
 - [`research/edge-economics.md`](research/edge-economics.md) — fee-adjusted probability-edge thresholds, expected dollar return, maker/taker and exit economics
 - [`research/specialist-archetypes.md`](research/specialist-archetypes.md) — observed profitable daily-temperature trader styles and the unified probability-surface formulation
+- [`research/minimal-data-reconstruction.md`](research/minimal-data-reconstruction.md) — smallest official Polymarket API dataset needed to reconstruct wallet alpha, markout, prices and future live depth
 - [`research/profit-evidence.md`](research/profit-evidence.md) — observed leaderboard profits, turnover and capacity clues
 - [`research/edge-thesis.md`](research/edge-thesis.md) — detailed edge hypotheses and persistence mechanisms
 - [`research/weather-math.md`](research/weather-math.md) — probability, extrema and execution math
