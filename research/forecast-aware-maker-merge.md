@@ -1,516 +1,427 @@
-# Forecast-aware maker/merge — strongest new structural weather hypothesis
+# Forecast-aware market making — corrected merge interpretation
 
 Snapshot: **2026-08-11**
 
-Purpose: identify the smallest reproducible monetization mechanism behind high-frequency profitable Polymarket behavior that can be combined with the existing weather probability engine.
+Purpose: identify the smallest structural execution edge that can monetize a weather probability engine, while separating **directly observed trader behavior** from **exchange-internal settlement mechanics**.
 
-## Verdict
+## Corrected verdict
 
-The strongest new evidence is not another forecast model. It is a **different way to monetize the same fair probabilities**:
+The strongest structural evidence is still **forecast-aware passive market making**, but an earlier interpretation was too strong.
 
-> **Post passive bids on both complementary YES and NO tokens, acquire inventory below combined collateral value when flow permits, merge matched pairs back into $1 pUSD, collect maker rebates, and let the weather model control quote skew and unpaired-inventory risk. Cross the spread only when a forecast/observation shock is too fast to wait for passive fills.**
+### What remains supported
 
-This is materially different from a pure directional forecast bettor, but it is complementary to the supplied wallet's apparent forecast-revision behavior.
+`Poligarch` is directly proven to provide **zero-fee maker liquidity** in daily Weather markets. It has enormous buy activity, very few direct sells, simultaneous YES/NO inventory in the same binaries, material maker rebates, and substantial Weather leaderboard profit/volume.
 
-The most important empirical clue is `Poligarch`.
+A coherent weather probability `q` gives a natural two-sided quote surface:
 
-Wallet:
+`YES bid = q - mY`
+
+`NO bid  = 1 - q - mN`
+
+If both bids eventually fill for the same quantity, combined cash cost is:
+
+`1 - mY - mN`
+
+and the complete YES/NO set can be merged to `$1 pUSD`.
+
+Therefore deliberate paired inventory can mechanically capture:
+
+`mY + mN`
+
+before rebates/rewards/operational costs.
+
+### What is **not** yet proven
+
+Struct's displayed trader `Merges` count is **not sufficient evidence that the trader manually paired inventory and called merge later**.
+
+Polymarket's exchange contract itself has matching paths that mint or merge complete sets during order settlement. In a directly inspected Poligarch transaction, a `PositionsMerge` occurs inside the same neg-risk exchange transaction in which Poligarch supplies maker liquidity. That merge can therefore be exchange settlement plumbing rather than a discretionary post-fill action by Poligarch.
+
+The corrected thesis is:
+
+> **Use a calibrated weather distribution to provide passive two-sided liquidity and control adverse selection. Treat manual pair-and-merge recycling as a valid strategy primitive, but do not attribute it to Poligarch/ColdMath until trader-specific token and cashflow reconstruction proves it.**
+
+---
+
+# 1. Direct Weather maker proof
+
+Poligarch wallet:
 
 `0xb40e89677d59665d5188541ad860450a6e2a7cc9`
 
-Struct's Aug 10 indexed snapshot shows:
+Transaction:
 
-- cumulative PnL: **~$207K**;
-- volume: **~$24.5M**;
-- fees paid: **~$2.29K**;
+`0xfde6e19660e6a98edd7328dfc68c2e4841e82b93bf7fc346c2827cc6cb5a3213`
+
+PolygonScan:
+
+https://polygonscan.com/tx/0xfde6e19660e6a98edd7328dfc68c2e4841e82b93bf7fc346c2827cc6cb5a3213
+
+Timestamp:
+
+`2026-07-21 01:56:10 UTC`
+
+Daily Weather event:
+
+**Wellington July 21 — 11°C**.
+
+Relevant `OrderFilled` log:
+
+- `maker = 0xB40e89677d59665d5188541aD860450A6e2a7cc9`;
+- Poligarch contributes `9.400590 pUSD`;
+- receives `9.990000` related outcome tokens;
+- `fee = 0`.
+
+Effective acquisition price:
+
+`9.400590 / 9.990000 = 94.1¢`.
+
+This directly proves:
+
+1. passive Weather maker activity;
+2. zero maker platform fee on the fill;
+3. inventory acquisition inside a neg-risk temperature match.
+
+It does **not** by itself prove later manual merge or the exact economic direction of the neg-risk token without full token mapping.
+
+---
+
+# 2. Poligarch aggregate shape still matters — but interpret it correctly
+
+Struct indexed approximately:
+
+- cumulative PnL: **$207K**;
+- volume: **$24.5M**;
+- fees: **$2.29K**;
 - buys: **1,612,158**;
 - sells: **1,287**;
 - redemptions: **40,882**;
 - merges: **67,647**;
 - splits: **0**;
 - converts: **2**;
-- rebates: **~$19.3K**;
-- liquidity rewards: **~$5.52K**.
+- rebates: **$19.3K**;
+- liquidity rewards: **$5.52K**.
 
 Source:
+
 https://explorer.struct.to/traders/0xb40e89677d59665d5188541ad860450a6e2a7cc9
 
-The operation-count shape is extreme: roughly **1,253 buys per sell** and **53 merges per sell**. Counts are operations rather than token quantities, so they do not directly reveal dollars recycled, but they strongly reject a conventional buy-then-sell trading lifecycle.
+The buy/sell operation ratio is roughly **1,253:1**.
 
-The parsimonious interpretation is **buy-heavy passive inventory acquisition followed by merge/redemption**, with sells used rarely.
+That is strong evidence that a conventional `buy -> later sell` lifecycle is not the dominant visible activity.
+
+However, the `67,647 merges` figure must now be treated as **ambiguous attribution** until Struct's event-accounting semantics are established at transaction level.
+
+It can contain or reflect exchange-internal transformation paths, not only user-initiated merge operations.
+
+Do not use `merge count / sell count` as proof of capital-recycling behavior.
 
 ---
 
-# 1. Direct same-market evidence: Poligarch owns both YES and NO
+# 3. Why the merge-count correction is necessary
 
-The Aug 10 Struct snapshot shows complementary positions in the same weather binaries.
+Direct transaction:
 
-Examples:
+`0xee8fd0c9e0de9ceb8f42a615188dba0d40aa17f939075fc523fdcb63fcc0b716`
 
-### New York City Aug 10 — 90–91°F
+PolygonScan:
 
-- YES: 126.73 shares, average entry 47.4¢, 24 buys;
-- NO: 103.94 shares, average entry 53.5¢, 13 buys.
+https://polygonscan.com/tx/0xee8fd0c9e0de9ceb8f42a615188dba0d40aa17f939075fc523fdcb63fcc0b716
 
-### New York City Aug 10 — 92–93°F
+Timestamp:
 
-- YES: 137.29 shares, average entry 19.0¢, 13 buys;
-- NO: 235.10 shares, average entry 74.2¢, 29 buys.
+`2026-05-10 13:17:36 UTC`.
 
-### New York City Aug 10 — 88–89°F
+In this single Neg Risk CTF Exchange transaction:
 
-- YES: 73.12 shares, average entry 28.1¢, 10 buys;
-- NO: 99.90 shares, average entry 71.6¢, 9 buys.
+- Poligarch transfers pUSD into the exchange in multiple maker fills;
+- the transaction also contains a `PositionsMerge` path releasing **33.46** collateral;
+- the merge is executed through the exchange/adapter settlement path, not shown as a standalone Poligarch wallet call.
 
-### Houston Aug 10 — 92–93°F
+This is exactly the failure mode that makes raw `Merges` counts unsafe as trader-behavior evidence.
 
-- YES: 21.25 shares, average entry 6.4¢, 3 buys;
-- NO: 41.25 shares, average entry 77.8¢, 6 buys.
+Polymarket's own exchange source describes three matching paths:
 
-### Toronto Aug 10 — 28°C
+- complementary BUY vs SELL: direct transfer;
+- two BUY orders: `MINT` complete sets;
+- two SELL orders: `MERGE` complete sets.
 
-- YES: 90.11 shares, average entry 28.0¢, 5 buys;
-- NO: 132.20 shares, average entry 71.5¢, 14 buys.
+Official source:
 
-### London Aug 10 — 26°C
+https://github.com/Polymarket/ctf-exchange-v2
 
-- YES: 190.69 shares, average entry 56.6¢, 22 buys;
-- NO: 237.82 shares, average entry 53.3¢, 26 buys;
-- Struct also displays merge activity on both rows.
+Legacy exchange overview with matching scenarios:
 
-Source:
-https://explorer.struct.to/traders/0xb40e89677d59665d5188541ad860450a6e2a7cc9
+https://github.com/Polymarket/ctf-exchange/blob/main/docs/Overview.md
 
-This is not consistent with interpreting every visible position as an independent directional forecast. A market maker accumulating both complementary tokens can have both positions visible before matched quantity is merged.
-
-Do **not** sum displayed average YES and NO entry prices and treat that as the economics of a matched pair. The averages pool different fill times and residual inventory after prior merges; quantities differ; already-merged lots may no longer appear in the current balance. Chronological fill matching is required.
+Therefore a `PositionsMerge` event can be part of **order matching itself**.
 
 ---
 
-# 2. Why merge is economically powerful
+# 4. Manual merge remains a valid economic primitive
 
-Polymarket's official CTF mechanics are exact:
+The correction above changes attribution, not the CTF identity.
 
-`1 YES + 1 NO -> $1 pUSD`
+Official Polymarket mechanics remain:
 
-For `m` matched shares acquired at cash costs `bY` and `bN` per share:
+`1 YES + 1 NO -> $1 pUSD`.
 
-`pair_cash_cost = m * (bY + bN)`
+Sources:
 
-`merge_proceeds = m`
+https://docs.polymarket.com/trading/ctf/merge
 
-so before incentives and operational costs:
+https://docs.polymarket.com/concepts/positions-tokens
 
-`locked_pair_pnl = m * (1 - bY - bN)`
+Polymarket's market-maker inventory guide explicitly describes merging equal YES/NO inventory to free collateral:
 
-If both acquisitions are maker fills and:
+https://docs.polymarket.com/market-makers/inventory
+
+For paired quantities `m` acquired at prices `bY` and `bN`:
+
+`pair_cost = m * (bY + bN)`
+
+`merge_value = m`
+
+`gross_pair_capture = m * (1 - bY - bN)`.
+
+If:
 
 `bY + bN < 1`
 
-then the matched pair has positive mechanical PnL independent of the weather outcome.
+then a completed pair has positive mechanical value independent of weather resolution.
 
-Official merge docs:
-https://docs.polymarket.com/trading/ctf/merge
-
-Official positions/token mechanics:
-https://docs.polymarket.com/concepts/positions-tokens
-
-Polymarket's market-maker inventory docs explicitly describe merging equal YES/NO inventory to free capital and skewing quotes when inventory becomes imbalanced:
-https://docs.polymarket.com/market-makers/inventory
-
-This gives a clean capital-recycling loop:
-
-`resting maker bids`
-
-`-> one/both sides fill`
-
-`-> pair min(YES_balance, NO_balance)`
-
-`-> merge paired amount`
-
-`-> pUSD immediately reusable`
-
-`-> keep only residual directional inventory`
-
-The central economic variable is therefore not gross trade volume. It is:
-
-`net_pair_capture = 1 - acquisition_cost_yes - acquisition_cost_no + attributable_rebate + attributable_rewards - residual_inventory_loss - operational_cost`
+But whether **these specialists deliberately exploit this post-fill** remains an empirical question.
 
 ---
 
-# 3. Weather's current fee structure makes passive acquisition especially attractive
+# 5. The cleanest maker formulation comes directly from fair probability
 
-Polymarket's current Weather fee schedule is:
+For one binary bucket, let calibrated resolver probability be `q`.
+
+Then:
+
+`fair YES = q`
+
+`fair NO = 1 - q`.
+
+Choose maker margins `mY > 0`, `mN > 0`:
+
+`bid_yes = q - mY`
+
+`bid_no  = 1 - q - mN`.
+
+If both sides fill equally:
+
+`bid_yes + bid_no = 1 - mY - mN`.
+
+The complete set is worth exactly `$1`, so the raw pair capture is:
+
+`mY + mN` per paired share.
+
+This is important because it shows that **the weather model and the pair economics are the same object**:
+
+- `q` determines where each side is actually cheap;
+- `mY,mN` are the compensation demanded for fill-conditioned adverse selection, queue risk, uncertainty and capital-time;
+- if both sides fill, the two margins become mechanical pair capture;
+- if only one side fills, the forecast distribution determines whether the residual inventory is good or toxic.
+
+That is the simplest professional formulation of a forecast-aware maker.
+
+---
+
+# 6. Maker rebates materially reduce the required gross edge
+
+Current Weather fee structure from Polymarket documentation:
 
 - taker fee rate: **0.05**;
 - maker fee rate: **0**;
-- maker rebate allocation: **25%** of eligible taker fees.
+- Weather maker rebate allocation: **25%** of eligible taker fees.
 
-The fee curve is:
+Fee curve:
 
-`fee = shares * 0.05 * p * (1-p)`
+`fee = shares * 0.05 * p * (1-p)`.
 
-Official source:
+Official sources:
+
 https://docs.polymarket.com/trading/fees
 
-For fee-curve-weighted maker rebates, each maker fill receives a fee-equivalent weight:
-
-`fee_equivalent = shares * 0.05 * p * (1-p)`
-
-and the daily market rebate is allocated as:
-
-`rebate = own_fee_equivalent / total_market_fee_equivalent * rebate_pool`
-
-The exact rebate is therefore competition-dependent. It is **not** correct to assume that a maker automatically gets 25% of the fee-equivalent generated by its own fill.
-
-Maker rebate docs:
 https://docs.polymarket.com/market-makers/maker-rebates
 
-Economic implication:
+Approximate taker fee/share before rounding:
 
-- a taker directional strategy loses roughly 1–1.25 probability points to platform fee near the 30–70¢ region before additional book walking;
-- a maker pays zero platform trading fee;
-- a successful maker may additionally receive part of the rebate pool.
+- at 50¢: **1.25¢**;
+- at 30¢/70¢: **1.05¢**;
+- at 10¢/90¢: **0.45¢**.
 
-This makes maker-first execution economically important even if the weather probability model is unchanged.
+Maker rebate allocation is competition-dependent:
+
+`rebate = own_fee_equivalent / total_market_fee_equivalent * rebate_pool`.
+
+Do not assume every maker receives 25% of the fee-equivalent generated by its own fill.
+
+For strategy selection, rebates should be measured empirically and added **after** the core maker economics, not used to rescue a structurally losing quote.
 
 ---
 
-# 4. Liquidity rewards are a separate optional income stream
+# 7. Liquidity rewards are currently an overlay, not the Weather thesis
 
-Polymarket also has per-market liquidity rewards for resting competitive orders. Reward eligibility and economics are **market-specific**, so do not assume every daily-temperature contract carries an active LP reward.
-
-Current configuration can be queried from:
-
-`GET https://clob.polymarket.com/rewards/markets/current`
+Polymarket also supports market-specific liquidity rewards.
 
 Official docs:
-https://docs.polymarket.com/api-reference/rewards/get-current-active-rewards-configurations
 
-The scoring design explicitly rewards tighter quotes, size and two-sided liquidity; single-sided quoting can score in central probability ranges, while extreme-price markets require two-sided liquidity.
-
-Methodology:
 https://docs.polymarket.com/market-makers/liquidity-rewards
 
-For a live weather market the engine should read:
+https://docs.polymarket.com/api-reference/rewards/get-current-active-rewards-configurations
 
-- `rewards_max_spread`;
-- `rewards_min_size`;
-- daily reward rate;
-- current competition / expected share;
+Struct's indexed active-rewards page inspected in this research showed 25 active reward markets and **no Weather market** among them.
 
-and add expected reward only when it is actually configured.
+Source:
 
-Struct's current rewards page did not surface Weather among the top indexed reward markets inspected on Aug 11, so LP rewards should currently be treated as an opportunistic overlay, not the primary weather thesis.
+https://explorer.struct.to/rewards
 
----
+This is a point-in-time observation, not a permanent rule.
 
-# 5. Poligarch's incentives are economically material but not sufficient to explain PnL
-
-Using Struct's Aug 10 displayed totals only as rough ratios:
-
-- rebates / displayed volume ≈ **7.88 bps**;
-- liquidity rewards / displayed volume ≈ **2.25 bps**;
-- combined incentives / displayed volume ≈ **10.13 bps**;
-- fees paid / displayed volume ≈ **0.93 bps**;
-- combined displayed incentives are ≈ **12.0% of displayed cumulative PnL**.
-
-These ratios are descriptive, not audited realized-return attribution. Struct's volume/PnL/merge accounting may use different bases, and some PnL is associated with open inventory.
-
-Still, two facts are useful:
-
-1. **maker incentives are large enough to matter**;
-2. **they are not large enough by themselves to explain the displayed $207K PnL**.
-
-The remaining return plausibly comes from some combination of:
-
-- spread/pair capture;
-- directional inventory alpha;
-- cross-market/neg-risk transformations;
-- resolution/redemption economics;
-- other non-weather categories.
-
-Therefore the target is not “farm rebates.” The target is a profitable market-making loop whose economics remain positive before uncertain rewards, with rebates as incremental income.
+Production logic should query current reward configuration per market and assign zero expected LP reward unless the contract is actually eligible.
 
 ---
 
-# 6. A second archetype supports basket/liquidity behavior
+# 8. Same-market YES + NO inventory remains useful evidence
 
-`automatedAItradingbot` shows a different but related pattern.
+Struct showed Poligarch simultaneously carrying YES and NO residual inventory in the same Weather binaries, including examples in New York City, Houston, Toronto and London.
 
-Struct indexed roughly:
+That is consistent with continuous two-sided quoting and incomplete inventory matching.
 
-- 28K buys;
-- 10K sells;
-- hundreds of merges;
-- >$1M volume;
-- large weather-market wins.
+It is **not** enough to calculate pair PnL from displayed average entry prices because:
 
-Publicly indexed Seoul May 30 positions showed many different exact-temperature buckets acquired at approximately the same **9.1¢** entry and **1,000-share** size, including both the eventual winner and multiple losers.
+- YES/NO quantities differ;
+- average prices combine fills from different times;
+- earlier transformations may already have removed matched inventory;
+- current balances are residual state, not the chronological ledger.
 
-This is much more compatible with a grid/basket/liquidity strategy than a one-bucket point forecast.
-
-The evidence does **not** prove that all ladder buckets filled simultaneously or as maker orders. The useful conclusion is narrower: profitable weather activity includes systematic multi-bucket inventory behavior that a purely directional model would miss.
+The correct measurement is lot-level cashflow reconstruction.
 
 ---
 
-# 7. The correct synthesis: weather model as market-maker control surface
+# 9. ColdMath remains independent evidence of non-directional microstructure, but not proof of manual merge
 
-The existing research already argues for a coherent probability vector:
+ColdMath wallet:
 
-`q = (q_1, ..., q_K)`
+`0x594edb9112f526fa6a80b8f858a6379c8a2c1c11`
 
-for the mutually exclusive resolver ladder.
+Struct indexed approximately:
 
-For each binary bucket `i`:
+- volume: **$14M**;
+- buys: **224,892**;
+- sells: **1,306**;
+- merges: **6,790**;
+- cumulative PnL: **$132K**.
 
-- fair YES = `q_i`;
-- fair NO = `1-q_i`.
+Polymarket's indexed all-time Weather leaderboard placed ColdMath around **#3 by Weather profit** and among the largest Weather-volume accounts.
 
-A maker should not quote a symmetric fixed spread around the market midpoint. It should quote around its **own resolver probability** and inventory state.
+This supports the broader conclusion that very profitable Weather activity can have a highly nonstandard buy/sell lifecycle.
 
-Minimal form:
-
-`bid_yes_i < q_i - required_margin_yes_i`
-
-`bid_no_i < (1-q_i) - required_margin_no_i`
-
-where required margin absorbs:
-
-- expected adverse selection;
-- uncertainty in q;
-- residual inventory cost;
-- opportunity cost of capital;
-- expected rebate/reward can reduce the required margin only after measured.
-
-If both sides fill:
-
-`pair_qty_i = min(YES_balance_i, NO_balance_i)`
-
-merge `pair_qty_i` immediately when the released collateral is more valuable than retaining a full pair.
-
-Residual directional inventory:
-
-`net_yes_i = YES_balance_i - NO_balance_i`
-
-A positive value is net YES exposure; a negative value is economically net NO exposure.
-
-Weather probability controls how aggressively the engine tries to acquire the opposite leg versus retaining the residual view.
+But the same merge-attribution caveat applies: **do not call ColdMath a manual merge strategy until its token/cashflow path is reconstructed.**
 
 ---
 
-# 8. Forecast revisions define when passive quoting should stop
+# 10. Corrected highest-value experiment
 
-The supplied wallet remains useful because its recovered Milan behavior suggests directional posterior revision:
+The original experiment was:
 
-- T+1 35°C purchase around 30¢ all-in on Milan Jun 30;
-- large reduction of Milan Jun 25 33°C after the bucket deteriorated;
-- near-$1 winner sale immediately after local day end in Mexico City.
+> reconstruct complementary fills and later merge.
 
-These behaviors are compatible with an execution router:
+It now needs one extra classification layer.
 
-## Quiet information state
+For one Poligarch or ColdMath Weather binary, recover every relevant transaction and classify each transformation as:
 
-Forecast distribution changes slowly.
+### A. Exchange settlement transformation
 
-Prefer maker acquisition because:
+Transaction is an order-matching call to the CTF / Neg Risk CTF Exchange and the mint/merge occurs internally as part of matching.
 
-- zero platform fee;
-- spread capture opportunity;
-- possible rebate;
-- possible LP reward;
-- enough time to wait for fill.
+### B. Trader-initiated inventory transformation
 
-## Fresh forecast/observation shock
+The trader/proxy/relayer initiates a dedicated CTF/adapter split, merge, redeem or conversion outside an order-match settlement.
 
-If `Δq` is large and market response half-life is short:
-
-`EV_cross = q_new - executable_ask - taker_fee - impact`
-
-Cross when immediate expected dollars exceed the passive alternative.
-
-## After deterioration
-
-For an existing YES position at bid `b`:
-
-`net_bid = b - taker_sell_fee`
-
-sell when net realizable value exceeds updated hold value, unless an opposite maker fill/merge route is better.
-
-## Near physical certainty
-
-When the resolver maximum is effectively locked, compare:
-
-- holding to $1;
-- selling near $1;
-- pairing/merging where possible;
-- redeploying collateral into another live edge.
-
-This unifies the supplied wallet's directional behavior with Poligarch's inventory mechanics.
-
----
-
-# 9. Negative-risk adds a second transformation layer
-
-Daily-temperature events are multi-outcome negative-risk events. In addition to binary YES/NO merge inside an outcome market, Polymarket's neg-risk mechanism creates the identity:
-
-`NO_i ≡ sum(YES_j for j != i)`
-
-Therefore residual inventory should not be valued only against its same-binary opposite side.
-
-At every event snapshot compare:
-
-1. acquire opposite token and merge;
-2. keep residual directional exposure;
-3. use neg-risk conversion into the other event outcomes;
-4. acquire a basket of other YES tokens;
-5. sell/cross existing inventory.
-
-The optimal route is the one returning the most pUSD / expected value after actual executable prices and costs.
-
-This is especially attractive in temperature ladders because forecast shocks mostly move mass among neighboring buckets. An engine that knows the entire coherent `q` vector can identify the cheapest way to neutralize or transform unwanted inventory.
-
----
-
-# 10. Highest-value experiment is now chronological fill -> merge reconstruction
-
-The original highest-value unknown was the entry/revision/exit path of the supplied wallet's Milan positions.
-
-That remains valuable for directional alpha, but the new structural evidence makes one additional experiment at least as important:
-
-> **Reconstruct one full Poligarch weather day at fill level and determine whether complementary maker buys create positive realized pair capture before rebates.**
-
-For one city/date, collect:
+For each fill/operation collect:
 
 `timestamp`
+`tx_hash`
+`order_hash`
 `condition_id`
-`outcome`
 `token_id`
 `YES/NO`
 `BUY/SELL`
 `maker/taker`
-`shares`
 `price`
+`shares`
 `fee`
-`order_hash`
-`tx_hash`
-`merge_timestamp`
-`merge_quantity`
-`rebate allocation`
-`LP reward allocation`
-
-Then perform FIFO or lot-aware inventory matching and calculate:
-
-`paired_acquisition_cost`
-`merge_proceeds`
-`raw_pair_pnl`
+`pUSD wallet delta`
+`token wallet delta`
+`internal MINT/MERGE path`
+`dedicated merge/split/convert call`
 `rebate`
-`reward`
-`unpaired_inventory_markout`
-`settlement_pnl`
+`reward`.
 
-The decisive questions are:
+Then calculate trader-level economics from wallet deltas, not explorer labels.
 
-1. What percentage of acquired shares are eventually merged rather than sold/redeemed?
-2. What is the distribution of `1 - bY - bN` for actual paired lots?
-3. How long is capital exposed between first-leg and second-leg fill?
-4. How much adverse selection occurs on the first filled leg after weather updates?
-5. How much of PnL survives with **rebates and LP rewards set to zero**?
-6. Does weather-aware skew predict which side fills before the market moves?
-7. What is net PnL per $1M maker turnover and per dollar-hour of unpaired inventory?
+Decisive questions:
 
-If pre-incentive paired PnL is positive and repeatable, this is a structural engine worth building immediately.
-
----
-
-# 11. Accounting warning: Struct position PnL is not sufficient for transformed inventory
-
-Struct is extremely useful for discovery, but its per-position presentation can become misleading when merges/conversions move value between tokens.
-
-Concrete warning signs found in this research:
-
-- some merge-heavy rows display large negative position PnL even though merge value has separately left the position;
-- another trader page displayed a “best win” far above its “best day,” indicating that position-level attribution and daily realized accounting are not interchangeable.
-
-Therefore the economic ledger for this strategy must be reconstructed at cashflow/event level:
-
-`pUSD spent on buys`
-`+ pUSD received from sells`
-`+ pUSD released by merges`
-`+ redemption proceeds`
-`+ rebates`
-`+ rewards`
-`- fees`
-`+ terminal value of open inventory`
-
-That is the quantity to optimize.
-
-Do not rank strategies from Struct's displayed per-token PnL without reconciling transformation cashflows.
+1. What fraction of Weather volume is zero-fee maker?
+2. What is the 5m / 30m / 2h markout of maker fills?
+3. How often does the trader end up with both complementary balances?
+4. Are those balances deliberately merged later, or does the exchange transformation explain most `merge` events?
+5. What is realized spread / pair capture before rebates?
+6. How long is unpaired inventory held?
+7. How strongly do forecast revisions predict adverse selection?
+8. What is net PnL per dollar-hour of inventory and per $1M maker turnover?
 
 ---
 
-# 12. Minimal production strategy implied by current evidence
+# 11. Synthesis with the supplied directional wallet
 
-The current best small professional design is now:
+The supplied wallet gives a different execution archetype.
 
-### Probability layer
+Recovered purchases show it explicitly submitting **fee-paying taker orders** when it wants immediate Weather exposure.
 
-Maintain coherent exact-resolver probabilities over every bucket using:
+That implies a state-dependent router:
 
-- point-in-time model vintages;
-- station/horizon residual calibration;
-- current resolver observations;
-- full-ladder normalization.
+## Quiet information state
 
-### Passive monetization layer
+Use maker quotes around calibrated `q`:
 
-For each binary outcome:
+- maker fee = zero;
+- collect spread/margin;
+- possible rebate;
+- manage unpaired inventory with q;
+- deliberately merge complete sets if and only if doing so improves capital efficiency.
 
-- post maker bids where fair value exceeds quote by enough to cover fill-conditioned adverse selection;
-- quote both complementary sides when pair economics are favorable;
-- skew based on q and residual inventory;
-- merge matched YES/NO immediately to recycle collateral;
-- include actual rebate/reward configuration when present.
+## Fresh information shock
 
-### Fast directional layer
+Cancel stale quotes first.
 
-After meaningful model/observation revisions:
+Cross only when:
 
-- cancel stale maker quotes immediately;
-- cross only the stale depth with clear fee-adjusted EV;
-- update all neighboring buckets coherently.
+`q_new - executable_price - taker_fee - impact > required_margin`.
 
-### Capital ranking
-
-Rank each marginal dollar among:
-
-- passive pair-capture opportunity;
-- directional taker opportunity;
-- residual inventory reduction;
-- late-certainty recycling;
-- another city/event.
-
-The objective remains:
-
-`maximize expected net dollars / capital-time`
-
-not trade count, rebate amount, win rate or nominal volume.
+The target wallet's recovered Milan and Jul 12 purchases show that a specialist is willing to pay roughly **~1¢/share** Weather taker fee when the information advantage is large enough.
 
 ---
 
-# Bottom line
+# 12. Bottom line
 
-The earlier research was centered on finding a better weather forecast and copying directional specialists.
+The most defensible structural thesis after the correction is:
 
-The new evidence adds a stronger structural income mechanism:
+> **A calibrated weather distribution should be monetized with maker-first, two-sided quoting during quiet states and taker execution only after fast information shocks. Complete-set merge is a valid capital-recycling primitive, but specialist manual-merge behavior remains unproven until wallet-level operation attribution is reconstructed.**
 
-> **forecast-informed market making with buy-heavy inventory acquisition and aggressive merge-based collateral recycling.**
+This is actually a cleaner research target than the earlier interpretation.
 
-Poligarch is the clearest evidence: enormous buy count, almost no sells, tens of thousands of merges, material rebates/rewards, and simultaneous YES/NO weather inventory.
+The edge does not depend on assuming that Poligarch manually merged 67K times.
 
-The highest-value next measurement is a **single complete weather-day fill/merge ledger** for Poligarch, followed in parallel by the Milan forecast-revision reconstruction for the supplied wallet.
+What is already proven is enough to justify the next measurement:
 
-Those two datasets answer complementary questions:
+- major profitable Weather specialists provide passive liquidity;
+- makers pay zero Weather trading fee;
+- rebates are economically material;
+- target-wallet specialists sometimes pay substantial taker fees for immediate information-driven execution;
+- Polymarket's own CTF mechanics allow deliberate pair merge whenever complementary inventory is acquired cheaply.
 
-- **where does fair-value alpha come from?** — supplied wallet / forecast revisions;
-- **how should we monetize it most efficiently?** — maker fills / paired inventory / merge / incentives.
+The next production-fidelity evidence should therefore measure **maker fill markout + trader-level inventory cashflows**, not raw Struct merge counts.
