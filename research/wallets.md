@@ -1,177 +1,271 @@
-# Weather wallets to reverse-engineer
+# Weather specialist wallets
 
 Snapshot: **2026-08-11**
 
-Public wallets are not a copy-trading list. They are a dataset of revealed decisions. The useful question is: **what information or execution pattern explains their PnL, and does that information remain predictive after controlling for weather forecasts and price?**
+Profitable weather wallets are an empirical dataset for discovering strategy structure. The goal is to reconstruct **what they trade, when they trade, at what price, after which information event, and how that flow predicts price or settlement**.
 
-## Verified category-level evidence
+Polymarket's public Data API exposes trades, current positions, closed positions with realized PnL, user activity and leaderboards. That is enough to build useful behavioral fingerprints without guessing from profile screenshots.
 
-Polymarket exposes a WEATHER-specific leaderboard. Recent all-time leaderboard snapshots show several large realized category winners, including approximately:
+Official endpoints:
 
-| Account | Wallet shown on leaderboard/profile | Approx. all-time weather PnL in observed snapshot | Why inspect |
-|---|---|---:|---|
-| `gopfan2` | `0xf2f6af4f27ec2dcf4072095ab804016e14cd5817` | +$349k | largest observed weather-category winner |
-| `aenews2` | leaderboard account | +$285k | second large winner; high-value behavior sample |
-| `ColdMath` | `0x594edb9112f526fa6a80b8f858a6379c8a2c1c11` | +$136k | high volume + high PnL |
-| `gopfan` | leaderboard account | +$118k | possible relationship to `gopfan2` worth investigating, not assuming |
-| `Poligarch` | leaderboard account | +$85k | very high observed weather volume |
-| `Hans323` | `0x0f37cb80dee49d55b5f6d9e595d52591d6371410` | +$84k | high volume; good execution sample |
-| `automatedAItradingbot` | `0xd8f8c13644ea84d62e1ec88c5d1215e436eb0f11` | +$65k | profile identifies meteorology/IT + automated bot testing |
-| `WeatherTraderBot` | `0xacc8e9dcabf9d65a5c78e3bec6941ed53a2b7d08` | +$57k | explicitly bot-themed |
-| `HighTempTation` | `0x6011655c4afb76f36dd1b08a137a1ba73466b31e` | +$54k | recently strong monthly weather performance in observed snapshots |
-| `JoeTheMeteorologist` | `0x1838cca016850ac7185a9b149fe7d0bd2d6629b4` | +$52k | profile self-identifies as former TV weather professional |
+- `GET https://data-api.polymarket.com/trades?user=<wallet>`
+- `GET https://data-api.polymarket.com/positions?user=<wallet>`
+- `GET https://data-api.polymarket.com/closed-positions?user=<wallet>`
+- `GET https://data-api.polymarket.com/activity?user=<wallet>`
+- leaderboard API with `category=WEATHER`
 
-Leaderboard values are time-varying; the numbers above are snapshot evidence, not permanent account statistics.
+Docs:
+https://docs.polymarket.com/market-data/overview
 
-High PnL alone is not enough. We want accounts with enough trades and stable specialty to estimate a policy.
+## Priority wallet: supplied account
 
-## User-supplied wallet
+Address:
 
-Profile:
+`0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4f`
 
-`0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4-1774968947489`
+Profile URL:
+https://polymarket.com/@0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4f-1774968947489
 
-Underlying address observed:
+### 2026-08-11 visible snapshot
 
-`0xbddc2a7690BF600E347d5eb4A9C28f9F24E55d4f`
+The account shows:
 
-Evidence found in public Polymarket/Polygon data includes temperature-market trades such as:
+- joined March 2026;
+- 792 predictions;
+- about $4,522 active position value;
+- $827.65 biggest win;
+- +$1,018.71 past-day profile PnL.
 
-- buying YES on a Milan 35°C daily-temperature bucket;
-- selling YES on a Mexico City 25°C bucket;
-- selling a Milan 33°C YES position in another event;
-- fills through Polymarket's negative-risk exchange contract.
+Visible positions are overwhelmingly **YES on exact temperature buckets**, not broad NO-tail positions.
 
-A recent daily WEATHER leaderboard snapshot placed this account in the top ten for that day with roughly +$1.5k. That establishes that it is worth tracking, but **does not establish its all-time profitability or strategy**.
+Examples:
 
-## Other specialist accounts worth watching
+| Market | Avg entry | Snapshot price | Shares | Visible PnL |
+|---|---:|---:|---:|---:|
+| Istanbul Aug 11 — 27°C | 52.6¢ | 100¢ | 856 | +$405.61 |
+| Tel Aviv Aug 11 — 35°C | 56.9¢ | 100¢ | 439 | +$189.21 |
+| Milan Aug 11 — 36°C | 65.0¢ | 100¢ | 308 | +$107.66 |
+| Karachi Aug 11 — 32°C | 47.3¢ | 100¢ | 211 | +$111.31 |
+| Munich Aug 11 — 31°C | 52.0¢ | 99.9¢ | 192 | +$92.12 |
+| Madrid Aug 12 — 38°C | 31.5¢ | 53¢ | 634 | +$136.04 |
+| Tel Aviv Aug 12 — 35°C | 48.7¢ | 49¢ | 821 | +$2.27 |
+| Wuhan Aug 12 — 30°C | 40.1¢ | 41¢ | 623 | +$5.41 |
+| Paris Aug 12 — 35°C | 51.6¢ | 63.5¢ | 194 | +$23.09 |
+| Singapore Aug 12 — 32°C | 53.0¢ | 64.5¢ | 189 | +$21.70 |
+| Wellington Aug 12 — 13°C | 18.7¢ | 20.5¢ | 536 | +$9.87 |
+| Ankara Aug 12 — 31°C | 26.4¢ | 17¢ | 569 | -$53.35 |
+| Shanghai Aug 12 — 28°C | 24.7¢ | 18.5¢ | 405 | -$25.06 |
 
-### `meteoblue`
+US same-day positions include Miami 92–93°F bought at 67¢ and Denver 96–97°F at 55.3¢.
 
-Wallet observed: `0xf73f7e9c6bd1f40dc045d2a93bec3dd4248aee53`
+### Working inference
 
-Profile bio identifies it as a `meteoblue staff account`; public activity contains many daily-temperature positions. This is potentially unusually informative because meteoblue is itself a professional weather-forecast provider. Treat the bio as self-reported identity, but the trade history is observable.
+The visible pattern suggests a **modal-bucket exact-YES strategy** with two time horizons:
 
-### `WeatherHK`
+1. same-day entries where observation/peak information has sharply reduced uncertainty;
+2. next-day entries where a forecast identifies a concentrated modal bucket before the crowd fully converges.
 
-Wallet observed: `0x488c725253fc21c7a9ca812030dc2f6343f98c1c`
+This is an inference from positions, not a verified algorithm. The decisive variable is trade time. If many winning T+0 fills occur shortly after a station observation or local peak, certainty-collapse is likely. If next-day fills cluster just after ECMWF/NBM/local-model updates, forecast-vintage latency is likely.
 
-Recent public activity is heavily weather-focused, including Hong Kong/China-related contracts. Useful for testing whether local-region specialization beats generic global-model signals.
+### Highest-value reconstruction
 
-### `opopv.`
+For each fill:
 
-Wallet observed: `0x7c63520c2ca9b336af0c205b9ccf68217bb393d4`
-
-Observed profile/activity indicates a very large prediction count and temperature positions across multiple cities. High sample size may make policy inference easier even if per-trade edge is modest.
-
-### `badatmath`
-
-Wallet observed from leaderboard snapshots: `0x8fbd7cf5f806f563080864694415829f7229a959`
-
-Appeared near the top of recent weekly weather PnL and among high all-time weather volume accounts. Worth comparing with the more obviously meteorology-branded accounts.
-
-## What to infer from each wallet
-
-For each historical trade, reconstruct these features **as they existed at execution time**:
-
-### Market state
-
-- event/city/station/date;
-- exact bucket;
+- exact timestamp;
+- event date and local resolver time;
+- city/station;
+- T+0/T+1/T+2 horizon at fill;
+- exact bucket and distance from current forecast mode;
 - side and price;
-- best bid/ask and spread;
-- depth near trade price;
-- time to resolution;
-- complete ladder prices;
-- fee-enabled status;
-- trade size and inferred liquidity-taking/providing behavior where possible.
+- notional and fraction of wallet typical size;
+- market bid/ask and spread if recoverable;
+- latest station observation;
+- latest available forecast vintages;
+- new-vs-old forecast revision;
+- final resolver outcome;
+- 5m/30m/2h price markout;
+- realized PnL.
 
-### Weather state
+Then cluster fills by information state.
 
-- latest available forecast run from each model;
-- calibrated fair bucket probability;
-- ensemble median/spread/skew;
-- distance of bucket from forecast median;
-- same-day observed maximum;
-- current METAR;
-- forecast revision since prior run;
-- model disagreement;
-- hours until likely daily peak.
+## All-time weather leaders to decompose
 
-### Wallet behavior
+Current all-time WEATHER profit leaderboard includes:
 
-- first entry time;
-- average entry price;
-- add/reduce sequence;
-- adjacent-bucket hedges;
-- YES/NO direction;
-- exits before resolution vs hold;
-- size as fraction of wallet's recent exposure;
-- simultaneous positions in other buckets/events;
-- reaction time after model/observation updates.
+- `gopfan2` — about +$349k;
+- `aenews2` — about +$285k;
+- `ColdMath` — about +$136k;
+- `gopfan` — about +$118k;
+- `bama124` — about +$87k;
+- `Poligarch` — about +$85k;
+- `Hans323` — about +$84k;
+- `ShyGuy1` — about +$74k;
+- `Handsanitizer23` — about +$71k;
+- `automatedAItradingbot` — about +$65k;
+- `WeatherTraderBot` — about +$57k;
+- `HighTempTation` — about +$54k.
 
-## Strategy fingerprints to test
+Source:
+https://polymarket.com/leaderboard/weather/all/profit
 
-1. **Forecast trader:** entries correlate with our forecast-value revisions and settlement outcome.
-2. **Nowcaster:** mostly T+0 trades after observations materially constrain the max.
-3. **Longshot seller:** repeatedly buys NO / sells YES in low-probability tail buckets.
-4. **Central-bucket buyer:** buys forecast-modal bucket before crowd catches up.
-5. **Relative-value trader:** holds multiple adjacent buckets / NO-vs-other-YES structures.
-6. **Market maker:** many two-sided fills, small inventory, repeated entries/exits, spread capture.
-7. **Release sniper:** concentrated activity immediately after model runs or METAR updates.
-8. **Climate specialist:** PnL primarily from monthly/global anomaly markets rather than daily highs.
+The volume leaderboard includes `dpnd`, `largeleeks888`, `Poligarch`, `OraculumNobius`, `TENETENET`, `planktonXD`, `ColdMath`, `KingZeManel` and `aenews2` with roughly $10M+ weather turnover.
 
-Accounts can of course combine these.
+High PnL plus high volume suggests repeatable activity worth decomposing. High PnL with low frequency can instead reveal large climate-index bets.
 
-## Incremental-value test
+## Separate wallet skill by market family
 
-A wallet should only influence our own fair value if its trades predict outcomes or future prices after accounting for the information we already possess.
+WEATHER category PnL mixes several distinct mathematical problems. Score each wallet separately on:
 
-For example:
+- daily high temperature;
+- daily low temperature;
+- monthly/global temperature anomaly;
+- hottest-year/month records;
+- precipitation totals;
+- wind/extrema;
+- other weather contracts.
 
-`logit(P(outcome)) = weather_probability + current_market_price + wallet_flow + controls`
+A trader with climate-index expertise should receive near-zero prior weight in an airport daily-high signal until evidence shows cross-family skill.
 
-Or for short-horizon price movement:
+## Behavioral fingerprints
 
-`future_price_change = forecast_revision + wallet_signed_flow + spread/depth + controls`
+### A. Modal-bucket sniper
 
-If wallet flow has no out-of-sample incremental value, copying it only creates worse fills behind the original trader.
+Fingerprint:
 
-## PnL decomposition
+- exact YES bucket;
+- entry price often 20–70¢ rather than pennies;
+- concentration on the current mode;
+- short holding period or settlement hold;
+- high same-day activity.
 
-For each wallet, separate:
+Interpretation: forecast/observation precision.
 
-- settlement alpha: bought outcomes that ultimately paid more than purchase price;
-- mark-to-market alpha: traded ahead of later repricing;
-- spread capture: repeated buy-low/sell-high behavior;
-- rebates/rewards if inferable;
-- concentration: a small number of huge climate bets vs repeatable daily edge.
+### B. Tail seller / NO buyer
 
-This distinction is essential. A six-figure leaderboard account built on two giant climate wins is a different research target from a daily-temperature bot compounding small edges.
+Fingerprint:
 
-## API paths to use later
+- BUY_NO on low-probability YES outcomes;
+- repeated entries in similar NO price bands;
+- positive returns driven by longshot overpricing.
 
-Official Polymarket endpoints expose the necessary public account data:
+Interpretation: calibration/behavioral bias rather than superior modal forecast.
 
-- profile lookup through Gamma;
-- user trades through the Data API;
-- activity through the Data API;
-- positions through the Data API;
-- WEATHER leaderboard by PnL or volume.
+### C. Release-latency trader
 
-The CLOB market APIs provide current/historical price data; for exact contemporaneous depth we will need our own snapshots going forward because historical full books are not guaranteed by the simple price-history endpoint.
+Fingerprint:
 
-## Source policy
+- fills cluster in minutes after ECMWF/NBM/METAR/local-source updates;
+- positive near-term markout;
+- broad geographic coverage following known model schedules.
 
-- Leaderboard/trades/positions: **verified public platform data**.
-- Profile bios: **self-reported**.
-- Strategy classification: **inference only until reconstructed quantitatively**.
-- Claims about profitability mechanism: **unknown until PnL decomposition is complete**.
+Interpretation: fast information processing.
 
-## Primary references
+### D. Resolver specialist
 
-- Polymarket Data API leaderboard docs: https://docs.polymarket.com/api-reference/core/get-trader-leaderboard-rankings
-- Public trades: https://docs.polymarket.com/api-reference/core/get-trades-for-a-user-or-markets
-- User activity: https://docs.polymarket.com/api-reference/core/get-user-activity
-- User positions: https://docs.polymarket.com/api-reference/core/get-current-positions-for-a-user
-- Polymarket WEATHER leaderboard: https://polymarket.com/leaderboard/weather/all/profit
+Fingerprint:
+
+- same-day fills after authoritative station data;
+- exact winning bucket bought while generic weather sites still disagree;
+- focus on stations with tricky source/rounding mechanics.
+
+Interpretation: oracle/source advantage.
+
+### E. Climate-index nowcaster
+
+Fingerprint:
+
+- monthly GISTEMP/global-record markets;
+- large positions held toward scheduled release dates;
+- entries after early global datasets become informative.
+
+Interpretation: dataset-basis model.
+
+### F. Structural arbitrageur
+
+Fingerprint:
+
+- simultaneous activity across multiple outcomes in one event;
+- short holding periods;
+- repeated YES/NO basket relationships;
+- PnL weakly related to final weather outcome.
+
+Interpretation: ladder/negative-risk or liquidity strategy.
+
+## Wallet skill statistics
+
+For wallet `w` and segment `s`, estimate:
+
+- `N` trades / positions;
+- realized PnL;
+- ROI on deployed cost;
+- median entry price;
+- hit rate versus price-implied expectation;
+- Brier-style calibration residual;
+- 5m/30m/2h markout;
+- average time to settlement;
+- concentration by city;
+- PnL per dollar of turnover;
+- PnL persistence through time.
+
+### Price-controlled alpha
+
+The key statistic is excess outcome performance relative to entry probability.
+
+For YES fills:
+
+`alpha_outcome = y - p_entry`
+
+where `y ∈ {0,1}`.
+
+Aggregate by wallet/segment with dollar or information weighting.
+
+A wallet buying 60¢ contracts and winning 65% has smaller informational edge than one buying 30¢ contracts and winning 50%, even if raw win rate looks higher.
+
+### Markout alpha
+
+For trade at price `p_t`:
+
+`markout_τ = signed_direction * (p_{t+τ} - p_t)`.
+
+Positive markout indicates the wallet tends to trade before price convergence. Settlement alpha indicates the underlying prediction is good. The two together distinguish information timing from lucky late fills.
+
+## Wallet consensus signal
+
+Independent specialists agreeing on the same outcome can be more informative than one wallet.
+
+One simple factor:
+
+`W_i(t) = Σ_w skill_w(segment) * exp(-(t-t_w)/τ) * signed_notional_w`
+
+Enhancements:
+
+- normalize notional by each wallet's typical trade size;
+- weight same-city historical skill;
+- weight fills more strongly when they occur after a fresh weather update;
+- reduce weight after the market has already repriced most of the move;
+- calculate consensus separately for YES and NO expressions.
+
+The economic question is whether adding `W_i(t)` increases incremental net PnL over a weather+market baseline.
+
+## Public-data limitation that matters to interpretation
+
+Polymarket's public Data API exposes fill-level activity. The off-chain order-placement/cancellation lifecycle is not fully attributable to addresses in public archives, so fill history alone cannot identify a wallet's complete maker quoting policy.
+
+This affects one inference only: wallet data is excellent for **what got filled and at what price**, while full resting-order behavior requires our own live book observation or authenticated self-data.
+
+## Practical wallet research output
+
+Produce one compact table per specialist:
+
+`wallet × family × city × horizon × direction × price_band × timing_bucket`
+
+with:
+
+- count;
+- turnover;
+- realized PnL;
+- excess win probability over price;
+- short-horizon markout;
+- forecast-release alignment.
+
+Then rank wallet-derived features by incremental expected net PnL.
