@@ -1,67 +1,22 @@
-# US ASOS extrema case studies — resolver information before midnight
+# US ASOS case studies — earliest observable resolver bucket
 
 Snapshot: **2026-08-11**
 
-Purpose: validate the concrete part of the ASOS observation-alpha thesis on resolved Polymarket daily-high events.
+Purpose: identify the **earliest public observation time** at which a US airport's running observed maximum entered the eventual winning Polymarket bucket.
 
-The question in this file is deliberately narrow:
+This replaces the weaker framing that treated the 6-hour extrema report itself as the signal.
 
-> **Did a late-day ASOS 6-hour maximum already identify the eventual winning Polymarket Fahrenheit bucket while the local civil day was still open?**
+The money-relevant state is:
 
-This is **not yet** a claim that Polymarket prices were stale after the report. The separate price-response study remains necessary.
+`M_t = max(all authoritative temperature information publicly available by t)`.
 
----
+Use every routine METAR, SPECI, precise `T` group and extrema group. The 6-hour maximum is valuable only when it reveals a peak not already visible in earlier reports.
 
-# 1. Chicago — June 20, 2026
-
-Polymarket event:
-
-https://polymarket.com/event/highest-temperature-in-chicago-on-june-20-2026
-
-Resolver:
-
-- Chicago O'Hare `KORD`;
-- Weather Underground;
-- whole degrees Fahrenheit;
-- final winning bucket: **76–77°F**.
-
-Official Aviation Weather Center history shows:
-
-`METAR KORD 202351Z 32007KT 10SM SCT080 SCT250 24/10 A2991 RMK AO2 SLP126 T02390100 10250 20228 58006`
-
-Timestamp:
-
-- **2026-06-20 23:51 UTC**;
-- **18:51 CDT**.
-
-Decoded 6-hour maximum:
-
-- `10250` → **25.0°C = 77.0°F**.
-
-The ordinary instantaneous METAR temperature at that moment was only **75.0°F**.
-
-### Result
-
-The 6-hour extrema field said **77°F**, directly inside the final **76–77°F winning bucket**, while the instantaneous displayed temperature was lower.
-
-This was available at approximately **18:51 local**, about **5 hours 9 minutes before local midnight**.
-
-The following day's early ASOS report later carried a 24-hour maximum of 77.0°F as well, confirming the same daily maximum.
-
-Primary sources:
-
-- Aviation Weather Center METAR history for KORD;
-- Polymarket resolved event above.
-
-### Why this matters
-
-A strategy watching only current temperature at 18:51 would see 75°F. The extrema remark already encoded a 77°F peak that had occurred during the preceding six hours.
-
-For the prediction market, those are materially different states.
+The separate unresolved question remains whether Polymarket was still mispriced at the first-lock timestamp.
 
 ---
 
-# 2. New York / LaGuardia — July 20, 2026
+# 1. NYC / LaGuardia — July 20, 2026
 
 Polymarket event:
 
@@ -69,41 +24,52 @@ https://polymarket.com/event/highest-temperature-in-nyc-on-july-20-2026
 
 Resolver:
 
-- LaGuardia `KLGA`;
+- `KLGA` LaGuardia;
 - Weather Underground;
-- whole degrees Fahrenheit;
-- final winning bucket: **82–83°F**.
+- whole °F;
+- final bucket: **82–83°F**.
 
-Aviation Weather Center history shows:
+## Earlier routine observations
 
-`METAR KLGA 202351Z 18009KT 10SM FEW200 SCT250 24/12 A2995 RMK AO2 SLP141 T02390122 10283 20239 53001`
+Aviation Weather history shows:
 
-Timestamp:
+`METAR KLGA 202051Z ... T02720100 ...`
 
-- **2026-07-20 23:51 UTC**;
-- **19:51 EDT**.
+- 20:51 UTC / 16:51 EDT;
+- precise T-group 27.2°C = 81.0°F.
 
-Decoded state:
+Then:
 
-- instantaneous temperature: **75.0°F**;
-- 6-hour maximum: **28.3°C = 82.9°F**.
+`METAR KLGA 202151Z ... T02780100`
 
-### Result
+- **21:51 UTC / 17:51 EDT**;
+- precise T-group **27.8°C = 82.0°F**.
 
-The 6-hour maximum maps directly into the eventual **82–83°F** Polymarket winner.
+At that moment the running observed maximum entered the eventual **82–83°F** winner.
 
-It was published around **19:51 local**, approximately **4 hours 9 minutes before midnight**.
+The later report:
 
-The information gap versus current-temperature displays is extreme in this example:
+`METAR KLGA 202351Z ... T02390122 10283 20239 ...`
 
-- instantaneous observation: 75°F;
-- peak-window 6-hour max: 82.9°F.
+at 23:51 UTC / 19:51 EDT reported a six-hour max of **28.3°C = 82.9°F**, confirming the same bucket.
 
-Anyone using only the current reading would be looking at a completely different resolver state.
+## Economic timing
+
+Earliest verified bucket entry from the inspected routine stream:
+
+- **17:51 EDT**;
+- roughly **6h09m before local midnight**;
+- roughly **2h before the 6-hour extrema summary**.
+
+### Key lesson
+
+The 6-hour max was not the unique information event here. A correct running-max parser would have reached the winning bucket earlier from the routine T-group.
+
+The signal should fire when `M_t` first crosses a resolver boundary, regardless of report type.
 
 ---
 
-# 3. Chicago — June 29, 2026
+# 2. Chicago / O'Hare — June 29, 2026
 
 Polymarket event:
 
@@ -111,177 +77,244 @@ https://polymarket.com/event/highest-temperature-in-chicago-on-june-29-2026
 
 Resolver:
 
-- O'Hare `KORD`;
+- `KORD` O'Hare;
 - Weather Underground;
-- whole degrees Fahrenheit;
-- final winner: **92–93°F**.
+- whole °F;
+- final bucket: **92–93°F**.
 
-Aviation Weather Center history shows:
+Aviation / CheckWX history shows the afternoon sequence:
 
-`METAR KORD 292351Z 20017G26KT 10SM SCT042 BKN250 32/23 A2988 RMK AO2 PK WND 19028/2330 SLP110 T03170228 10333 20311 55001 $`
+`KORD 291851Z ... T03220239`
 
-Timestamp:
+- 18:51 UTC / 13:51 CDT;
+- 32.2°C = 90.0°F.
 
-- **2026-06-29 23:51 UTC**;
-- **18:51 CDT**.
+`KORD 291951Z ... T03280233`
 
-Decoded state:
+- 19:51 UTC / 14:51 CDT;
+- 32.8°C = 91.0°F.
 
-- instantaneous temperature: **89.1°F / 31.7°C**;
-- 6-hour maximum: **91.9°F / 33.3°C**.
+`KORD 292051Z ... T03330228`
 
-Polymarket ultimately resolved **92–93°F**.
+- **20:51 UTC / 15:51 CDT**;
+- precise T-group **33.3°C = 91.9°F**.
 
-### Result
+At whole-F resolver precision, that is the **92°F** side of the eventual 92–93°F bucket.
 
-The 6-hour max of 91.9°F is the high-fidelity value that, when represented at the contract's whole-Fahrenheit resolution, is consistent with the **92–93°F winning bucket**.
+Further routine observations remained at the same peak:
 
-Again, the instantaneous temperature was materially lower than the already-observed peak.
+- 21:51 UTC: `T03330228`;
+- 22:51 UTC: `T03280233`.
 
-The report arrived roughly **5 hours before local midnight**.
+The 23:51 UTC synoptic report later gave:
 
----
+`10333`
 
-# 4. Three-event pattern
+- six-hour maximum **33.3°C / 91.9°F**;
+- instantaneous T-group only 31.7°C / 89.1°F.
 
-| Event | Report local time | Instant temp | 6h max | Final Polymarket bucket | Time to midnight |
-|---|---:|---:|---:|---|---:|
-| Chicago Jun 20 | 18:51 CDT | 75.0°F | **77.0°F** | **76–77°F** | 5h09m |
-| NYC Jul 20 | 19:51 EDT | 75.0°F | **82.9°F** | **82–83°F** | 4h09m |
-| Chicago Jun 29 | 18:51 CDT | 89.1°F | **91.9°F** | **92–93°F** | 5h09m |
+## Economic timing
 
-All three cases have the same economically useful shape:
+Earliest verified winning-bucket observation:
 
-1. the afternoon/evening peak had already occurred or nearly occurred;
-2. current temperature had fallen below that peak;
-3. the synoptic METAR explicitly reported the preceding 6-hour maximum;
-4. that maximum mapped to the eventual winning Polymarket bucket;
-5. several hours of local-day trading time remained.
+- **15:51 CDT**;
+- roughly **8h09m before local midnight**;
+- roughly **3 hours before the 00Z-era 6-hour-max report**.
 
-This validates the **information object**. It does not yet validate the **price lag**.
+### Key lesson
 
----
+Again, the profitable state is the running maximum, not the scheduled extrema summary.
 
-# 5. Why ordinary current-temperature feeds can be materially wrong for trading
-
-In the three cases above, current temperature versus 6-hour maximum differed by:
-
-- Chicago Jun 20: **2.0°F**;
-- NYC Jul 20: **7.9°F**;
-- Chicago Jun 29: **2.8°F**.
-
-Every difference is at least one full 2°F Polymarket bucket width; NYC spans several buckets.
-
-Thus a simplistic T+0 algorithm of:
-
-`current airport temperature + forecast remaining heating`
-
-can badly misrepresent the state if it does not separately track the maximum already achieved.
-
-The minimum state variable is:
-
-`M_t = maximum authoritative temperature observed/reported so far`.
-
-For US ASOS, the 6-hour max report can improve `M_t` materially beyond spot observations.
+A bot polling every routine METAR would know the resolver had reached the 92°F region several hours earlier than one waiting for the six-hour group.
 
 ---
 
-# 6. Minimal trading probability after the 00Z/late-day report
+# 3. Chicago / O'Hare — June 20, 2026
 
-Once the late-day 6-hour max `M` is known, the problem is no longer a full-day high forecast.
+Polymarket event:
 
-It becomes:
+https://polymarket.com/event/highest-temperature-in-chicago-on-june-20-2026
 
-`P(final maximum exceeds M before local midnight | current state)`.
+Resolver:
 
-For many late-day regimes this can be tiny because:
+- `KORD`;
+- Weather Underground;
+- whole °F;
+- final bucket: **76–77°F**.
 
-- solar forcing is collapsing;
-- the current temperature is already below the peak;
-- the next several hours are evening/night;
-- LAMP/HRRR/NBM can estimate any exceptional rebound risk.
+Official Aviation Weather history shows:
 
-Then the probability vector is approximately:
+### Early afternoon
 
-- large mass on the bucket containing `M`;
-- small mass on only higher reachable buckets;
-- zero mass on buckets below the known observed maximum.
+17:51 UTC / 12:51 CDT:
 
-That is a much easier inference problem than predicting the original high 24 hours earlier.
+`T02330100 10239 20172`
 
----
+- instantaneous 23.3°C / 73.9°F;
+- preceding six-hour max 23.9°C / 75.0°F.
 
-# 7. The most important unresolved test: did the market already know?
+18:51 UTC:
 
-These case studies become a trading edge only if the winning bucket was still available below its fair value when the extrema report became public.
+`T02330111`
 
-For each event we need the winning-token price around the report timestamp:
+- 73.9°F.
 
-- `t - 5m`;
-- `t`;
-- `t + 5m`;
-- `t + 15m`;
-- `t + 30m`;
-- `t + 60m`.
+19:51 UTC:
 
-Then calculate:
+`T02390106`
 
-`observation_markout_tau = p(t+tau) - executable_price_at_signal`.
+- **23.9°C / 75.0°F**.
 
-Also compare neighboring buckets.
+22:51 UTC:
 
-A strong result would look like:
+`T02390100`
 
-- winning bucket still 50–80¢ immediately after the high-fidelity max report;
-- higher/lower impossible buckets still retain meaningful price;
-- prices converge toward 1/0 over the following minutes.
+- 75.0°F.
 
-A weak/no-edge result would be:
+### Late synoptic extrema
 
-- winning bucket already ~98–100¢ before the report;
-- no fillable depth at stale prices;
-- repricing occurs faster than our acquisition path.
+23:51 UTC / 18:51 CDT:
 
-The entire ASOS thesis can be judged by this one event-study family.
+`T02390100 10250 20228`
 
----
+- instantaneous 23.9°C / 75.0°F;
+- **six-hour maximum 25.0°C / 77.0°F**.
 
-# 8. Do not require the 6-hour max to be the final max deterministically
+The following early-morning report later included a 24-hour maximum of 25.0°C / 77.0°F.
 
-The report covers the preceding six hours, not the remaining night.
+## Current evidence
 
-The correct signal is probabilistic:
+The indexed official history inspected so far shows routine spot/T-group values up to 75°F, while the 23:51 report reveals a 77°F six-hour maximum.
 
-`q_same_bucket = 1 - P(later exceedance crosses next bucket boundary)`.
+This is therefore the strongest current candidate for a **hidden between-report peak**: a whole bucket-width increase in the authoritative running maximum that is not visible in the routine observations we have recovered.
 
-Cases with ongoing warm advection, downslope wind, fronts, unusual nighttime mixing or late-day western peaks can still exceed `M`.
+However, the complete 20:51/21:51/SPECI set must be checked before calling the 23:51 extrema group the *first* public 77°F evidence.
 
-The benefit of the 6-hour max is not certainty by definition. It is that it gives a much higher-fidelity lower bound on the final resolver maximum.
+### Economic significance if confirmed
+
+If no intervening METAR/SPECI exposed 25.0°C, then parsing the six-hour extrema group adds genuinely new resolver information beyond ordinary hourly feeds.
+
+This is the exact data advantage worth measuring, rather than assuming every six-hour extrema report is unique.
 
 ---
 
-# 9. High/low symmetry
+# 4. Corrected event-state table
 
-The same logic applies to lowest-temperature markets using the METAR 6-hour **minimum** group.
+| Event | First verified winning-bucket state | Local time | Source | Later 6h max | Hours to midnight |
+|---|---|---:|---|---:|---:|
+| NYC Jul 20 | 27.8°C = 82.0°F → 82–83 | **17:51 EDT** | routine T-group | 82.9°F | 6h09m |
+| Chicago Jun 29 | 33.3°C = 91.9°F → 92–93 | **15:51 CDT** | routine T-group | 91.9°F | 8h09m |
+| Chicago Jun 20 | 77°F candidate first visible at late extrema report | **≤18:51 CDT** | 6h max unless earlier omitted report exists | 77.0°F | ≥5h09m |
 
-The most relevant report clock differs because the overnight minimum usually occurs around dawn rather than afternoon.
-
-Once daily-high observation latency is quantified, daily lows can reuse essentially the same parser/math:
-
-`final_min = min(observed_min_so_far, remaining_min)`.
-
-This potentially doubles the recurring US opportunity set with almost no new statistical machinery.
+This materially improves the research target.
 
 ---
 
-# 10. Money-relevant conclusion
+# 5. The true observation-driven signal
 
-Three resolved 2026 US Polymarket events independently confirm that the ASOS 6-hour extrema field can expose the eventual winning temperature bucket **4–5 hours before local midnight**, while the instantaneous airport temperature has already moved materially away from the high.
+For each incoming report at timestamp `t`:
 
-That makes ASOS extrema parsing one of the highest-value simple T+0 research targets.
+1. parse current precise temperature;
+2. parse any SPECI precise temperature;
+3. parse six-hour max if present;
+4. update:
 
-The next decision is binary and empirical:
+`M_t = max(M_{t-1}, all newly reported credible extrema)`;
 
-> **After the 18Z/00Z 6-hour extrema publication, does Polymarket still offer stale probability at executable size?**
+5. map `M_t` into the Polymarket resolver's native Fahrenheit bucket;
+6. estimate only the probability of a later crossing into a **higher** bucket.
 
-If yes, this may be simpler and higher-confidence than trying to win purely through better multi-model forecasting. If no, the same extrema state still materially improves same-day probability calibration.
+Signal importance is highest when a new report:
+
+- enters a new bucket;
+- crosses the midpoint/rounding threshold relevant to whole-F resolution;
+- eliminates lower outcomes;
+- substantially lowers remaining-crossing probability because peak time has passed.
+
+There is no need to privilege 18Z/00Z except that their extrema fields can reveal peaks the routine stream missed.
+
+---
+
+# 6. Why this is simpler and potentially earlier
+
+The old framing waited for a scheduled six-hour extrema report.
+
+The corrected approach reacts immediately whenever the station first enters a resolver bucket.
+
+For NYC Jul 20 that advances the useful state by about **2 hours**.
+
+For Chicago Jun 29 it advances it by about **3 hours**.
+
+If Polymarket price convergence is slower than these observation updates, this earlier trigger directly increases captured edge and fill capacity.
+
+---
+
+# 7. Resolver fidelity hierarchy
+
+For US same-day reconstruction, retain raw METAR/SPECI text and derive:
+
+1. precise T-group temperature;
+2. native/processed Fahrenheit where reliable;
+3. routine mandatory whole-C field;
+4. six-hour extrema;
+5. later 24-hour/DSM truth.
+
+The empirical question is which combination reproduces Weather Underground/Polymarket resolutions most reliably.
+
+The six-hour max is best viewed as a **gap-filling observation**, not the primary state variable.
+
+---
+
+# 8. Price-latency test must use the first-lock timestamp
+
+For each event define:
+
+`t_lock = first public report time when running observed extreme enters the eventual resolver bucket`.
+
+Then sample the full Polymarket ladder around:
+
+- `t_lock - 5m`;
+- `t_lock`;
+- `+5m`;
+- `+15m`;
+- `+30m`;
+- `+60m`;
+- `+2h`.
+
+This is superior to anchoring every event on 00Z/12Z.
+
+Measure:
+
+`markout_tau = p_winner(t_lock+tau) - executable_price(t_lock)`
+
+and the collapse of now-impossible neighboring buckets.
+
+---
+
+# 9. Remaining meteorological uncertainty
+
+Entering the eventual winning bucket does not mean it will remain the winner.
+
+The tradable fair probability after `t_lock` is:
+
+`P(no later temperature crosses the next bucket boundary | current atmosphere, remaining hours)`.
+
+This is where LAMP/HRRR/NBM and recent station trajectory belong.
+
+The high-value combination is:
+
+> **authoritative running maximum + simple remaining-boundary-crossing probability.**
+
+That is much easier than forecasting the whole-day maximum from scratch.
+
+---
+
+# Bottom line
+
+The case-study audit improves the US observation thesis:
+
+> **Track the exact resolver-aligned running maximum continuously. Routine T-groups often reveal the final bucket hours before the scheduled extrema summary; six-hour extrema groups add value primarily when they expose hidden between-report peaks.**
+
+NYC Jul 20 and Chicago Jun 29 prove the earlier-running-max mechanism. Chicago Jun 20 is the current best candidate for genuine extra information from a six-hour extrema field.
+
+The decisive remaining economic test is still the same: **what executable Polymarket price remained at the first-lock timestamp?**
