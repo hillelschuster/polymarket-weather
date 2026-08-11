@@ -112,7 +112,89 @@ The volume leaderboard includes `dpnd`, `largeleeks888`, `Poligarch`, `OraculumN
 
 High PnL plus high volume suggests repeatable activity worth decomposing. High PnL with low frequency can instead reveal large climate-index bets.
 
-## Separate wallet skill by market family
+# Current specialist archetypes visible from profiles
+
+Current public profile snapshots reveal that “top WEATHER trader” is not one strategy class.
+
+## `gopfan2` — large-capacity climate/index archetype
+
+Current profile:
+https://polymarket.com/profile/0xdd42ffb8aabe818f7538d93c175a9f9e2da9990d
+
+Visible August 2026 position:
+
+- **“Will 2026 be the second-hottest year on record?”**
+- ~91,697.5 YES shares;
+- average entry ~29.3¢;
+- recent mark ~54¢;
+- position value ~49.5k;
+- unrealized gain shown around +$22.6k.
+
+This is directly relevant because `gopfan2` is also the all-time WEATHER PnL leader in the category snapshot. It demonstrates that the highest-dollar weather program should include **global-temperature / annual-rank basis models**, not only daily city markets.
+
+### Research implication
+
+Build a climate-wallet segment separately:
+
+- GISTEMP monthly buckets;
+- hottest-month ranks;
+- hottest-year ranks;
+- monthly→annual cross-market consistency;
+- entry timing relative to ERA5T/NOAA/Berkeley/NASA releases.
+
+## `Poligarch` — high-frequency city-temperature / ladder archetype
+
+Current profile:
+https://polymarket.com/profile/0xb40e89677d59665d5188541ad860450a6e2a7cc9
+
+Profile snapshot shows ~39k predictions and many simultaneous daily-temperature positions. Examples from one July 22 slate include:
+
+- Hong Kong 33°C YES around 65¢;
+- Paris 25°C NO around 57.4¢;
+- London 25°C YES around 49–54¢;
+- Paris 26°C YES around 42.7¢;
+- London 26°C NO around 65.7¢;
+- Madrid 40°C NO around 75.7¢;
+- Hong Kong 32°C NO around 67¢;
+- Munich 25°C YES around 57.9¢;
+- Munich 23°C NO around 88.8¢;
+- Warsaw 22°C YES around 68.6¢.
+
+Several of these later displayed large positive mark-to-market or settled-value gains.
+
+### Inference
+
+This pattern looks much closer to **full distribution / ladder trading** than one-outcome gambling. Simultaneous YES on one modal bucket and NO on neighboring/distant buckets is exactly how a trader with an internal probability surface can monetize multiple mispricings in the same event.
+
+### Research implication
+
+For Poligarch, reconstruct positions at the **event portfolio** level:
+
+`event PnL = Σ outcome-expression PnL`
+
+rather than analyze each YES/NO trade independently.
+
+Compare the wallet's net implied distribution with:
+
+- coherent market distribution;
+- our weather distribution;
+- final outcome.
+
+## `ColdMath` — high-frequency near-certainty / favorite expression candidate
+
+Current profile shows more than 8k predictions and recent positions such as NO on very high-priced London low-temperature alternatives around 97–99¢.
+
+This is consistent with a possible strategy class that monetizes **near-certainty / resolution-state** prices rather than seeking only large percentage edges.
+
+Full closed-position decomposition is needed to determine whether this is a major historical weather strategy or simply the most recent visible state.
+
+## `aenews2` — broad cross-category high-capital trader
+
+Current public profile is dominated by non-weather positions despite ranking near the top of WEATHER PnL historically. That means its weather edge should be reconstructed from closed WEATHER positions rather than inferred from current active portfolio.
+
+This is an important segmentation lesson: current profile state can identify active archetypes, but historical WEATHER category skill requires category-filtered fills/closed positions.
+
+# Separate wallet skill by market family
 
 WEATHER category PnL mixes several distinct mathematical problems. Score each wallet separately on:
 
@@ -180,16 +262,16 @@ Fingerprint:
 
 Interpretation: dataset-basis model.
 
-### F. Structural arbitrageur
+### F. Structural arbitrageur / ladder trader
 
 Fingerprint:
 
 - simultaneous activity across multiple outcomes in one event;
-- short holding periods;
+- combinations of YES modal bucket + NO neighbors/tails;
 - repeated YES/NO basket relationships;
-- PnL weakly related to final weather outcome.
+- PnL can be driven by relative mispricing as much as final directional view.
 
-Interpretation: ladder/negative-risk or liquidity strategy.
+Interpretation: full probability-surface trading, negative-risk structure and/or liquidity strategy.
 
 ## Wallet skill statistics
 
