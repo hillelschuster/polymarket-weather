@@ -24,6 +24,7 @@ The target is **net executable expected value and realized dollar PnL**, after s
 - [`research/weather-math.md`](research/weather-math.md) — probability, extrema and execution math
 - [`research/resolution-alpha.md`](research/resolution-alpha.md) — resolver/station mechanics as tradable information
 - [`research/release-timing.md`](research/release-timing.md) — forecast/observation release clocks and latency events
+- [`research/city-source-map.md`](research/city-source-map.md) — resolver and direct local-model/feed map for high-value cities
 - [`research/market-families.md`](research/market-families.md) — daily highs/lows, rainfall, wind maxima and climate-index markets
 - [`research/wallets.md`](research/wallets.md) — profitable weather specialists and reverse-engineering framework
 - [`research/bots-and-tools.md`](research/bots-and-tools.md) — public project survey
