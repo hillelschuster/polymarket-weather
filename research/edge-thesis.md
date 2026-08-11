@@ -1,212 +1,439 @@
-# Ranked edge thesis
+# Edge thesis — where the money can come from
 
 Snapshot: **2026-08-11**
 
-This is a ranking of research hypotheses by expected value *if validated*, not a claim that each is already profitable.
+The project starts from a favorable prior: weather markets contain repeatable, executable inefficiencies. The useful question is **which mechanism creates the most net dollars per unit of capital and attention**.
 
-## Tier 1 — likely core edge
+Each edge below is described by:
 
-### 1. Exact-station probabilistic calibration
+- **mechanism** — why the mispricing exists;
+- **persistence** — why competition may not erase it immediately;
+- **signal** — what we calculate;
+- **monetization** — how the edge turns into PnL;
+- **capacity** — where the dollars can scale;
+- **decay** — what makes the edge weaker.
 
-**Thesis:** the market is often priced from public point forecasts / raw model outputs, while the tradable object is an exact discrete bucket at a specific station. The profitable transformation is forecast -> calibrated station-specific distribution -> settlement bucket.
+## 1. Same-day certainty-collapse edge
 
-Why it can persist:
+### Mechanism
 
-- grid forecasts and airport stations have systematic local residuals;
-- ensemble systems have bias and dispersion errors;
-- model skill differs by city, lead time, season and weather regime;
-- multi-model member counts are not comparable weights;
-- raw probabilities are especially weak in tails, where payoff convexity is largest.
+A daily high is a running maximum. At time `t`:
 
-The basic model should therefore estimate a full CDF for the station daily maximum. EMOS/NGR-style postprocessing is a strong simple baseline because the literature explicitly targets ensemble bias and underdispersion.
+`H = max(M_t, R_t)`
 
-**What would kill this thesis:** after point-in-time calibration and executable-price simulation, model-vs-market residuals are zero or negative after fees/spread.
+where `M_t` is the maximum already observed and `R_t` is the highest remaining temperature.
 
-### 2. Same-day conditional maximum / observation edge
+Once `M_t` enters a bucket, lower buckets become impossible. After the likely peak, the only important uncertainty is whether the station crosses the next resolver boundary. That probability can collapse rapidly after each observation.
 
-**Thesis:** same-day markets become easier because the observed high is a hard lower bound on the final high, while remaining uncertainty shrinks rapidly. Public bot evidence also repeatedly focuses on T+0.
+A daily low has the symmetric structure:
 
-Let `M_obs(t)` be the highest station temperature observed so far and `M_future(t)` the maximum of all remaining observations. Then:
+`L = min(m_t, Rmin_t)`.
 
-`M_final = max(M_obs(t), M_future(t))`
+### Persistence
 
-Any bucket below the already observed maximum should collapse to essentially zero subject to resolver/reporting semantics. More generally, probability must be recomputed from the conditional remaining-hours path distribution, not from the morning forecast.
+Many traders and public bots use a daily point forecast or generic weather app. Those inputs update less intelligently than a state-conditioned resolver model. International cities also have heterogeneous station/source conventions that increase the advantage of specialized plumbing.
 
-The best same-day engine should use:
+### Signal
 
-- latest METAR / official station observations;
-- time of climatological daily peak;
-- remaining hourly ensemble paths;
-- cloud/radar/wind/sea-breeze/boundary-layer state where relevant;
-- observed model error so far that day;
-- exact resolver rounding/reporting behavior.
+For every resolver bucket `i`:
 
-**Why attractive:** the informational half-life is short, so a thin niche book can lag an objective public observation.
+`q_i(t) = P(bucket(H) = i | station observations through t, remaining forecast paths)`.
 
-### 3. Forecast-run latency
+Condition each remaining model path on the model's observed error at the exact station, then map every member's final maximum through the exact resolver rounding function.
 
-**Thesis:** scheduled model updates create discrete information shocks. If weather books are less watched than sports/crypto, prices may adjust slowly enough to monetize a new run.
+### Monetization
 
-Candidate catalysts:
+- buy the exact locked/modal bucket when `q_i - ask_i - fee_i` is positive;
+- sell/fade neighboring buckets whose residual probability has collapsed;
+- quote maker liquidity around the updated probability before stale orders reprice.
 
-- ECMWF ENS / AIFS ENS cycles;
-- GEFS / NBM / regional model updates;
-- METAR observations;
-- local official weather-network updates.
+### Capacity
 
-The research question is not merely whether price moves after a run. It is:
+Daily temperature markets can reach tens or hundreds of thousands of dollars in volume. The strategy recurs across many cities every day, creating high turnover and diversification.
 
-`E[future mid / settlement value | forecast delta at t] - executable price at t`
+### Decay
 
-as a function of seconds/minutes since the new data became available.
+The edge narrows as other participants consume the same station feed. Better conditioning, faster feed access and less-followed cities preserve the advantage.
 
-This edge may be largest in cities with enough liquidity to trade but too little attention to reprice instantly.
+**Current rank: #1.**
 
-## Tier 1.5 — market-structure edge independent of superior weather forecasting
+---
 
-### 4. Probability-simplex / negative-risk relative value
+## 2. T+1 station-calibrated modal-bucket forecasting
 
-A daily ladder has `K` mutually exclusive outcomes. Fair values satisfy:
+### Mechanism
 
-`sum(q_i) = 1`
+Public implementations often transform one deterministic daily maximum into a bucket or count raw ensemble members. The economically correct target is the distribution of the **resolver-station daily maximum**.
 
-Polymarket's negative-risk mechanism links outcomes: one NO can be converted into YES shares for every other outcome.
+For model member `m` with hourly path `T_m(h)`:
 
-Research checks:
+`H_m = max_h T_m(h)`.
 
-- `sum(best_ask_yes_i + fees_i) < 1` -> buy-the-ladder candidate;
-- `sum(best_bid_yes_i - fees_i) > 1` -> mint/convert-and-sell candidate, subject to exact CTF mechanics and executable depth;
-- compare `NO_i` with the executable basket of `YES_j, j != i`;
-- detect local shape violations: a market surface inconsistent with any plausible smooth temperature CDF;
-- use our calibrated weather CDF to decide which leg of an inconsistency is actually wrong.
+The distribution of `{H_m}` is then corrected for station/model/lead/cycle biases and residual dispersion before bucketization.
 
-This is especially attractive because the signal comes from accounting identities before meteorological opinion.
+### Persistence
 
-### 5. Informed market making
+Weather forecast skill is heterogeneous by station, weather regime and lead time. A universal Gaussian/Laplace sigma or Open-Meteo “best match” forecast leaves information on the table. Global Polymarket coverage creates many stations that receive little bespoke calibration from traders.
 
-**Thesis:** if we have better fair values, the highest-return implementation may be to provide liquidity around them rather than cross the spread.
+### Signal
 
-Current Polymarket docs:
+`q_i = P(g(H) in bucket_i | model vintages, calibrated residuals, local predictors)`
 
-- makers pay zero platform trading fees;
-- fee-enabled Weather markets use a taker fee curve with rate 0.05;
-- 25% of collected Weather fees is allocated to maker rebates;
-- some markets can also have explicit liquidity rewards.
+where `g` reproduces the resolver measurement/rounding convention.
 
-Therefore quote PnL has four terms:
+Blend models by out-of-sample probability skill rather than generic reputation. Useful features include:
 
-`forecast alpha + captured spread + maker rebate/reward - adverse selection`
+- cycle and lead time;
+- station/model rolling bias;
+- ensemble spread;
+- cloud, wind, humidity, boundary-layer depth and advection regime;
+- forecast disagreement;
+- previous-cycle revision;
+- climatological local forecast-error shape.
 
-The crucial weather-specific advantage is knowing when **not** to leave stale quotes up: before/after forecast runs, METAR updates, or a fast-changing same-day maximum.
+### Monetization
 
-This should be researched before assuming pure taker trading is optimal.
+Concentrate on the modal bucket and high-EV adjacent outcomes rather than spreading across many YES contracts. Use maker orders where the taker fee consumes a material share of the edge.
 
-## Tier 2 — potentially large amplifiers
+### Capacity
 
-### 6. Wallet-derived alpha
+Broad daily global market inventory. Highest capacity in established cities such as NYC, London, Paris, Hong Kong, Seoul and Beijing; potential higher percentage edge in less-followed cities.
 
-Public weather winners provide a labeled dataset of decisions made by unknown private models.
+### Decay
 
-Do not merely copy trades. Reverse-engineer them:
+Generic model improvements reduce raw forecast error; station calibration and timing remain differentiators.
 
-- city preference;
-- lead time at entry;
-- YES vs NO asymmetry;
-- entry-price distribution;
-- tail distance from forecast center;
-- position sizing;
-- maker/taker behavior where inferable;
-- trade timing relative to forecast releases;
-- whether they ladder adjacent buckets;
-- whether they exit before settlement or hold;
-- performance by city / price band / horizon / regime.
+**Current rank: #2.**
 
-Then ask whether wallet action adds predictive information **after conditioning on our weather model and current market price**.
+---
 
-A useful form is:
+## 3. Forecast-vintage repricing latency
 
-`logit(P(outcome)) = weather_features + market_features + informed_wallet_flow`
+### Mechanism
 
-If the wallet coefficient remains positive out of sample, the wallet is an information source rather than just a copy target.
+Weather information arrives in discrete shocks:
 
-### 7. Market-as-a-forecaster
+- ECMWF/GFS/ICON model cycles;
+- NBM updates;
+- LAMP/MOS guidance;
+- METAR/SPECI and official station reports;
+- national-agency observations;
+- tropical cyclone advisories;
+- climate/reanalysis updates.
 
-Ignoring market price is also wasteful. The crowd may know things our model misses.
+The market may reprice with a delay after the new information becomes available.
 
-Instead of treating market sentiment as either sacred or useless, estimate when it adds information:
+### Signal
 
-`logit(q_final) = a + b_w * logit(q_weather) + b_m * logit(p_market) + regime terms`
+For each new data vintage:
 
-Potential regime terms:
+`shock_i = q_i(new vintage) - q_i(previous vintage)`.
 
-- time to resolution;
-- spread/depth;
-- latest forecast-run age;
-- city;
-- observation availability;
-- market concentration / wallet flow.
+Align `shock_i` to the first realistically accessible timestamp and compare against CLOB bid/ask evolution at 1s, 10s, 1m, 5m, 30m and 2h horizons.
 
-The target is not to beat the market on every contract. It is to identify contexts where weather data deserves more weight than price.
+### Persistence
 
-### 8. City/regime specialization
+Weather markets are geographically fragmented. A new Tokyo, Ankara or Wuhan forecast may receive much less instantaneous trading attention than a major sports line or BTC market.
 
-A universal model is convenient but likely leaves money behind. Each station has different failure modes:
+### Monetization
 
-- coastal sea breeze;
-- urban heat island;
-- elevation/grid mismatch;
-- monsoon convection;
-- fog/cloud burn-off;
-- airport exposure;
-- local sensor/reporting peculiarities.
+- cross immediately when the expected price response exceeds fee + spread + impact;
+- post inside stale books when latency is long enough for maker fills;
+- prioritize revisions that move probability across narrow bucket boundaries.
 
-Per-station residual structure should determine where capital goes. A smaller set of highly calibrated stations can outperform broad shallow coverage.
+### Capacity
 
-## Tier 3 — separate but important weather markets
+Depends on depth during update windows. A large forecast shock can move several neighboring buckets simultaneously.
 
-### 9. Climate / monthly / record-temperature contracts
+### Decay
 
-The weather leaderboard's biggest historical wins include monthly/global temperature anomalies and record-temperature contracts, not just daily airport highs.
+Latency-sensitive and competitive. Direct feeds, WebSocket books and proximity to Polymarket's matching infrastructure improve capture.
 
-These need a different model stack:
+**Current rank: #3.**
 
-- reanalysis / climate index definitions;
-- anomaly-baseline details;
-- publication schedules and revisions;
-- seasonal forecast systems;
-- climate trend priors.
+---
 
-Do not mix their statistics with daily temperature ladders. They may nevertheless offer larger capacity and slower-moving information.
+## 4. Resolver/source lead edge
 
-## Candidate behavioral mispricings to test, not assume
+### Mechanism
 
-1. **Longshot bias / tail overpricing:** one public bot reports a profitable T+0 BUY_NO price-band regime and claims extreme YES outcomes were overpriced. This is self-reported and must be independently rebuilt from historical data.
-2. **Round-number anchoring:** traders may overweight central point-forecast buckets instead of distributing probability over adjacent bins.
-3. **Stale-run anchoring:** price may remain centered on an older deterministic run after ensemble consensus moves.
-4. **Forecast-app anchoring:** retail may use city-center consumer forecasts while contracts resolve at airports.
-5. **Adjacent-bucket inconsistency:** independently traded binary books can form an implausible shape even when their sum is near one.
+The market can reference a public website whose displayed value originates from an upstream observation network. The upstream value may be available earlier or at higher precision.
 
-## Priority ordering for eventual implementation
+Examples:
 
-If the research holds up, the minimal profitable stack should probably be developed in this order:
+- Wunderground Daily Observations often mirrors airport observations;
+- Tel Aviv current rules use NOAA WRH LLBG data directly;
+- Hong Kong can resolve from HKO Daily Extract data;
+- US ASOS daily extrema involve measurement/rounding details that generic METAR parsers can mishandle.
 
-1. exact event/station/rules parser;
-2. point-in-time forecast + observation archive;
-3. calibrated daily-max probability surface;
-4. executable order-book / fee model;
-5. forecast-release event study;
-6. wallet reverse-engineering;
-7. maker / cross-bucket optimizer.
+### Signal
 
-That ordering is about information value, not software architecture.
+Estimate the eventual resolver-displayed value from the earliest authoritative/raw observation stream.
 
-## Sources
+### Persistence
 
-- Polymarket negative risk: https://docs.polymarket.com/advanced/neg-risk
-- Polymarket fees: https://docs.polymarket.com/trading/fees
-- Maker rebates: https://docs.polymarket.com/market-makers/maker-rebates
-- Liquidity rewards: https://docs.polymarket.com/market-makers/liquidity-rewards
-- ECMWF ENS guide: https://confluence.ecmwf.int/spaces/FUG/pages/673550376/Section+2A.1.2.1+Medium+Range+Ensemble+forecasts
-- NOAA NBM probabilistic elements: https://vlab.noaa.gov/web/mdl/nbm-weather-elements
-- Gneiting et al. (2005), EMOS: https://doi.org/10.1175/MWR2904.1
-- Wilks & Hamill (2007), Ensemble-MOS using reforecasts: https://doi.org/10.1175/MWR3402.1
+Source heterogeneity creates implementation cost. Many bots hard-code a city coordinate and a generic API instead of parsing rules and resolver semantics per event.
+
+### Monetization
+
+The largest payoff occurs near resolution when the physical outcome is effectively known but market prices remain below certainty.
+
+### Capacity
+
+Potentially high on heavily traded same-day buckets because uncertainty collapses while traders still exchange positions.
+
+### Decay
+
+Depends on how quickly Polymarket participants discover and automate the same upstream source.
+
+**Current rank: #4, tightly connected to #1.**
+
+---
+
+## 5. Profitable-wallet information factor
+
+### Mechanism
+
+Specialist traders can encode private model choices, faster source access, local expertise or execution skill. Their fills are public data.
+
+### Signal family
+
+For wallet `w`, outcome `i`, time `t`:
+
+- signed net flow;
+- entry price;
+- size relative to wallet history;
+- city/horizon specialization;
+- trade timing relative to model/observation releases;
+- 30m/2h/close markout;
+- realized PnL by contract type;
+- consensus across independent profitable wallets.
+
+A useful meta-feature is:
+
+`wallet_signal_i(t) = Σ_w skill_weight_w(segment) * signed_flow_w,i(t)`.
+
+Weights belong to segments: a wallet can be excellent on daily highs and irrelevant on climate markets.
+
+### Persistence
+
+The public market reveals fills, not the trader's underlying model. Following flow can therefore inherit information without reproducing the full research process, provided latency and price impact remain favorable.
+
+### Monetization
+
+Use wallet flow as an incremental feature alongside weather probability and market price. The highest-value test is whether specialist flow predicts settlement or near-term price movement **after controlling for current price and weather state**.
+
+### Capacity
+
+Scales with wallet opportunity set; especially useful as a ranking layer across many simultaneous cities.
+
+### Decay
+
+Copying after large visible fills can lose edge through price movement. Fast ingestion and agreement among several specialists improve value.
+
+**Current rank: #5.**
+
+---
+
+## 6. Informed market making
+
+### Mechanism
+
+Weather currently has a 0 maker fee and a 25% maker-rebate allocation on fee-enabled markets, while takers pay the weather fee curve. Wide multi-outcome books can therefore reward a trader who knows fair value well enough to quote selectively.
+
+### Signal
+
+For candidate maker price `p_m`:
+
+`EV_filled = q - p_m + expected_rebate_per_share - expected_adverse_selection_markout`
+
+Expected dollars also multiply by fill probability.
+
+Quote around a state-conditioned fair value and reprice when forecasts/observations move.
+
+### Persistence
+
+Most forecast bots focus on directional taker entries. Weather information can improve both side selection and stale-quote avoidance.
+
+### Monetization
+
+- capture spread;
+- collect rebate share;
+- accumulate favorable inventory before convergence;
+- cross only for especially time-sensitive shocks.
+
+### Capacity
+
+Potentially larger than pure taker signals because repeated small fills monetize the same model continuously.
+
+### Decay
+
+Adverse selection increases around scheduled model releases and decisive observations. Quote freshness determines economics.
+
+**Current rank: #6.**
+
+---
+
+## 7. Full-ladder / negative-risk relative value
+
+### Mechanism
+
+Only one temperature bucket wins, so coherent probabilities sum to one. Negative-risk conversion economically links one outcome's NO token to the YES basket of all other outcomes.
+
+### Signal
+
+Construct an arbitrage-consistent surface and compare:
+
+- each YES bid/ask to weather fair value;
+- `NO_i` to the basket `Σ_{j≠i} YES_j`;
+- aggregate YES basket cost/revenue;
+- nearest-simplex projection of quoted probabilities;
+- depth-weighted relative distortions.
+
+### Persistence
+
+Separate binary books can move asynchronously when the forecast shifts. The full event may momentarily contain inconsistencies even when each individual quote looks plausible.
+
+### Monetization
+
+Capture pure structural discrepancies where available, then use weather forecasts to choose the direction of relative-value discrepancies that remain after costs.
+
+### Capacity
+
+Constrained by the shallowest leg of a basket. Repeated across every multi-outcome event.
+
+### Decay
+
+Mechanical arbitrage is highly automatable; forecast-informed relative value has greater durability.
+
+**Current rank: #7.**
+
+---
+
+## 8. Market-residual learning / crowd-as-feature
+
+### Mechanism
+
+The crowd contains information that weather models omit. Conversely, weather models contain information the crowd underweights. The best probability can combine both.
+
+### Signal
+
+Examples:
+
+`logit(q*) = a_segment + b_segment logit(q_weather) + c_segment logit(q_market) + dX`
+
+or a regularized probability pool with weights learned point-in-time.
+
+Segment by city, horizon and time-of-day. Add wallet flow and microstructure only when they improve out-of-sample probability/PnL.
+
+### Monetization
+
+Trade the residual `q* - executable_price`, which directly measures incremental informational advantage over the existing market.
+
+### Persistence
+
+Market efficiency varies across segments. Learning the segment-specific weight of crowd versus weather prevents overconfident trades where the market is genuinely more informed.
+
+**Current rank: #8 as a meta-model feeding other strategies.**
+
+---
+
+## 9. GISTEMP monthly climate nowcast
+
+### Mechanism
+
+Polymarket trades narrow 0.05°C GISTEMP anomaly buckets. NASA's monthly GISTEMP result is released on a scheduled date roughly ten days into the following month. Other global datasets and reanalyses become available earlier.
+
+ERA5T is updated roughly five days behind real time, with monthly means roughly five days after month-end. NASA GISTEMP uses GHCN v4 land-station data and ERSST v5 sea-surface data.
+
+### Signal
+
+Learn a historical mapping:
+
+`GISTEMP_month = f(ERA5/ERA5T, Berkeley Earth, NOAA, ERSST, partial GHCN, season, ENSO, data coverage)`.
+
+More directly, reproduce as much of the GISTEMP pipeline as practical from early inputs and model the residual between proxy datasets and final published GISTEMP.
+
+### Persistence
+
+The contract resolves on one specific index, while many traders reason from generic “global temperature.” Dataset-specific basis is the edge.
+
+### Monetization
+
+As the month completes and preliminary/reanalysis information arrives, buy the narrow GISTEMP bucket whose calibrated probability exceeds price. The known NASA release schedule creates a precise information timeline.
+
+### Capacity
+
+Potentially much larger than small-city daily contracts; weather leaderboard winners have historically made large profits in global/climate markets.
+
+### Decay
+
+Basis-model accuracy and early data latency determine the advantage.
+
+**Current rank: #9 now, with potential to move much higher after capacity analysis.**
+
+---
+
+## 10. Monthly cumulative precipitation
+
+### Mechanism
+
+Monthly precipitation is an accumulating state:
+
+`P_final = P_observed(t) + P_remaining(t)`.
+
+Observed rainfall cannot disappear. As the month advances, the forecastable remaining distribution becomes a smaller part of the total.
+
+### Signal
+
+Combine exact resolver precipitation-to-date with ensemble precipitation totals for the remaining month. Calibrate the highly skewed precipitation distribution and account for source measurement conventions.
+
+### Monetization
+
+Trade bucket transitions following major rain events and late-month certainty collapse.
+
+### Capacity
+
+Current monthly precipitation markets are new and can be thin, making them potentially high percentage-edge but initially smaller dollar opportunities.
+
+**Current rank: #10 with high structural interest.**
+
+---
+
+## 11. Monthly wind-maximum / event-driven extrema
+
+### Mechanism
+
+Monthly maximum wind is another running maximum:
+
+`W_final = max(W_observed(t), W_remaining(t))`.
+
+For Mt. Washington, tropical cyclones, fronts and strong pressure-gradient events dominate tail probabilities.
+
+### Signal
+
+Blend observed maximum-to-date with ensemble maximum-gust distributions conditioned on synoptic events and tropical cyclone tracks.
+
+### Monetization
+
+Threshold markets allow direct trading of exceedance probabilities. A major storm forecast can reprice several nested thresholds at once.
+
+### Capacity
+
+Current August market is small, while prior July volume reached tens of thousands, so capacity may be episodic.
+
+**Current rank: #11.**
+
+---
+
+## Meta-ranking formula
+
+For research prioritization, score each strategy approximately by:
+
+`ResearchValue ≈ expected_net_edge × executable_capacity × opportunity_frequency × persistence × measurement_speed`
+
+For deployment economics, rank by:
+
+`ExpectedNetPnL/day = Σ opportunities E[filled_size × per_share_net_EV] - financing/operational drag`
+
+This keeps the project pointed at dollars rather than abstract forecast accuracy.
