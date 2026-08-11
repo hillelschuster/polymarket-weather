@@ -23,13 +23,14 @@ The target is **net executable expected value and realized dollar PnL**, after s
 - [`research/edge-thesis.md`](research/edge-thesis.md) — detailed edge hypotheses and persistence mechanisms
 - [`research/weather-math.md`](research/weather-math.md) — probability, extrema and execution math
 - [`research/resolution-alpha.md`](research/resolution-alpha.md) — resolver/station mechanics as tradable information
+- [`research/release-timing.md`](research/release-timing.md) — forecast/observation release clocks and latency events
 - [`research/market-families.md`](research/market-families.md) — daily highs/lows, rainfall, wind maxima and climate-index markets
 - [`research/wallets.md`](research/wallets.md) — profitable weather specialists and reverse-engineering framework
 - [`research/bots-and-tools.md`](research/bots-and-tools.md) — public project survey
 - [`research/public-bot-code-audit.md`](research/public-bot-code-audit.md) — code-level lessons and exploitable gaps
 - [`research/data-sources.md`](research/data-sources.md) — forecast, observation, market and resolver feeds
 - [`research/market-microstructure.md`](research/market-microstructure.md) — CLOB, fees, rebates and ladder structure
-- [`research/data-quality.md`](research/data-quality.md) — point-in-time truth and measurement fidelity
+- [`research/data-quality.md`](research/data-quality.md) — point-in-time truth and alpha integrity
 - [`research/next-research.md`](research/next-research.md) — highest-value measurements and experiments
 - [`research/deep-research-2026-08-11.md`](research/deep-research-2026-08-11.md) — expanded August 11 research pass
 
