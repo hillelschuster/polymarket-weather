@@ -1,0 +1,29 @@
+name: Inspect NASA GISTEMP source
+
+on:
+  push:
+    paths:
+      - '.github/workflows/inspect-gistemp-source.yml'
+  workflow_dispatch:
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download NASA source
+        run: |
+          set -euxo pipefail
+          curl --fail --location --retry 3 \
+            https://data.giss.nasa.gov/gistemp/sources_v4/gistemp4.0.tar.gz \
+            -o /tmp/gistemp4.0.tar.gz
+          sha256sum /tmp/gistemp4.0.tar.gz
+          mkdir -p /tmp/gistemp-src
+          tar -xzf /tmp/gistemp4.0.tar.gz -C /tmp/gistemp-src
+      - name: Print source layout and run instructions
+        run: |
+          set -euxo pipefail
+          find /tmp/gistemp-src -maxdepth 3 -type f -printf '%P\n' | sort
+          echo '--- README_steps.md ---'
+          find /tmp/gistemp-src -name README_steps.md -print -exec cat {} \;
+          echo '--- top-level README files ---'
+          find /tmp/gistemp-src -maxdepth 2 -type f \( -iname 'README*' -o -iname 'requirements*' -o -iname 'setup*' \) -print -exec sh -c 'echo --- "$1"; cat "$1"' sh {} \;
