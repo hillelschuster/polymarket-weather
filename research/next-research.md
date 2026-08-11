@@ -1,463 +1,298 @@
-# Highest-value next measurements
+# Highest-value next measurements — profit-only ordering
 
-Snapshot: **2026-08-11**
+Snapshot: **2026-08-12**
 
-The next work is ranked by expected impact on future net PnL. Each measurement should either identify a profitable edge, improve the probability/execution model, or redirect capital toward a higher-dollar segment.
+Objective:
 
-Priority score:
+`maximize realistic net dollars after fees + spread + depth + fills + capital lock`.
 
-`ResearchValue ≈ expected edge × capacity × frequency × persistence × speed-to-measurement`
-
----
-
-# Priority 1 — reverse-engineer the supplied forecasting wallet
-
-Wallet:
-`0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4f`
-
-## Output
-
-Reconstruct all accessible weather fills and closed positions, then build:
-
-`fill_time × city × station × horizon × bucket × side × entry × size × final_outcome × PnL`
-
-Join each fill to:
-
-- latest resolver observation;
-- current observed max/min;
-- latest forecast vintages;
-- forecast revision magnitude;
-- market bid/ask/spread;
-- 5m/30m/2h price markout.
-
-## Questions with immediate PnL value
-
-1. Do T+0 entries cluster after the resolver prints the eventual winning bucket?
-2. Do fills cluster after ECMWF/NBM/LAMP/local-model releases?
-3. Does the wallet buy the mode or forecast revisions toward the mode?
-4. Does its flow predict settlement after controlling for market price?
-5. Does its flow predict near-term price after controlling for our weather signal?
-6. Which cities/horizons produce most of its PnL?
-7. How much edge remains at the price immediately after its public fill?
-
-## Why this is #1
-
-The wallet is currently visible making large exact-bucket YES positions across many cities, including same-day positions bought far below final certainty. One successful reconstruction can reveal the dominant strategy family faster than broad theory.
+Research is ranked only by the probability that the next measurement changes profitable capital deployment.
 
 ---
 
-# Priority 2 — build the resolver/station truth map
+# Priority 1 — prove/kill GISTEMP resolver alpha at executable depth
 
-For every recoverable daily temperature event:
+This is now the highest-value research question because GISTEMP combines:
 
-- event ID/date/city;
-- all buckets;
-- exact source/station;
-- local civil day;
-- unit/precision;
-- rounding/bucket semantics;
-- revision cutoff;
-- resolved bucket;
-- source regime through time.
+- public NASA resolver code;
+- exact public upstream inputs;
+- scheduled release times;
+- 0.05°C Polymarket brackets;
+- repeated specialist GISTEMP profits;
+- historical event capacity reaching hundreds of thousands to several million dollars.
 
-## Economic outputs
+## Forward August 2026 experiment
 
-### City opportunity map
+Use:
 
-Rank cities by:
+- `scripts/gistemp_input_watch.py`;
+- `scripts/gistemp_market_watch.py`.
 
-- market volume;
-- spread;
-- resolver complexity;
-- direct-source availability;
-- historical station-model basis;
-- number of public competitors using generic sources.
+Preserve every changed:
 
-### Resolver discrepancy model
+`GHCNm qcf vintage`
+`ERSST August file`
+`NASA LOTI output`
 
-Measure how often:
+and synchronized all-outcome Polymarket books.
 
-- routine METAR max;
-- IEM reconstruction;
-- national agency extrema;
-- Wunderground display;
-- final market resolution
+For every input change calculate:
 
-differ by a bucket.
+`replica_value_t`
+`P(first_release_bucket_i | vintage_t)`
+`executable YES/NO EV by depth`
+`market response 5m/30m/2h later`.
 
-Cities with predictable discrepancies can become late-resolution specialist opportunities.
+After NASA publication calculate:
 
----
+`t_correct = earliest vintage whose high-probability bracket matches first NASA bracket`
 
-# Priority 3 — T+0 certainty-collapse study
+and:
 
-At repeated timestamps for each city/day, calculate:
+`net executable dollars available between t_correct and market convergence`.
 
-- maximum/minimum observed so far;
-- next relevant bucket boundary;
-- remaining ensemble exceedance probability;
-- final winning bucket;
-- Polymarket book.
+### Historical April forensic gap
 
-Suggested timestamps are event-driven rather than only fixed clock intervals:
+April 2026 is already a strong natural experiment:
 
-- each METAR/SPECI observation;
-- LAMP update;
-- NBM update;
-- major NWP cycle;
-- first time observed max enters each bucket;
-- local climatological peak window;
-- subsequent hours after the current max stops increasing.
+- May 5 03:21 UTC: event volume ~$298.6K, winning-bracket ask 80¢;
+- May 5 reconstruction still only ~80–85% main-bin probability;
+- May 6 GHCNm reconstruction fell to ~1.1791°C and the major remaining bracket-crossing variables disappeared;
+- official first release = 1.18°C.
 
-## Main probability
+The missing decisive fact is **May 6–May 9 synchronized L2**, especially the first ask/depth after each qcf vintage. Recover it if a genuine archive exists. Do not fabricate it from later trades/midpoints.
 
-For current bucket upper boundary `u`:
-
-`P(exceed u before local day ends | all current information)`.
-
-## Economic outputs
-
-For each city/time-to-peak state:
-
-- model calibration;
-- average taker edge;
-- average maker edge;
-- depth/capacity;
-- price response after observations;
-- PnL/day.
-
-The most valuable result is a heatmap:
-
-`city × local_hour × state -> expected executable net PnL`.
+If no trustworthy historical L2 exists, prospectively measuring August/September has more value than prolonged forensic approximation.
 
 ---
 
-# Priority 4 — market calibration / behavioral bias map
+# Priority 2 — continuous full-ladder L2 capture for all high-dollar Weather events
 
-Before relying solely on sophisticated weather forecasts, estimate whether the market itself contains systematic price distortions.
+Historical onchain trades cannot reconstruct canceled/off-book liquidity. Capacity therefore requires prospective L2.
 
-For resolved daily temperature outcomes, segment by:
+Capture:
 
-- YES entry price;
-- NO entry price;
-- T+0/T+1/T+2;
-- exact bucket vs tail;
-- distance from market-implied mode;
-- city;
-- liquidity/spread;
-- local time;
-- time to likely daily peak.
+- every GISTEMP monthly outcome;
+- annual GISTEMP rank outcomes;
+- highest-volume daily temperature ladders;
+- any unusually large precipitation/wind Weather event.
 
-Calculate:
+At one synchronized timestamp store:
 
-- empirical hit probability;
-- excess hit probability over price;
-- fee-adjusted buy-YES PnL;
-- fee-adjusted buy-NO PnL;
-- capacity.
+`token`
+`bid levels`
+`ask levels`
+`tick`
+`feesEnabled / fee schedule`
+`negRiskMarketID / feeBips`
+`book hash`
+`source-information state`.
 
-## Key public hypothesis to test
+Economic outputs:
 
-BallesJr reports a profitable historical T+0 NO price zone around ~0.20–0.35, while jattree's small clean-ish subset favored modal/consensus NO. Establish the true point-in-time curve independently.
+- fillable expected dollars at $100/$1K/$5K/$25K/$100K scales;
+- full-YES and full-NO/NegRisk basket economics;
+- spread and stale-depth duration;
+- information-response half-life;
+- capital-time.
 
-Potential output:
-
-`behavioral_prior(segment)`
-
-which can combine with weather probability.
+This is the dataset that distinguishes a clever probability estimate from an actual business.
 
 ---
 
-# Priority 5 — station/model forecast skill matrix
+# Priority 3 — resolver-exact daily extrema distribution
 
-For every model/source and resolver station compute daily-extreme probability skill by:
+Daily temperature remains the likely high-frequency cashflow engine while climate opportunities mature.
 
-- lead time;
-- run cycle;
-- month/season;
-- local hour;
-- regime;
-- city.
+The target is one coherent vector:
 
-Models/sources:
+`q = P(final resolver bucket_i | exact information available now)`.
 
-- ECMWF ENS/control;
-- NBM;
-- LAMP;
-- HRRR/HREF;
-- GFS MOS;
-- DWD ICON family;
-- JMA MSM;
-- Met Office products;
-- ECCC HRDPS/RDPS;
-- HKO direct forecasts;
-- KMA local products;
-- Open-Meteo models as accessible baseline.
+For T+0, condition on:
 
-Metrics:
+- exact resolver max/min already observed;
+- next bucket boundary;
+- remaining local-day forecast path;
+- station-specific model residuals;
+- source-specific finalization rules.
 
-- bucket log loss;
-- Brier score;
-- CRPS for continuous max/min;
-- mode hit rate;
-- calibration by probability band;
-- tail reliability;
-- incremental trading PnL versus coherent market probability.
+For T+1, condition on point-in-time forecast vintages and station/horizon residual distributions.
 
-## Economic output
+Do not optimize generic weather MAE. Optimize:
 
-A source weight table:
+`fee-adjusted executable dollars`.
 
-`station × lead × cycle × regime -> source weights`
+## Most useful state diagnostic
 
-plus a data-cost/latency ranking.
+Compare weather and market concentration:
+
+`H(q) = -sum q_i log q_i`
+
+`H(p) = -sum p_i log p_i`.
+
+If weather is materially more concentrated than market, modal/adjacent YES may dominate.
+If market is too concentrated relative to weather, exact-bucket NO/fade may dominate.
+
+This unifies profitable fee-era YES and NO specialist behavior without hard-coding either side.
 
 ---
 
-# Priority 6 — forecast-release latency event study
+# Priority 4 — one global marginal-dollar allocator
 
-For every model/observation release:
+Every validated opportunity must produce a capacity curve:
 
-1. save pre-release fair distribution and book;
-2. calculate first post-release fair distribution;
-3. record full order-book response;
-4. calculate capture at 1s/5s/10s/30s/1m/5m/30m.
+`size -> expected net dollars -> expected capital time`.
 
-Segment by:
+Rank incremental dollars across:
 
-- city;
-- source/model;
-- horizon;
-- shock size;
-- whether revision crosses a bucket boundary;
-- spread/depth regime.
+- GISTEMP YES/NO;
+- annual-rank implication trades;
+- daily temperature directional trades;
+- maker quotes;
+- NegRisk transformations;
+- source-lock terminal trades;
+- precipitation/wind only when they outrank the above.
 
-## Main outputs
+No fixed allocation like “50% climate / 50% daily.”
 
-- median price-response curve;
-- information half-life;
-- executable capacity before convergence;
-- source-specific PnL per shock.
+Primary ranking quantity:
 
-## Direct business implication
+`expected_net_dollars / expected_capital_time`
 
-This decides which sources justify faster collection/execution and which are slow enough for ordinary polling.
+with correlation accounted for only when shared exposure materially changes portfolio economics.
 
 ---
 
-# Priority 7 — specialist-wallet universe
+# Priority 5 — maker versus taker routing measured from identical signals
 
-After the supplied wallet, decompose:
+Weather taker fee is economically large near 50¢; makers pay zero platform trading fee and can receive rebates.
 
-- gopfan2;
-- aenews2;
-- ColdMath;
-- gopfan;
-- Poligarch;
-- Hans323;
-- automatedAItradingbot;
-- WeatherTraderBot;
-- HighTempTation;
-- other high-PnL/high-volume WEATHER specialists.
+For every fair-value revision compare:
 
-Separate skill by market family.
+### Cross now
 
-## Incremental feature test
+`EV_cross = realized fillable q - actual ask/bid - fee - impact`.
 
-Compare:
+### Make
 
-`Model A = market + weather`
+`EV_maker = P(fill before edge decay) * (fair_at_fill - quote + rebate - adverse_markout)`.
 
-versus
+Required measurements:
 
-`Model B = market + weather + specialist flow`.
-
-Measure:
-
-- log-loss improvement;
-- near-term markout improvement;
-- executable PnL improvement.
-
-If several independent specialists trade the same bucket before price convergence, create a consensus factor.
-
----
-
-# Priority 8 — full-ladder structural edge
-
-For synchronized event snapshots calculate:
-
-- sum of YES asks/bids;
-- coherent probability projection;
-- NO_i versus other-YES basket;
-- executable basket cost by depth;
-- duration of discrepancies;
-- forecast-informed local relative value.
-
-## Economic outputs
-
-- pure arbitrage frequency/capacity;
-- relative-value PnL after weather signal;
-- which cities have the least synchronized ladders;
-- whether structural edge is largest immediately after forecast shocks.
-
----
-
-# Priority 9 — maker-versus-taker monetization
-
-For the exact same fair-value signals simulate/measure two paths:
-
-### Taker
-
-- immediate ask/bid;
-- fee;
-- depth/impact;
-- markout.
-
-### Maker
-
-- candidate quote;
 - fill probability;
-- fill latency;
-- adverse-selection markout;
-- rebate;
-- inventory PnL.
+- time to fill;
+- 10s/1m/5m adverse markout;
+- spread captured;
+- rebate actually earned;
+- missed opportunity when no fill.
 
-## Output
+Expected result should be state-dependent:
 
-Learn a routing rule:
-
-`execution_mode = f(edge_size, half_life, spread, depth, time_to_resolution, recent_flow)`.
-
-This can increase realized PnL without changing forecast accuracy at all.
-
----
-
-# Priority 10 — GISTEMP monthly anomaly nowcast
-
-This is the highest-capacity alternative weather track.
-
-## Historical dataset
-
-For each month collect:
-
-- first-published GISTEMP anomaly;
-- ERA5/ERA5T monthly anomaly in the corresponding reference convention;
-- NOAA GlobalTemp;
-- Berkeley Earth;
-- GHCN/ERSST inputs or proxies;
-- day-of-availability for each source;
-- Polymarket climate-market price history where available.
-
-## Model
-
-At each day from late month through NASA release:
-
-`P(GISTEMP bucket_i | data available by that day)`.
-
-Key output:
-
-- residual SD of each proxy/basis model;
-- probability of each 0.05°C bucket;
-- expected PnL/day and available depth;
-- information gain curve from month-end to release.
-
-ERA5T's roughly five-day publication lag versus NASA's scheduled ~10th-of-month GISTEMP release makes the post-month-end window especially interesting.
+- large fresh information shock -> taker;
+- quiet state / slow edge decay -> maker;
+- near deterministic source lock -> take stale depth aggressively when EV survives costs.
 
 ---
 
-# Priority 11 — cumulative precipitation
+# Priority 6 — propagate monthly GISTEMP information into annual rank
 
-For NYC monthly precipitation and future similar markets:
+Do not build a separate annual climate model.
 
-- reconstruct official precipitation-to-date exactly;
-- collect remaining-month ensemble precip distributions;
-- estimate skewed bracket probabilities;
-- measure repricing after major rain events and tropical systems.
+NASA annual GISTEMP is the equal-weight average of monthly values. Use monthly distributions directly:
 
-Core formula:
+`A_2026 = sum(M_1...M_12) / 12`.
 
-`P_final = observed_to_date + remaining_precip`.
+After every meaningful monthly/GISTEMP revision:
 
-Output expected net PnL by day-of-month and weather-event type.
+1. update annual distribution;
+2. compare with historical annual rank thresholds;
+3. derive rank probabilities;
+4. compare with the direct annual-rank book.
 
----
+This is attractive because the annual event has demonstrated multi-million-dollar volume and specialist positions in the tens of thousands of dollars.
 
-# Priority 12 — monthly maximum wind / other running extremes
-
-For Mt Washington and future extrema markets:
-
-- running official maximum-to-date;
-- ensemble future maxima;
-- tropical-cyclone/front event features;
-- nested threshold coherence;
-- market depth.
-
-Core formula:
-
-`W_final = max(observed_max, remaining_max)`.
-
-The threshold ladder gives both forecast edge and monotonic structural constraints.
+The monthly information acquisition can therefore create more than one PnL opportunity.
 
 ---
 
-# Priority 13 — city specialization map
+# Priority 7 — specialist decomposition only where it can change a signal
 
-Build a ranking for every active temperature city:
+Wallet archaeology is no longer a top-level objective.
 
-`CityScore = forecast_alpha × source_lead × spread × volume × opportunity_frequency × capacity`
+Continue it only for one of three reasons:
 
-Useful columns:
+1. identify an information source/catalyst we do not yet consume;
+2. estimate real capacity/sizing at a validated edge;
+3. improve execution timing after controlling for our own fair value.
 
-- resolver/source complexity;
-- direct national feed availability;
-- model MAE/log loss;
-- public bot coverage;
-- specialist wallet activity;
-- average spread;
-- average daily volume;
-- average observed market lag after forecast shocks.
+High-value targets:
 
-This can reveal unintuitive targets: a “hard” weather city may be extremely profitable when market calibration is even worse.
+- `badatmath.` — fee-era exact YES / secondary-mode behavior;
+- `gghff` — fee-era exact-bucket NO/fade behavior;
+- supplied wallet — large directional taker after information revisions;
+- Poligarch — passive Weather maker behavior;
+- GISTEMP specialists — market-family PnL/timing around qcf/ERSST updates.
 
----
-
-# Priority 14 — capacity and capital allocation
-
-For every validated strategy segment estimate PnL curves at bankroll scales:
-
-- $1k;
-- $5k;
-- $25k;
-- $100k+.
-
-Inputs:
-
-- profitable depth;
-- opportunity count/day;
-- overlap/correlation;
-- capital lock;
-- fill probability;
-- edge decay with size.
-
-Output:
-
-`marginal expected net dollars per additional dollar of bankroll`.
-
-This determines which edge should receive capital first.
+Do **not** infer strategy from Struct token-level PnL when merge/conversion cashflows are involved. Reconcile event-level cashflows.
 
 ---
 
-# Minimal research collector implied by these priorities
+# Priority 8 — source-lock / NegRisk terminal layer
 
-The smallest useful collector eventually needs only a few durable tables/files:
+The math is strong but direct wallet-PnL attribution is weaker than the priorities above.
 
-1. **events/resolvers** — rules, station, buckets, outcome;
-2. **weather_vintages** — forecasts/observations with availability times;
-3. **market_snapshots** — synchronized full ladder books;
-4. **wallet_fills** — specialist public activity;
-5. **derived_signals** — fair probability, net EV, execution choice;
-6. **outcomes/fills** — realized settlement and PnL.
+For daily temperature events, after the contractual resolver value is locked but before formal Polymarket resolution:
 
-Everything else can be derived offline.
+- search stale winning YES;
+- search stale losing NO;
+- compare multi-NO NegRisk conversion;
+- include current market-specific conversion `feeBips`;
+- rank by dollars per capital-time.
 
-The first implementation should maximize data useful across several hypotheses rather than implement a broad trading framework.
+This becomes high priority only when live L2 proves repeated, meaningful capacity.
+
+---
+
+# What has been demoted
+
+## Generic tail strategy
+
+Cheap YES is not a strategy. Some spectacular-looking Struct penny-tail “wins” were merge-accounting artifacts. Buy tails only when calibrated `q` makes them positive EV.
+
+## Broad model zoo
+
+Add another weather/climate source only when it improves out-of-sample/executable dollars beyond the current resolver model.
+
+## Generic wallet copying
+
+Profitable specialists express different edges. Their public flow is useful only if it adds predictive/execution value after our own weather/climate probability and current market state.
+
+## General infrastructure
+
+No dashboards, services, abstractions or broad data platform unless a measured opportunity needs them.
+
+---
+
+# Minimal evidence pipeline
+
+The smallest data chain that now serves the highest-dollar hypotheses is:
+
+1. **resolver inputs/vintages** — GISTEMP and daily station/model data with true availability time;
+2. **synchronized L2** — complete event books at the same information timestamp;
+3. **fair probability vector** — contract-native buckets;
+4. **action/capacity curves** — maker/taker/NegRisk/hold;
+5. **realized cashflows** — actual fill, fee, rebate, transformation and settlement PnL.
+
+Everything else is secondary.
+
+---
+
+# Bottom line
+
+The next research dollar should go to the measurement with the largest potential capital consequence:
+
+> **Can public GISTEMP inputs make one 0.05°C bracket near-deterministic while Polymarket still offers meaningful stale depth?**
+
+That can plausibly produce far larger dollars per opportunity than another incremental improvement to airport-temperature forecasting.
+
+The forward August/September capture now provides the cleanest possible proof. Daily extrema work remains active in parallel because it supplies high-frequency opportunities and a faster feedback loop.
