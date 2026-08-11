@@ -1,0 +1,23 @@
+name: GISTEMP source map
+on:
+  push:
+    paths:
+      - '.github/workflows/gistemp-source-map.yml'
+  workflow_dispatch:
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Show exact NASA input map
+        run: |
+          set -euxo pipefail
+          curl --fail --location --retry 3 https://data.giss.nasa.gov/gistemp/sources_v4/gistemp4.0.tar.gz -o /tmp/g.tar.gz
+          mkdir /tmp/g
+          tar -xzf /tmp/g.tar.gz -C /tmp/g
+          cd /tmp/g/gistemp4.0
+          echo '=== config/sources.txt ==='
+          cat config/sources.txt
+          echo '=== fetch source handling ==='
+          sed -n '1,260p' tool/fetch.py
+          echo '=== settings ==='
+          cat settings.py
