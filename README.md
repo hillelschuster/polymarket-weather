@@ -24,6 +24,7 @@ The target is **net executable expected value and realized dollar PnL**, after s
 - [`research/edge-economics.md`](research/edge-economics.md) — fee-adjusted probability-edge thresholds, expected dollar return, maker/taker and exit economics
 - [`research/specialist-archetypes.md`](research/specialist-archetypes.md) — observed profitable daily-temperature trader styles and the unified probability-surface formulation
 - [`research/minimal-data-reconstruction.md`](research/minimal-data-reconstruction.md) — smallest official Polymarket API dataset needed to reconstruct wallet alpha, markout, prices and future live depth
+- [`research/point-in-time-forecast-reconstruction.md`](research/point-in-time-forecast-reconstruction.md) — historical model-vintage reconstruction, station residual calibration and exact run-availability treatment
 - [`research/profit-evidence.md`](research/profit-evidence.md) — observed leaderboard profits, turnover and capacity clues
 - [`research/edge-thesis.md`](research/edge-thesis.md) — detailed edge hypotheses and persistence mechanisms
 - [`research/weather-math.md`](research/weather-math.md) — probability, extrema and execution math
@@ -34,6 +35,7 @@ The target is **net executable expected value and realized dollar PnL**, after s
 - [`research/wallets.md`](research/wallets.md) — profitable weather specialists and reverse-engineering framework
 - [`research/wallet-history-acquisition.md`](research/wallet-history-acquisition.md) — recovered fill-level history for the supplied specialist wallet, exact fees/timestamps/token IDs and full API acquisition path
 - [`research/wallet-history-followup.md`](research/wallet-history-followup.md) — resolved outcomes, active bucket exits, specialist co-matches and Struct PnL/history endpoints
+- [`research/zero-edge-paper-audit.md`](research/zero-edge-paper-audit.md) — audit of the strongest negative live-weather study and the exact target/model defects behind its conclusions
 - [`research/bots-and-tools.md`](research/bots-and-tools.md) — public project survey
 - [`research/public-bot-code-audit.md`](research/public-bot-code-audit.md) — code-level lessons and exploitable gaps
 - [`research/data-sources.md`](research/data-sources.md) — forecast, observation, market and resolver feeds
