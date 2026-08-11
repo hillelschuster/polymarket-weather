@@ -1,251 +1,466 @@
-# Weather market math
+# Weather trading math
 
 Snapshot: **2026-08-11**
 
-The objective is not weather-forecast accuracy in the abstract. It is **well-calibrated probability at the exact contract boundary, converted into positive net executable EV**.
+The central mathematical object is a probability distribution over the **exact resolver outcome**, conditioned on every data vintage available at trade time.
 
-## 1. Model the daily maximum as a path functional
+For outcome bucket `i`:
 
-For ensemble member `m`, first map the forecast to the exact resolution station and settlement-day clock, then compute:
+`q_i(t) = P(Y = i | I_t)`
 
-`X_m = max_h T[m,h]`
+where `I_t` includes weather forecasts, observations, resolver state, market information and any validated specialist-wallet features available at time `t`.
 
-where `h` runs over all valid observations in the contract's settlement day.
+The trading problem is then to compare `q_i(t)` with executable prices and choose the path with the highest expected net dollars.
 
-This matters because:
+---
 
-`max_h E[T_h] != E[max_h T_h]`
+## 1. Daily maximum from ensemble paths
 
-and because the hourly temperatures are strongly correlated. A Gaussian pasted onto the maximum of the ensemble mean discards information we already have.
+A daily-high contract settles on:
 
-The primitive object should therefore be a collection of **member-level daily maxima**, not a point forecast.
+`H = max_{h in resolver day} T(h)`
 
-## 2. Do not treat raw ensemble members as calibrated probabilities
+A common modeling error is:
 
-Raw ensemble systems can be biased, under/over-dispersed, and station/grid mismatched. A useful simple baseline is EMOS / non-homogeneous Gaussian regression:
+`max_h E[T(h)]`
 
-`X ~ Normal(mu, sigma^2)`
+which is not equal to:
 
-with a location model such as:
+`E[max_h T(h)]`.
 
-`mu = a + sum_k b_k * model_summary_k`
+For ensemble member `m`:
 
-and spread model:
+`H_m = max_h T_m(h)`.
 
-`sigma^2 = c + d*S^2`
+The raw empirical daily-max CDF is:
 
-where `S^2` is ensemble spread (or a model-specific spread vector).
+`F_raw(x) = (1/M) Σ_m 1(H_m <= x)`.
 
-Parameters should be conditional where data permits on:
+This preserves path dependence and peak timing.
 
-- resolution station;
+### Resolver transformation
+
+Let `g()` represent the contract-specific measurement and rounding rule. Examples include whole °C, whole °F or a 2°F range.
+
+The contract probability is:
+
+`q_i = P(g(H) ∈ B_i)`.
+
+The resolver function belongs inside the model, not as a display-layer conversion.
+
+---
+
+## 2. Calibration of raw ensemble maxima
+
+Raw ensemble frequency is not automatically a calibrated probability. Calibrate by station, model, horizon and regime.
+
+A compact residual-dressing approach:
+
+`H_actual = H_model + b_s,m,l,c + ε_s,m,l,c`
+
+where:
+
+- `s` = station;
+- `m` = model;
+- `l` = lead-time bucket;
+- `c` = cycle/season/regime;
+- `b` = learned bias;
+- `ε` = empirical residual distribution.
+
+Then sample or analytically convolve the member maxima with the residual distribution.
+
+### EMOS-style alternative
+
+For an ensemble mean `μ_e` and spread `σ_e`:
+
+`H ~ D(a + b μ_e, c + d σ_e²)`
+
+where distribution `D` can be Gaussian, truncated Gaussian, logistic, Student-t, skew-normal or another family chosen by calibrated bucket likelihood rather than habit.
+
+For daily temperature maxima, the tail shape matters because Polymarket buckets are narrow.
+
+### Hierarchical shrinkage
+
+Small city samples can share information:
+
+`bias_station = λ_station * local_bias + (1-λ_station) * regional/global_bias`
+
+with `λ` increasing with effective local sample size.
+
+This preserves city specificity without estimating noisy independent parameters from a handful of days.
+
+---
+
+## 3. Multi-model blending
+
+Suppose each model `k` produces a calibrated bucket distribution `q_{ik}`.
+
+Linear pool:
+
+`q_i = Σ_k w_k q_{ik}`, with `w_k >= 0`, `Σ w_k = 1`.
+
+Weights can vary by:
+
+- station;
 - lead time;
-- season;
 - forecast cycle;
-- broad weather regime.
+- month/season;
+- weather regime.
 
-A simpler alternative worth testing first is empirical residual correction / quantile mapping of the member-max distribution.
+Use point-in-time scoring history to estimate weights. A simple exponentially weighted log-score or Brier-score weighting often captures most of the value.
 
-The calibration loss should be a proper score: CRPS for the continuous maximum distribution, plus Brier/log loss for the exact Polymarket bucket probabilities. Trading PnL remains the final selection criterion.
+Logarithmic opinion pool:
 
-## 3. Multi-model ensembles are not one giant bag of equally weighted members
+`q_i ∝ Π_k q_{ik}^{w_k}`
 
-Naively pooling 50 ECMWF members, 30 GFS members, and smaller ensembles gives model weight according to ensemble size rather than skill. Models are also correlated.
+can produce sharper consensus when independent models agree.
 
-Prefer:
+The economic scoring target is trading PnL / log loss on resolver buckets rather than generic 2m-temperature RMSE.
 
-1. estimate a calibrated CDF `F_k(x)` per model;
-2. combine CDFs using station/lead/regime weights learned from historical point-in-time forecasts;
-3. constrain weights sensibly rather than allowing one short sample to create absurd coefficients.
+---
 
-Simple linear pool:
+## 4. Same-day conditional maximum
 
-`F(x) = sum_k w_k F_k(x),  sum_k w_k = 1`
+This is the highest-priority math.
 
-Weights can be chosen by rolling CRPS/log score. A dynamically weighted model can be tested later, but static station×horizon weights are a strong low-complexity baseline.
+At time `t` define:
 
-## 4. Same-day markets are conditional-max problems
+`M_t = max_{h<=t} O(h)`
 
-At time `t`, let:
+where `O(h)` is the resolver-aligned observed temperature.
 
-`M_obs(t) = max temperature actually observed at the resolver station so far`
+Future remaining maximum:
 
-and let `M_future(t)` be the maximum temperature from the remaining hours. Then:
+`R_t = max_{h>t} T(h)`.
 
-`M_final = max(M_obs(t), M_future(t))`
+Final high:
 
-For any threshold `x < M_obs(t)`:
+`H = max(M_t, R_t)`.
 
-`P(M_final <= x | information_t) = 0`
+Immediately:
 
-For `x >= M_obs(t)`:
+`P(H < M_t) = 0`.
 
-`P(M_final <= x | information_t) = P(M_future(t) <= x | information_t)`
+For `x >= M_t`:
 
-Use the remaining ensemble **paths**, preserving hourly dependence. Also update those paths with the day's observed forecast error: if every model is already running +1.4°F cold at the station under a persistent regime, the conditional distribution should move.
+`P(H <= x | I_t) = P(R_t <= x | I_t)`.
 
-Useful same-day state variables:
+### Observation-conditioned member paths
 
-- observed maximum so far;
-- current station temperature/dew point/wind/clouds;
-- time relative to climatological peak;
-- latest model-run age;
-- today's model-vs-observation residual;
-- cloud/radar/sea-breeze/convection regime;
-- remaining ensemble-path maxima.
+Each model/member has an observed error at time `t`:
 
-## 5. Convert the continuous distribution into the resolver's discrete buckets
+`e_m(t) = O(t) - T_m(t)`.
 
-Never assume bucket boundaries until the contract rules and resolver reporting are verified.
+Correct remaining path:
 
-If a contract resolves on an integer-valued reported temperature `R(X)`, then for bucket `B_i`:
+`T*_m(h) = T_m(h) + b_{s,m,l} + α_m(h-t) e_m(t)`.
 
-`q_i = P(R(X) in B_i)`
+`α(Δ)` describes how much a current local model error persists into the next few hours. It is estimated historically and generally decays with lead.
 
-The mapping `R()` must reproduce the resolver source's actual reporting/rounding semantics. If Wunderground displays a whole-degree station maximum derived from METARs, empirically validate how that display relates to raw observations before assuming `[x-0.5, x+0.5)`.
+Then:
 
-This is especially important for edge buckets such as `<= 72°F` and `>= 81°F`.
+`H_m(t) = max(M_t, max_{h>t} T*_m(h))`.
 
-## 6. Fair probability is only the beginning: executable EV
+Apply residual dressing and resolver transformation to `{H_m(t)}`.
 
-Let `q` be our fair YES probability.
+### Peak-crossing formulation
 
-### Taker YES
+Suppose current resolver value maps to bucket `b`, whose next upper decision boundary is `u_b`.
 
-For an executable YES ask `a`, held to resolution:
+The core late-day probability is:
 
-`EV_yes_per_share = q - a - fee(a)`
+`r_t = P(max_{h>t} T(h) >= u_b | I_t)`.
 
-where current fee-enabled Weather markets use the Polymarket fee schedule and the exact per-order rounding rules.
+If there is no lower ambiguity because `M_t` is already in `b`, then approximately:
 
-### Taker NO
+`q_b(t) = 1 - r_t`.
 
-For executable NO ask `n`:
+This makes the strategy computationally simple near the peak: estimate one exceedance probability accurately.
 
-`EV_no_per_share = (1-q) - n - fee(n)`
+---
 
-### Maker order
+## 5. Same-day conditional minimum
 
-For a maker limit `l`, the conditional value is more complex:
+For low-temperature markets:
 
-`EV_maker ~= P(fill) * [fair_value_after_fill - l + expected_rebate - adverse_selection]`
+`m_t = min_{h<=t} O(h)`
 
-The probability after a fill is not the unconditional `q`: a fill may happen precisely because new weather information moved fair value through our stale quote. That adverse-selection term is central around forecast releases and same-day observations.
+`Rmin_t = min_{h>t} T(h)`
 
-## 7. Kelly sizing for a binary share
+`L = min(m_t, Rmin_t)`.
 
-If a YES share costs `a`, returns `$1` if YES and `$0` otherwise, and `f` is the fraction of bankroll spent on the position, the frictionless full-Kelly fraction is:
+Once the overnight/morning minimum is established, upper buckets become impossible. The key late-period probability becomes whether the temperature will fall below the next lower resolver boundary.
 
-`f* = (q - a) / (1 - a)`
+This is the mirror image of certainty-collapse in daily highs.
 
-for `q > a`.
+---
 
-For a NO share, replace `q` by `1-q` and `a` by the NO price.
+## 6. Cumulative precipitation
 
-With fees, slippage, fill uncertainty, and especially probability-estimation uncertainty, use the effective payoff distribution rather than this closed form. The main point: **sizing is downstream of probability calibration**. A 5-point probability error can overwhelm any sophistication in Kelly sizing.
+For monthly precipitation:
 
-A principled way to reduce overbetting without arbitrary caps is to integrate over uncertainty in `q`: maximize expected log wealth under the posterior / bootstrap distribution of the probability estimate.
+`P_final = A_t + R_t`
 
-## 8. The whole ladder must live on the probability simplex
+where:
 
-For `K` mutually exclusive temperature outcomes:
+- `A_t` = resolver-aligned accumulated precipitation through time `t`;
+- `R_t` = remaining-month precipitation.
+
+Precipitation is strongly non-Gaussian. Model `R_t` through ensemble totals or a zero-inflated / gamma-like distribution, then calibrate bucket probabilities directly.
+
+If bracket `B_i=[l_i,u_i)`:
+
+`q_i(t) = P(l_i - A_t <= R_t < u_i - A_t | I_t)`.
+
+Every realized rainfall event shifts the support permanently.
+
+---
+
+## 7. Running maximum for wind thresholds
+
+For a monthly highest-wind market:
+
+`W_final = max(W_obs,t, W_remaining,t)`.
+
+For threshold `K`:
+
+`P(W_final >= K) = 1` if `W_obs,t >= K`.
+
+Otherwise:
+
+`P(W_final >= K) = P(W_remaining,t >= K | I_t)`.
+
+Nested threshold contracts should obey monotonicity:
+
+`P(W>=85) >= P(W>=90) >= ... >= P(W>=115)`.
+
+Any market surface violating this relationship offers immediate structural information even without a superior weather model.
+
+---
+
+## 8. GISTEMP monthly anomaly mapping
+
+Let `G_m` be final NASA GISTEMP anomaly for month `m`.
+
+Useful proxy datasets `Z_m` include ERA5/ERA5T, NOAA GlobalTemp, Berkeley Earth and partial inputs closer to the NASA pipeline.
+
+Simple historical basis model:
+
+`G_m = a_month + b ERA5_m + c ENSO_m + d trend_m + ε_m`.
+
+A stronger model uses multiple datasets and revision-state variables:
+
+`G_m = f(ERA5T_m, GHCNcoverage_m, ERSST_m, NOAA_m, Berkeley_m, season, trend, previous revisions)`.
+
+For an unfinished month, use partial observed global temperature plus ensemble/weather predictions for remaining days:
+
+`ProxyFinal_m(t) = weighted_mean(observed days 1..t, forecast distribution days t+1..end)`.
+
+Then map the proxy into the historical GISTEMP basis distribution.
+
+The 0.05°C Polymarket buckets make residual standard deviation the key quantity. A model with 0.02–0.03°C residual error can create very different bucket probabilities from one with 0.06°C error even if both have tiny MAE in climate terms.
+
+---
+
+## 9. Full ladder coherence
+
+For mutually exclusive outcomes:
 
 `q_i >= 0`
 
-`sum_i q_i = 1`
-
 and:
 
-`P(NO_i) = 1 - q_i = sum_(j != i) q_j`
+`Σ_i q_i = 1`.
 
-This creates mechanical consistency checks.
+The weather model naturally satisfies this when all buckets partition the resolver state.
 
-### Buy-all-YES condition
+Quoted market midpoints generally will not sum exactly to one because of separate books and spreads. Build coherent market estimates by projecting an input price vector `p` onto the simplex:
 
-At executable asks `a_i`, with fees `f_i`:
+`q_market = argmin_q Σ_i w_i (q_i - p_i)^2`
 
-`sum_i (a_i + f_i) < 1`
+subject to `q_i>=0`, `Σ q_i=1`.
 
-is a locked-in gross payout opportunity if all legs can actually be filled at quoted depth and the contracts are truly one exhaustive negative-risk event.
+Weights can reflect spread/depth so liquid outcomes influence the projection more.
 
-### Sell-all-YES / mint route
+A logistic/entropy projection is another option.
 
-If the platform mechanics allow `$1` collateral to create the complete outcome set, then executable bids can create an opposite arbitrage when:
+---
 
-`sum_i (bid_i - fees_i) > 1`
+## 10. Negative-risk relationships
 
-The exact CTF / negative-risk adapter path and inventory constraints need to be verified before implementation.
+In a negative-risk event, one NO share in outcome `i` can convert to one YES share in every other outcome.
 
-### NO vs basket consistency
+Economically:
 
-For outcome `i`, compare the executable NO_i price with the executable basket of every other YES. Negative-risk conversion should keep these linked, but thin books can still create temporary depth-level discrepancies.
+`NO_i ≡ basket(YES_j for j != i)`.
 
-## 9. Use the market as information, not truth
+Fair probability:
 
-The market price may contain signals our weather model misses. Test a calibrated combination rather than either ignoring price or blindly accepting it:
+`q(NO_i) = 1 - q_i = Σ_{j != i} q_j`.
 
-`logit(q_final) = alpha + beta_w*logit(q_weather) + beta_m*logit(p_market) + beta_f*wallet_flow + regime_terms`
+At executable prices, compare:
 
-Regime terms can include:
+- buying NO_i;
+- buying the other-YES basket;
+- selling either expression when inventory/conversion permits.
 
-- hours to resolution;
-- bid/ask spread and depth;
-- forecast-run age;
-- observation availability;
-- city/station;
-- whether a major forecast update just landed.
+Depth and transaction fees determine realizable size.
 
-If `beta_m` is large in some regimes and small in others, the correct strategy is regime-dependent.
+---
 
-## 10. Forecast-release alpha is an event study
+## 11. Market as prior / feature
 
-For every forecast release `r`, compute the information shock, for example:
+Let `m_i` be a coherent market probability estimate and `w_i` a weather model probability.
 
-`delta_q_weather = q_new - q_old`
+A compact residual learner:
 
-Then measure market response at lags `0, 1, 2, 5, 10, 30, 60...` minutes using executable books, not only mids.
+`logit(q_i*) = a + b logit(w_i) + c logit(m_i) + β'X_i`.
 
-Questions:
+`X_i` can contain:
 
-- How much of `delta_q_weather` is reflected immediately?
-- Does response speed vary by city/liquidity/time of day?
-- Can a taker monetize the first minutes after release after fees?
-- Is the better trade a maker quote placed before the release and repriced instantly afterward?
-
-The edge exists only if the point-in-time forecast was obtainable before the market move.
-
-## 11. Profit diagnostics
-
-For every candidate edge, segment realized / simulated net PnL by:
-
-- city/station;
-- horizon;
-- price bucket;
-- YES vs NO;
-- distance of bucket from forecast median;
-- forecast-cycle age;
+- weather-model disagreement;
+- lead time;
+- city;
+- time since latest forecast update;
 - spread/depth;
-- model disagreement;
-- same-day observed-high state;
-- wallet-flow state;
-- maker/taker route.
+- specialist-wallet flow.
 
-Probability diagnostics still matter because they reveal whether profits came from real informational edge or accidental exposure:
+The learned coefficients tell us where independent weather information has incremental predictive value over the crowd.
 
-- Brier score;
+Because outcomes are mutually exclusive, fit the multi-class version with softmax or transform logits and renormalize.
+
+---
+
+## 12. Taker expected value
+
+For a YES token with true probability `q` and executable ask `a`:
+
+`gross_EV/share = q - a`.
+
+Current Weather taker fee on fee-enabled markets:
+
+`fee(a) = 0.05 * a * (1-a)`.
+
+Holding to resolution:
+
+`net_EV_taker/share = q - a - fee(a)`.
+
+Expected return on cash spent:
+
+`ROI = (q - a - fee(a)) / (a + fee(a))`.
+
+For NO, replace `q` with `1-q_yes` and use the executable NO ask.
+
+### Fee hurdle examples
+
+At 50¢ the weather fee is 1.25¢ per share, so a taker needs fair probability above 51.25% to have positive pre-slippage EV.
+
+At 20¢ the fee is 0.8¢ per share, so fair probability above 20.8% clears the fee hurdle.
+
+At 5¢ the fee is 0.2375¢ per share, a large percentage of the cheap token's cost.
+
+This is one reason raw “model probability minus midpoint” overstates usable edge.
+
+---
+
+## 13. Maker expected value
+
+Suppose we post a buy at `b < ask` and it fills.
+
+Per filled share:
+
+`EV_maker_filled = q_after_fill - b + rebate_share - adverse_selection_cost`.
+
+The relevant opportunity-level expectation is:
+
+`EV_opportunity = P(fill) * EV_maker_filled + P(no fill) * opportunity_cost`.
+
+For fast forecast shocks, crossing may dominate because fill delay loses the information edge. For slower fair-value convergence, maker execution can dominate due to zero maker fee, spread improvement and rebates.
+
+This comparison belongs to each signal rather than one global execution mode.
+
+---
+
+## 14. Optimal size from marginal EV and depth
+
+Binary Kelly under known `q` and price `p` is a useful starting point, but capacity and probability uncertainty matter.
+
+For YES at total cost per share `c = p + fee` and payout 1, full Kelly fraction on bankroll can be written from binary odds. In practice, the economically useful size is the maximum of expected log growth or expected dollars after accounting for:
+
+- probability estimation uncertainty;
+- order-book price ladder;
+- correlated city/weather exposures;
+- capital lock until resolution;
+- competing opportunities.
+
+A direct depth-aware expected-PnL calculation is often clearer:
+
+For orderbook levels `(p_k, size_k)`:
+
+`PnL_k = fill_k * (q - p_k - fee(p_k))`.
+
+Consume levels while marginal expected dollars remain attractive relative to alternative trades.
+
+---
+
+## 15. Information half-life
+
+For a forecast/observation shock at time `t0`, define market response:
+
+`Δp(τ) = p(t0+τ) - p(t0-)`.
+
+And fair-value shock:
+
+`Δq = q(new) - q(old)`.
+
+Capture ratio:
+
+`C(τ) = Δp(τ) / Δq`.
+
+If `C(10s)=0.2` and `C(5m)=0.8`, most of the edge remains briefly after release. If `C(1s)` is already near 1, the opportunity belongs to faster infrastructure or a different data source.
+
+Estimate half-life `τ50` where `C(τ50)=0.5`.
+
+This converts vague “market lag” into an execution parameter.
+
+---
+
+## 16. Wallet incremental information
+
+Let `S_w(t,i)` be signed flow from specialist wallet `w` into outcome `i`.
+
+A wallet factor can be:
+
+`W_i(t) = Σ_w α_{w,segment} * decay(t - trade_time_w) * signed_notional_w`.
+
+Estimate `α` from historical incremental predictive value within city/horizon/market family.
+
+The important regression is not whether a profitable wallet wins often. It is whether:
+
+`P(Y=i | market, weather, W) - P(Y=i | market, weather)`
+
+is economically meaningful.
+
+---
+
+## 17. Profit-first scoring
+
+Forecast scoring metrics:
+
 - log loss;
-- CRPS;
-- reliability curve;
-- PIT/rank histograms;
-- tail calibration.
+- Brier score;
+- CRPS for continuous extrema;
+- calibration curves;
+- tail reliability.
 
-But the strategy-level objective is **realized net PnL / deployed capital at executable prices**.
+Trading metrics:
 
-## Primary references
+- executable expected PnL;
+- realized PnL;
+- markout after entry;
+- fill-adjusted edge capture;
+- dollar capacity;
+- PnL per unit of locked capital;
+- opportunity frequency.
 
-- Gneiting et al. (2005), EMOS: https://doi.org/10.1175/MWR2904.1
-- Wilks & Hamill (2007), reforecast-based ensemble MOS: https://doi.org/10.1175/MWR3402.1
-- ECMWF ensemble guide: https://confluence.ecmwf.int/spaces/FUG/pages/673550376/Section+2A.1.2.1+Medium+Range+Ensemble+forecasts
-- NOAA NBM probabilistic elements: https://vlab.noaa.gov/web/mdl/nbm-weather-elements
-- Polymarket fees: https://docs.polymarket.com/trading/fees
-- Polymarket negative risk: https://docs.polymarket.com/advanced/neg-risk
+The model exists to improve the second group. The first group diagnoses where that improvement comes from.
