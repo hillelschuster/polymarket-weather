@@ -12,6 +12,7 @@ Start here: [`research/README.md`](research/README.md).
 
 - [`research/edge-thesis.md`](research/edge-thesis.md) — ranked hypotheses for where the money is
 - [`research/weather-math.md`](research/weather-math.md) — probability model and trading math
+- [`research/market-microstructure.md`](research/market-microstructure.md) — fees, maker economics, negative-risk ladders, depth and wallet fill attribution
 - [`research/wallets.md`](research/wallets.md) — profitable weather wallets to reverse-engineer
 - [`research/bots-and-tools.md`](research/bots-and-tools.md) — public bots/projects and what they miss
 - [`research/data-sources.md`](research/data-sources.md) — Polymarket + meteorological data sources
