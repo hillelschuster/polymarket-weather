@@ -1,0 +1,5 @@
+{
+  "url": "https://ensemble-api.open-meteo.com/v1/ensemble?latitude=45.61667&longitude=8.73333&hourly=temperature_2m%2Ctemperature_2m_spread&models=ecmwf_ifs025_ensemble_mean&run=2026-06-24T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+  "status": 400,
+  "body": "{\"reason\":\"The requested model run is not available. Model: ecmwf_ifs025_ensemble_mean, run: 2026-06-24T18:00Z\",\"error\":true}"
+}
