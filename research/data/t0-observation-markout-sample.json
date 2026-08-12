@@ -1,0 +1,3343 @@
+{
+  "generated_at": "2026-08-12T13:56:42.220685+00:00",
+  "cases": [
+    {
+      "name": "London Jul12 27C pre-breach",
+      "event_slug": "highest-temperature-in-london-on-july-12-2026",
+      "needles": [
+        "27"
+      ],
+      "anchor_ts": 1783862192,
+      "anchor_type": "pre_breach_trade",
+      "known_breach_ts": 1783862400,
+      "expected_final": "28C",
+      "event_title": "Highest temperature in London on July 12?",
+      "market_question": "Will the highest temperature in London be 27\u00b0C on July 12?",
+      "market_slug": "highest-temperature-in-london-on-july-12-2026-27c",
+      "condition_id": "0x1cbcd7f27f60388d43a9d3f1d5e7ed7d3cd31d1076c990a73ae48e644ef1f491",
+      "yes_token": "91076181803621459956200090324917139595424901620108017335569536029558392706177",
+      "no_token": "2655055245387824275985181109206555608704123016388750340070226258019209549699",
+      "token_label_source": "gamma",
+      "marks": [
+        {
+          "horizon_s": -300,
+          "target_ts": 1783861892,
+          "yes": {
+            "t": 1783861863,
+            "price": 0.12,
+            "offset_s": -29
+          },
+          "no": {
+            "t": 1783861864,
+            "price": 0.88,
+            "offset_s": -28
+          }
+        },
+        {
+          "horizon_s": 0,
+          "target_ts": 1783862192,
+          "yes": {
+            "t": 1783862163,
+            "price": 0.195,
+            "offset_s": -29
+          },
+          "no": {
+            "t": 1783862164,
+            "price": 0.805,
+            "offset_s": -28
+          }
+        },
+        {
+          "horizon_s": 300,
+          "target_ts": 1783862492,
+          "yes": {
+            "t": 1783862463,
+            "price": 0.12,
+            "offset_s": -29
+          },
+          "no": {
+            "t": 1783862464,
+            "price": 0.88,
+            "offset_s": -28
+          }
+        },
+        {
+          "horizon_s": 900,
+          "target_ts": 1783863092,
+          "yes": {
+            "t": 1783863064,
+            "price": 0.0005,
+            "offset_s": -28
+          },
+          "no": {
+            "t": 1783863065,
+            "price": 0.9995,
+            "offset_s": -27
+          }
+        },
+        {
+          "horizon_s": 1800,
+          "target_ts": 1783863992,
+          "yes": {
+            "t": 1783863963,
+            "price": 0.001,
+            "offset_s": -29
+          },
+          "no": {
+            "t": 1783863967,
+            "price": 0.999,
+            "offset_s": -25
+          }
+        },
+        {
+          "horizon_s": 3600,
+          "target_ts": 1783865792,
+          "yes": {
+            "t": 1783865763,
+            "price": 0.0005,
+            "offset_s": -29
+          },
+          "no": {
+            "t": 1783865764,
+            "price": 0.9995,
+            "offset_s": -28
+          }
+        },
+        {
+          "horizon_s": 7200,
+          "target_ts": 1783869392,
+          "yes": {
+            "t": 1783869364,
+            "price": 0.0005,
+            "offset_s": -28
+          },
+          "no": {
+            "t": 1783869365,
+            "price": 0.9995,
+            "offset_s": -27
+          }
+        }
+      ],
+      "market_trade_count_window": 374,
+      "yes_trade_count_window": 140,
+      "yes_trades_near_anchor": [
+        {
+          "timestamp": 1783862914,
+          "price": 0.001,
+          "size": 1000,
+          "side": "BUY",
+          "transactionHash": "0xf1520ce2dcb546eb5ec778ae90a0feb9c1f0aee45ea05e03ebeb6840ad117438",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862876,
+          "price": 0.001,
+          "size": 626.616,
+          "side": "BUY",
+          "transactionHash": "0x2898e904e7d1bcc8c2a02b92c1db7dbe9ca6e314d1588afe23b3e1b29c366f19",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862870,
+          "price": 0.001,
+          "size": 2196.47,
+          "side": "BUY",
+          "transactionHash": "0xb8252700f4e3d905ef45dee268b8f6479cd7556858cdcddfde2df4eee60ce82c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862863,
+          "price": 0.001,
+          "size": 89.65,
+          "side": "SELL",
+          "transactionHash": "0x1e53005334850b3329f5f3ae1883e28998c7893e5ad43449445ea4bbc188c0a2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862797,
+          "price": 0.001,
+          "size": 8.7,
+          "side": "BUY",
+          "transactionHash": "0xadebcac1f9fb8fc993b49f6f95d4de84a9f481d6cb02a9ddc79d9f3a5bc38851",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862710,
+          "price": 0.001,
+          "size": 8.7,
+          "side": "BUY",
+          "transactionHash": "0x29592168f8827cb330eacb986abe68a461e069b1c9f9bc042c6d252ab7ca143d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862659,
+          "price": 0.001,
+          "size": 100,
+          "side": "BUY",
+          "transactionHash": "0xdbede5ce2c1b4e44b17dce5a8d0ace8011fb4fcdce4cafe772852e23fd139092",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862659,
+          "price": 0.001,
+          "size": 15,
+          "side": "BUY",
+          "transactionHash": "0xdbede5ce2c1b4e44b17dce5a8d0ace8011fb4fcdce4cafe772852e23fd139092",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862659,
+          "price": 0.004,
+          "size": 10.35,
+          "side": "SELL",
+          "transactionHash": "0xade746b36511ec680ae44b97bab47e47fc2e0cf2e22ea2c2baab40cd83eed4cb",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862624,
+          "price": 0.001,
+          "size": 100,
+          "side": "SELL",
+          "transactionHash": "0xf32483ebbac704ef57577ac127161ad18cc2d17b12ac39c0137fbf117a054c34",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862624,
+          "price": 0.001,
+          "size": 100,
+          "side": "BUY",
+          "transactionHash": "0xf32483ebbac704ef57577ac127161ad18cc2d17b12ac39c0137fbf117a054c34",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862477,
+          "price": 0.01,
+          "size": 150,
+          "side": "BUY",
+          "transactionHash": "0xeafa86305808a0f9c978133f152a8f211e5433abd682afc53a134c6dbd3083ba",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862477,
+          "price": 0.01,
+          "size": 17.59,
+          "side": "BUY",
+          "transactionHash": "0xeafa86305808a0f9c978133f152a8f211e5433abd682afc53a134c6dbd3083ba",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862477,
+          "price": 0.02,
+          "size": 67.03,
+          "side": "BUY",
+          "transactionHash": "0xeafa86305808a0f9c978133f152a8f211e5433abd682afc53a134c6dbd3083ba",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862477,
+          "price": 0.03,
+          "size": 65,
+          "side": "BUY",
+          "transactionHash": "0xeafa86305808a0f9c978133f152a8f211e5433abd682afc53a134c6dbd3083ba",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862477,
+          "price": 0.03,
+          "size": 100,
+          "side": "BUY",
+          "transactionHash": "0xeafa86305808a0f9c978133f152a8f211e5433abd682afc53a134c6dbd3083ba",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862477,
+          "price": 0.07,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xeafa86305808a0f9c978133f152a8f211e5433abd682afc53a134c6dbd3083ba",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862447,
+          "price": 0.05,
+          "size": 57.29,
+          "side": "BUY",
+          "transactionHash": "0xbcb719a9415a24e2ce24c5add3605ce8d53f82d56bbc4d27233a1c4b239d22a2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862447,
+          "price": 0.06,
+          "size": 8,
+          "side": "BUY",
+          "transactionHash": "0xbcb719a9415a24e2ce24c5add3605ce8d53f82d56bbc4d27233a1c4b239d22a2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862447,
+          "price": 0.06,
+          "size": 22.91,
+          "side": "BUY",
+          "transactionHash": "0xbcb719a9415a24e2ce24c5add3605ce8d53f82d56bbc4d27233a1c4b239d22a2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862447,
+          "price": 0.09,
+          "size": 17.36,
+          "side": "BUY",
+          "transactionHash": "0xbcb719a9415a24e2ce24c5add3605ce8d53f82d56bbc4d27233a1c4b239d22a2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862447,
+          "price": 0.1,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xbcb719a9415a24e2ce24c5add3605ce8d53f82d56bbc4d27233a1c4b239d22a2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862447,
+          "price": 0.11,
+          "size": 125.59,
+          "side": "BUY",
+          "transactionHash": "0xbcb719a9415a24e2ce24c5add3605ce8d53f82d56bbc4d27233a1c4b239d22a2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862443,
+          "price": 0.1340139211,
+          "size": 8.62,
+          "side": "BUY",
+          "transactionHash": "0x01b1ea511456d5f0338174e60ed4015fe33efb97d00a5b039a7acad702d743ca",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862417,
+          "price": 0.0900000004,
+          "size": 182.630877,
+          "side": "BUY",
+          "transactionHash": "0xa4eb0554c87ac1548bea1dcef91656e4b53cbcbc265f88273cd7b68b76354cee",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862417,
+          "price": 0.11,
+          "size": 29.31,
+          "side": "BUY",
+          "transactionHash": "0xa4eb0554c87ac1548bea1dcef91656e4b53cbcbc265f88273cd7b68b76354cee",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862389,
+          "price": 0.1,
+          "size": 63.94,
+          "side": "BUY",
+          "transactionHash": "0x0ee35eba0e3cf5a7ec9c154d9af79d9d5d20db4154ef15c2fbfecbacbab39bac",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862360,
+          "price": 0.1,
+          "size": 7.11,
+          "side": "BUY",
+          "transactionHash": "0xafe25f52ee5670e7b93edb66b38cd9577b7c0d7cacfb877c459faf5f8535b88f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862360,
+          "price": 0.11,
+          "size": 8,
+          "side": "BUY",
+          "transactionHash": "0xafe25f52ee5670e7b93edb66b38cd9577b7c0d7cacfb877c459faf5f8535b88f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862347,
+          "price": 0.11,
+          "size": 7.81,
+          "side": "BUY",
+          "transactionHash": "0x567931ea65b8e9e42b851188d2fe4dc8ddfaa56af02c94c492de917ba0022f8a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862347,
+          "price": 0.11,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x567931ea65b8e9e42b851188d2fe4dc8ddfaa56af02c94c492de917ba0022f8a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862347,
+          "price": 0.11,
+          "size": 10,
+          "side": "BUY",
+          "transactionHash": "0x567931ea65b8e9e42b851188d2fe4dc8ddfaa56af02c94c492de917ba0022f8a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862347,
+          "price": 0.11,
+          "size": 5.19,
+          "side": "BUY",
+          "transactionHash": "0x567931ea65b8e9e42b851188d2fe4dc8ddfaa56af02c94c492de917ba0022f8a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862332,
+          "price": 0.110000032,
+          "size": 2.808981,
+          "side": "BUY",
+          "transactionHash": "0x0eb62a642fa650202a59106516387a6b1a8abc9f1a7c739dc8f18a3c1ba16ca5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862294,
+          "price": 0.12,
+          "size": 0.47,
+          "side": "BUY",
+          "transactionHash": "0x4d7f0e31ac324d01a44f18714353c47d305dcc6aff95f32b62d9d78ae9e0ff3f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862294,
+          "price": 0.12,
+          "size": 10,
+          "side": "BUY",
+          "transactionHash": "0x4d7f0e31ac324d01a44f18714353c47d305dcc6aff95f32b62d9d78ae9e0ff3f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862294,
+          "price": 0.13,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x4d7f0e31ac324d01a44f18714353c47d305dcc6aff95f32b62d9d78ae9e0ff3f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862294,
+          "price": 0.12,
+          "size": 2.413175,
+          "side": "BUY",
+          "transactionHash": "0xb31167cabb489f1f1d6f57e762187992823dab5ec1e965e9d2c43017620cbdc9",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862294,
+          "price": 0.12,
+          "size": 7.53,
+          "side": "BUY",
+          "transactionHash": "0xb31167cabb489f1f1d6f57e762187992823dab5ec1e965e9d2c43017620cbdc9",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862261,
+          "price": 0.19,
+          "size": 15,
+          "side": "BUY",
+          "transactionHash": "0x9c43ef9db8fff199b4f5e343e7ef005c0aebebf0db45f0088b7332503cce4ed8",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862260,
+          "price": 0.17,
+          "size": 2.21,
+          "side": "BUY",
+          "transactionHash": "0xbeb70955525f48b9cebe25dafb21b724a337e290f9c5978ac6695fa3f64ab296",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862260,
+          "price": 0.17,
+          "size": 5.79,
+          "side": "BUY",
+          "transactionHash": "0xbeb70955525f48b9cebe25dafb21b724a337e290f9c5978ac6695fa3f64ab296",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862260,
+          "price": 0.17,
+          "size": 2.79,
+          "side": "BUY",
+          "transactionHash": "0x35ed085d29f630c8999d063029a378d611553695901b102397bd95b98657a886",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862246,
+          "price": 0.2,
+          "size": 15,
+          "side": "BUY",
+          "transactionHash": "0xb07adf2a0752132955ccfab2400685ba9e26c13877b81ab3269e5e99fe0f3691",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862243,
+          "price": 0.17,
+          "size": 10,
+          "side": "BUY",
+          "transactionHash": "0x36a87a493f5144cb644e9163113d922ac675484ae0f172639df62190c00d2bb4",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862243,
+          "price": 0.17,
+          "size": 10,
+          "side": "BUY",
+          "transactionHash": "0xc240bf627403af3949e5296af376aec978df7a9b0fb6c03313d882127eea7777",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862192,
+          "price": 0.2656227502,
+          "size": 166.68,
+          "side": "BUY",
+          "transactionHash": "0xa980bbca4a7df7cc9a6a80efaacf0b277181e963a73ce2625a9dc8618e8a9597",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862179,
+          "price": 0.17,
+          "size": 3,
+          "side": "BUY",
+          "transactionHash": "0x56cd4ff938d4dc41ea881340e471135300ad2a9f603b4bbdb89a15cde8c9f16f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862119,
+          "price": 0.17,
+          "size": 10,
+          "side": "BUY",
+          "transactionHash": "0x8ff16d536dbedff74cf468e359344973778ab9e5056c0785dd54b1a333dc3532",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862060,
+          "price": 0.17,
+          "size": 6.66,
+          "side": "SELL",
+          "transactionHash": "0x75b34b7d85aa4baf06b14148de17329592ddf84563ee3f1b30357b102501288f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862060,
+          "price": 0.17,
+          "size": 6.66,
+          "side": "BUY",
+          "transactionHash": "0x75b34b7d85aa4baf06b14148de17329592ddf84563ee3f1b30357b102501288f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862057,
+          "price": 0.17,
+          "size": 43.79,
+          "side": "SELL",
+          "transactionHash": "0xbcc64d04fa030eea1885a5c22b01cad314f678d1cb8683ad2d49dd4f4253c081",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783862057,
+          "price": 0.17,
+          "size": 43.79,
+          "side": "BUY",
+          "transactionHash": "0xbcc64d04fa030eea1885a5c22b01cad314f678d1cb8683ad2d49dd4f4253c081",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861976,
+          "price": 0.230932729,
+          "size": 22.344165,
+          "side": "BUY",
+          "transactionHash": "0xd1d4972b0a9e36e2215baec36d1fb8630819c7fea606d690750b7e89c23a6235",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861964,
+          "price": 0.1646511628,
+          "size": 10.75,
+          "side": "BUY",
+          "transactionHash": "0x3a0499bf88a6849dfcd5bc4c4573a643f5d12d5795db0d2d17ea336b59dd1d22",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861964,
+          "price": 0.16,
+          "size": 5.75,
+          "side": "SELL",
+          "transactionHash": "0x3a0499bf88a6849dfcd5bc4c4573a643f5d12d5795db0d2d17ea336b59dd1d22",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861919,
+          "price": 0.13,
+          "size": 11.89,
+          "side": "BUY",
+          "transactionHash": "0xeacb37716acc256bab3e6708e2768f79d36ed2de4012338094971cfab7b9c83b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861910,
+          "price": 0.1,
+          "size": 8,
+          "side": "SELL",
+          "transactionHash": "0x600d210cfe92eee267b15e908b12143b2da003c9127a2466e621ff93f422fe9a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861910,
+          "price": 0.1,
+          "size": 8,
+          "side": "BUY",
+          "transactionHash": "0x600d210cfe92eee267b15e908b12143b2da003c9127a2466e621ff93f422fe9a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861882,
+          "price": 0.110000089,
+          "size": 1.12359,
+          "side": "BUY",
+          "transactionHash": "0x41af076e5197197972f62711053d59d717b306f69afe43eb0a9d9c013d7417a8",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861807,
+          "price": 0.13,
+          "size": 33.1,
+          "side": "BUY",
+          "transactionHash": "0x65142f9da3cb57b48c10ddc8198836f2d0d8f45ab3b5cba4b97963462d3f8d98",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861807,
+          "price": 0.13,
+          "size": 25.1,
+          "side": "SELL",
+          "transactionHash": "0x65142f9da3cb57b48c10ddc8198836f2d0d8f45ab3b5cba4b97963462d3f8d98",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861793,
+          "price": 0.1100000445,
+          "size": 2.24719,
+          "side": "BUY",
+          "transactionHash": "0xe0cabc22ea8407aa0597d2121d82d9f1811d3a079a00d9e5ed3519741a93efae",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861792,
+          "price": 0.1,
+          "size": 29.11,
+          "side": "SELL",
+          "transactionHash": "0x316dc23c8f90d8da05f4264546ca2588c8fbf01fd301b8cbfdf4c473ab701ab1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861792,
+          "price": 0.1,
+          "size": 25.04,
+          "side": "BUY",
+          "transactionHash": "0x316dc23c8f90d8da05f4264546ca2588c8fbf01fd301b8cbfdf4c473ab701ab1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861781,
+          "price": 0.11,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x959a71d09ecc224fbd0f00a16ac99025b6f58c70739e87c6cd9cd880bf56abb4",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861769,
+          "price": 0.1931589394,
+          "size": 51.770832,
+          "side": "BUY",
+          "transactionHash": "0x9455cc62f8131ef7787a4873927bb113fe358b7e8b7d1064ee58aaff7b07823d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861751,
+          "price": 0.1733333333,
+          "size": 18,
+          "side": "BUY",
+          "transactionHash": "0x46aecb7d514cbec2e2ac8c29ab23b9ba1030ad2b9a087b5c6a4105e88db798a4",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861375,
+          "price": 0.14,
+          "size": 2.24,
+          "side": "BUY",
+          "transactionHash": "0x4debe139abccb7b56085fd0e093ee7eb1ecbb3dd44318390a359652feeba7d83",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861373,
+          "price": 0.13,
+          "size": 2,
+          "side": "BUY",
+          "transactionHash": "0xea5da9f9639c25bbe89ede4440bdf79b704dfe363068dd521f4e64d4cb9fb1ae",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861349,
+          "price": 0.12,
+          "size": 37.9,
+          "side": "BUY",
+          "transactionHash": "0x8d6775501e236e1a1aac98bcf58b7211a13dc1e115271b3e053f29226ab1034c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861349,
+          "price": 0.12,
+          "size": 29.9,
+          "side": "SELL",
+          "transactionHash": "0x8d6775501e236e1a1aac98bcf58b7211a13dc1e115271b3e053f29226ab1034c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861334,
+          "price": 0.1771060697,
+          "size": 17.277776,
+          "side": "BUY",
+          "transactionHash": "0x498a5bb0f39c23a84dc9bcfc81a985375a1c0705acc997b473e8516422d70053",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861333,
+          "price": 0.1500000283,
+          "size": 3.529406,
+          "side": "BUY",
+          "transactionHash": "0xec552c6c94b107ae3dec2f4cc358322cd536c88bc88746d921a73db6591023ea",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861333,
+          "price": 0.15,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x978d4ee9b242a2816e19eeaf6b294a91fddb63b23fc6b4a9f2b3404588c8146c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861331,
+          "price": 0.05,
+          "size": 42.70946,
+          "side": "BUY",
+          "transactionHash": "0xc723df5d190fd86c25b014275986f8967ec1f9c3be51d1ccfe5b926b1283423b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861331,
+          "price": 0.06,
+          "size": 100,
+          "side": "BUY",
+          "transactionHash": "0xc723df5d190fd86c25b014275986f8967ec1f9c3be51d1ccfe5b926b1283423b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861331,
+          "price": 0.07,
+          "size": 13,
+          "side": "BUY",
+          "transactionHash": "0xc723df5d190fd86c25b014275986f8967ec1f9c3be51d1ccfe5b926b1283423b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861331,
+          "price": 0.08,
+          "size": 25.2,
+          "side": "BUY",
+          "transactionHash": "0xc723df5d190fd86c25b014275986f8967ec1f9c3be51d1ccfe5b926b1283423b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861331,
+          "price": 0.08,
+          "size": 19,
+          "side": "BUY",
+          "transactionHash": "0xc723df5d190fd86c25b014275986f8967ec1f9c3be51d1ccfe5b926b1283423b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861331,
+          "price": 0.09,
+          "size": 8,
+          "side": "BUY",
+          "transactionHash": "0xc723df5d190fd86c25b014275986f8967ec1f9c3be51d1ccfe5b926b1283423b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1783861331,
+          "price": 0.1,
+          "size": 4.88,
+          "side": "BUY",
+          "transactionHash": "0xc723df5d190fd86c25b014275986f8967ec1f9c3be51d1ccfe5b926b1283423b",
+          "outcome": "Yes"
+        }
+      ],
+      "first_yes_trade_after_anchor": {
+        "timestamp": 1783862192,
+        "price": 0.2656227502,
+        "size": 166.68,
+        "side": "BUY",
+        "transactionHash": "0xa980bbca4a7df7cc9a6a80efaacf0b277181e963a73ce2625a9dc8618e8a9597",
+        "outcome": "Yes"
+      },
+      "error": null
+    },
+    {
+      "name": "Wellington Jul21 11C pre-breach",
+      "event_slug": "highest-temperature-in-wellington-on-july-21-2026",
+      "needles": [
+        "11"
+      ],
+      "anchor_ts": 1784598970,
+      "anchor_type": "pre_breach_trade",
+      "known_breach_ts": 1784601000,
+      "expected_final": "12C+",
+      "event_title": "Highest temperature in Wellington on July 21?",
+      "market_question": "Will the highest temperature in Wellington be 11\u00b0C on July 21?",
+      "market_slug": "highest-temperature-in-wellington-on-july-21-2026-11c",
+      "condition_id": "0x6b7d24a529bf4e36f4c1b5842010cf191022013856a8566e59494013ea68431f",
+      "yes_token": "76748272067837382739230047685515398146156859777720150966319724226568038370768",
+      "no_token": "101940427571296396096846204867677734529692848694090204797814015788501285652940",
+      "token_label_source": "gamma",
+      "marks": [
+        {
+          "horizon_s": -300,
+          "target_ts": 1784598670,
+          "yes": {
+            "t": 1784598665,
+            "price": 0.212,
+            "offset_s": -5
+          },
+          "no": {
+            "t": 1784598664,
+            "price": 0.788,
+            "offset_s": -6
+          }
+        },
+        {
+          "horizon_s": 0,
+          "target_ts": 1784598970,
+          "yes": {
+            "t": 1784598967,
+            "price": 0.041,
+            "offset_s": -3
+          },
+          "no": {
+            "t": 1784598966,
+            "price": 0.9605,
+            "offset_s": -4
+          }
+        },
+        {
+          "horizon_s": 300,
+          "target_ts": 1784599270,
+          "yes": {
+            "t": 1784599267,
+            "price": 0.239,
+            "offset_s": -3
+          },
+          "no": {
+            "t": 1784599266,
+            "price": 0.7565,
+            "offset_s": -4
+          }
+        },
+        {
+          "horizon_s": 900,
+          "target_ts": 1784599870,
+          "yes": {
+            "t": 1784599865,
+            "price": 0.1045,
+            "offset_s": -5
+          },
+          "no": {
+            "t": 1784599864,
+            "price": 0.902,
+            "offset_s": -6
+          }
+        },
+        {
+          "horizon_s": 1800,
+          "target_ts": 1784600770,
+          "yes": {
+            "t": 1784600766,
+            "price": 0.2715,
+            "offset_s": -4
+          },
+          "no": {
+            "t": 1784600765,
+            "price": 0.7285,
+            "offset_s": -5
+          }
+        },
+        {
+          "horizon_s": 3600,
+          "target_ts": 1784602570,
+          "yes": {
+            "t": 1784602567,
+            "price": 0.0005,
+            "offset_s": -3
+          },
+          "no": {
+            "t": 1784602565,
+            "price": 0.9995,
+            "offset_s": -5
+          }
+        },
+        {
+          "horizon_s": 7200,
+          "target_ts": 1784606170,
+          "yes": {
+            "t": 1784606165,
+            "price": 0.0005,
+            "offset_s": -5
+          },
+          "no": {
+            "t": 1784606164,
+            "price": 0.9995,
+            "offset_s": -6
+          }
+        }
+      ],
+      "market_trade_count_window": 991,
+      "yes_trade_count_window": 537,
+      "yes_trades_near_anchor": [
+        {
+          "timestamp": 1784599767,
+          "price": 0.07,
+          "size": 0.52,
+          "side": "SELL",
+          "transactionHash": "0x5f14fe378eb0550f2c8987bb4b58dfebf4755f4b7a9e9c67db55e146ea76aad7",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599764,
+          "price": 0.076,
+          "size": 70,
+          "side": "SELL",
+          "transactionHash": "0x66977861585e34a1392ada02a8a4944b2d73b382b0ed6ed9bfa242cce3126739",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599764,
+          "price": 0.084,
+          "size": 30,
+          "side": "BUY",
+          "transactionHash": "0x66977861585e34a1392ada02a8a4944b2d73b382b0ed6ed9bfa242cce3126739",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599764,
+          "price": 0.07,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x81930dc5644e0938c9af89ee8c50c1b8fbbe96f38e273f1613ccf527e6a6ab5e",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599764,
+          "price": 0.07,
+          "size": 5,
+          "side": "SELL",
+          "transactionHash": "0x81930dc5644e0938c9af89ee8c50c1b8fbbe96f38e273f1613ccf527e6a6ab5e",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599626,
+          "price": 0.119,
+          "size": 28,
+          "side": "BUY",
+          "transactionHash": "0x4489ef335bedb1f8029ab14e1ae5ee2b07238cd5c223a3529ba601cf6843ef87",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599626,
+          "price": 0.119,
+          "size": 28,
+          "side": "SELL",
+          "transactionHash": "0x4489ef335bedb1f8029ab14e1ae5ee2b07238cd5c223a3529ba601cf6843ef87",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599602,
+          "price": 0.119,
+          "size": 19,
+          "side": "BUY",
+          "transactionHash": "0x9e1fee3833506100837a5161dc139863c8e616e814b6f037b2ade192d0ebc301",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599602,
+          "price": 0.119,
+          "size": 19,
+          "side": "SELL",
+          "transactionHash": "0x9e1fee3833506100837a5161dc139863c8e616e814b6f037b2ade192d0ebc301",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599602,
+          "price": 0.185,
+          "size": 8.25,
+          "side": "SELL",
+          "transactionHash": "0x31b288e77fd5ebb6ff5ce1bebf0d405690674307f5a518e77bd655ac38d26cb8",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599591,
+          "price": 0.307999916,
+          "size": 8.051947,
+          "side": "BUY",
+          "transactionHash": "0xdb6028784a99dcf629373d677c68fea60a23eb0a078ef32c9702af4262e82e06",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599561,
+          "price": 0.2749484536,
+          "size": 24.25,
+          "side": "BUY",
+          "transactionHash": "0x24515a3a2d757b0810fc86d8bbae62637bd0a860edfb1255ca0f2f0a1148ee17",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599525,
+          "price": 0.2638156035,
+          "size": 16.792028,
+          "side": "BUY",
+          "transactionHash": "0xc408cce7fb15aa2240f2dbbaeb32c3b9c05fdbae1bd46b4a39f409026e72ca82",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599521,
+          "price": 0.141,
+          "size": 18.16,
+          "side": "SELL",
+          "transactionHash": "0x2d2fe6ef0ab21e5ca0a70efdbae17417d359853a55aada368f144884dc986976",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599521,
+          "price": 0.141,
+          "size": 8.05,
+          "side": "BUY",
+          "transactionHash": "0x2d2fe6ef0ab21e5ca0a70efdbae17417d359853a55aada368f144884dc986976",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599518,
+          "price": 0.1401313819,
+          "size": 44.07,
+          "side": "SELL",
+          "transactionHash": "0xefa8f336f6e3179eb5d027fc5738b2a7d17b82030d38b905515b9353b3ad846d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599518,
+          "price": 0.119,
+          "size": 25.97,
+          "side": "BUY",
+          "transactionHash": "0xefa8f336f6e3179eb5d027fc5738b2a7d17b82030d38b905515b9353b3ad846d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599518,
+          "price": 0.171,
+          "size": 8,
+          "side": "BUY",
+          "transactionHash": "0xefa8f336f6e3179eb5d027fc5738b2a7d17b82030d38b905515b9353b3ad846d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599518,
+          "price": 0.172,
+          "size": 5.09,
+          "side": "BUY",
+          "transactionHash": "0xefa8f336f6e3179eb5d027fc5738b2a7d17b82030d38b905515b9353b3ad846d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599444,
+          "price": 0.253043225,
+          "size": 19.759466,
+          "side": "BUY",
+          "transactionHash": "0xd7629f340139706800d2c33daeed3c315303adf5261e8288350c939f6ffd7653",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599444,
+          "price": 0.25,
+          "size": 5,
+          "side": "SELL",
+          "transactionHash": "0xd7629f340139706800d2c33daeed3c315303adf5261e8288350c939f6ffd7653",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599353,
+          "price": 0.213,
+          "size": 14.61,
+          "side": "SELL",
+          "transactionHash": "0xc5c8710ed6a6222909f8bc29d356085c6334b2427acd5e7612f80b06b5fcb1b4",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599353,
+          "price": 0.213,
+          "size": 14.61,
+          "side": "BUY",
+          "transactionHash": "0xc5c8710ed6a6222909f8bc29d356085c6334b2427acd5e7612f80b06b5fcb1b4",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599251,
+          "price": 0.2822649177,
+          "size": 35.39228,
+          "side": "BUY",
+          "transactionHash": "0x42ddd21645b405cbf08273956a419424a92f2bf6b18bd8c13a7f19f3ac97e2cb",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599228,
+          "price": 0.213,
+          "size": 2.54,
+          "side": "BUY",
+          "transactionHash": "0x627d37f759fc63fbd2a0a6150ac99335cd875bd997737e191e9e23fd5f7f5ac1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599225,
+          "price": 0.22,
+          "size": 7.5,
+          "side": "BUY",
+          "transactionHash": "0xfd45355c2e126bddbb4947edee242754a0daf2082090dff2b2c7ae7449d00d48",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599224,
+          "price": 0.2169998739,
+          "size": 4.608293,
+          "side": "BUY",
+          "transactionHash": "0x5de82731504287662e7ac99a02f774fba2295304bfcb97c439a58eae49c3cb8c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599224,
+          "price": 0.21899998,
+          "size": 31.232875,
+          "side": "BUY",
+          "transactionHash": "0xb4ca0cf0a90489836802adb0a586112288a077bf8e385df7d818de6c4ba1b25b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599224,
+          "price": 0.213,
+          "size": 11,
+          "side": "BUY",
+          "transactionHash": "0x46288f4183e6bfc23c3233588aa26d44bc3e3126535b305ce3def65f84ed91f5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599222,
+          "price": 0.1970906578,
+          "size": 36.18,
+          "side": "BUY",
+          "transactionHash": "0xede948933e03c46220b5daf4296eacd18d23a60dac3334a766c5d36607f5bf7b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599222,
+          "price": 0.2181245276,
+          "size": 10.315204,
+          "side": "BUY",
+          "transactionHash": "0x44d0802d94c7b7d35b1c69156b72c8b7dcc581056235c20cc60efb11490f4772",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599197,
+          "price": 0.1095847176,
+          "size": 24.08,
+          "side": "BUY",
+          "transactionHash": "0x5b8e5843a92fcc5279827b519397d6d48546543cbf88505a96f809c73388ba4e",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599197,
+          "price": 0.109,
+          "size": 7.04,
+          "side": "BUY",
+          "transactionHash": "0x3de4aa909fd55f12cc729a9a298c94cae2777484e305e763e19f59b4787d93c8",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599197,
+          "price": 0.13,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0xdb7b5c726559282cbbf614dbb7d741fbf860188b29e5f0eb7fcf7e814cfa97a1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599195,
+          "price": 0.0997840951,
+          "size": 100.216362,
+          "side": "BUY",
+          "transactionHash": "0xfa2eb28040b22f4574f5ee9fab5822fd9b5c6e98471d65210ca1e08971268103",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599195,
+          "price": 0.124,
+          "size": 40,
+          "side": "BUY",
+          "transactionHash": "0xb565de316e53c0a7087a4fc7c48f95b3a214aa229bdd5bf92f67cbe620f3b2b7",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599074,
+          "price": 0.039,
+          "size": 9.75,
+          "side": "BUY",
+          "transactionHash": "0x076e173d48502e8fdbd72f2f5d3bfa608e4d12441935db47046738cfa50776f1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599056,
+          "price": 0.124,
+          "size": 23.7,
+          "side": "SELL",
+          "transactionHash": "0x95c562a562f490725c6f77f15efb4341d673d1a72b143fdd577380126b87e00f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784599054,
+          "price": 0.059,
+          "size": 5.19,
+          "side": "SELL",
+          "transactionHash": "0x29a5116a0193fafb42f232425ac671223097245ff0be6ed04e4d8621d343b119",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598996,
+          "price": 0.035,
+          "size": 15.32,
+          "side": "BUY",
+          "transactionHash": "0x89fc78905d9f16dc7496c3ba2fccfb64483b0b1fa2e8c4bd62b9945f08c1b7fe",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598970,
+          "price": 0.0590997061,
+          "size": 29.780165,
+          "side": "BUY",
+          "transactionHash": "0xfde6e19660e6a98edd7328dfc68c2e4841e82b93bf7fc346c2827cc6cb5a3213",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598970,
+          "price": 0.058,
+          "size": 8.41,
+          "side": "SELL",
+          "transactionHash": "0xfde6e19660e6a98edd7328dfc68c2e4841e82b93bf7fc346c2827cc6cb5a3213",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598969,
+          "price": 0.023,
+          "size": 100,
+          "side": "BUY",
+          "transactionHash": "0x6585af8c37de0574d0d9328b9c74e90b583297aafbd7f5beecbba1ce51d75720",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598864,
+          "price": 0.02,
+          "size": 241.88,
+          "side": "SELL",
+          "transactionHash": "0xbc087e6c0dc51e18010292bb1cd2947b181c40e4aa1d6760a115fd2711f00d66",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598864,
+          "price": 0.02,
+          "size": 241.88,
+          "side": "BUY",
+          "transactionHash": "0xbc087e6c0dc51e18010292bb1cd2947b181c40e4aa1d6760a115fd2711f00d66",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598855,
+          "price": 0.021,
+          "size": 28.25,
+          "side": "SELL",
+          "transactionHash": "0x5a9a46724978d1c3435ef54f4b52db6054fc84f054f21149e81fbcd85f3014db",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598855,
+          "price": 0.021,
+          "size": 28.25,
+          "side": "BUY",
+          "transactionHash": "0x5a9a46724978d1c3435ef54f4b52db6054fc84f054f21149e81fbcd85f3014db",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598823,
+          "price": 0.021,
+          "size": 23.1,
+          "side": "SELL",
+          "transactionHash": "0xd121c1af9b260fc54024a7276a8b066d0d682937ad441ad1e0894f1ef309d8c1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598823,
+          "price": 0.021,
+          "size": 23.1,
+          "side": "BUY",
+          "transactionHash": "0xd121c1af9b260fc54024a7276a8b066d0d682937ad441ad1e0894f1ef309d8c1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598801,
+          "price": 0.020926569,
+          "size": 110.58,
+          "side": "SELL",
+          "transactionHash": "0x2eb7c0ddf322a4088d1ba1e845ef1c6916ed5acf64c335bdeaf894a71279f23a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598801,
+          "price": 0.02,
+          "size": 8.12,
+          "side": "BUY",
+          "transactionHash": "0x2eb7c0ddf322a4088d1ba1e845ef1c6916ed5acf64c335bdeaf894a71279f23a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598801,
+          "price": 0.021,
+          "size": 97.29,
+          "side": "BUY",
+          "transactionHash": "0x2eb7c0ddf322a4088d1ba1e845ef1c6916ed5acf64c335bdeaf894a71279f23a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598801,
+          "price": 0.021,
+          "size": 5.17,
+          "side": "BUY",
+          "transactionHash": "0x2eb7c0ddf322a4088d1ba1e845ef1c6916ed5acf64c335bdeaf894a71279f23a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598768,
+          "price": 0.0301312786,
+          "size": 1386.06,
+          "side": "SELL",
+          "transactionHash": "0x4930c681e9ec1b96822cd3bc5c3acc86c9de1fb1bc9b585d23e5f299cdae32d3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598768,
+          "price": 0.023,
+          "size": 5.19,
+          "side": "BUY",
+          "transactionHash": "0x4930c681e9ec1b96822cd3bc5c3acc86c9de1fb1bc9b585d23e5f299cdae32d3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598768,
+          "price": 0.03,
+          "size": 1000,
+          "side": "BUY",
+          "transactionHash": "0x4930c681e9ec1b96822cd3bc5c3acc86c9de1fb1bc9b585d23e5f299cdae32d3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598768,
+          "price": 0.031,
+          "size": 200,
+          "side": "BUY",
+          "transactionHash": "0x4930c681e9ec1b96822cd3bc5c3acc86c9de1fb1bc9b585d23e5f299cdae32d3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598768,
+          "price": 0.031,
+          "size": 18.29,
+          "side": "BUY",
+          "transactionHash": "0x4930c681e9ec1b96822cd3bc5c3acc86c9de1fb1bc9b585d23e5f299cdae32d3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598754,
+          "price": 0.032,
+          "size": 12,
+          "side": "BUY",
+          "transactionHash": "0xa4c5ebbcec25481180f4d58be1f1639c2f7f9b220af571f9b049c227fe45d9fb",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598750,
+          "price": 0.033,
+          "size": 5.35,
+          "side": "BUY",
+          "transactionHash": "0x426b9e0e98642278cff0c64c6203da4cdfd45c15e8cf6ef084d099c0bf139498",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598735,
+          "price": 0.041,
+          "size": 3.47,
+          "side": "SELL",
+          "transactionHash": "0x3a959e17a2022439c5db8faa582fa030bceec4b7621399fe55191b6bd723d790",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598732,
+          "price": 0.041,
+          "size": 9.74,
+          "side": "SELL",
+          "transactionHash": "0xe96195d7c38219d639a30f50f101883360ae20c0761843c89780b9fd9276abab",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598723,
+          "price": 0.041,
+          "size": 5,
+          "side": "SELL",
+          "transactionHash": "0x73f802fa8254c37f173602d9ff670ddeab890f3a9d6035bd6707d1207c3a2cdc",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598717,
+          "price": 0.041,
+          "size": 22.46,
+          "side": "SELL",
+          "transactionHash": "0x43304b22e6ff7a49dd325d29d1f230c01a7b85e87023c7067a1c2411785298bc",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598715,
+          "price": 0.041,
+          "size": 8,
+          "side": "BUY",
+          "transactionHash": "0x4ef0305a954c1c43f7b1faab9c932d5b88585227a1a4d04e1abc19e31845ba27",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598715,
+          "price": 0.041,
+          "size": 8,
+          "side": "SELL",
+          "transactionHash": "0x4ef0305a954c1c43f7b1faab9c932d5b88585227a1a4d04e1abc19e31845ba27",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598715,
+          "price": 0.0384423979,
+          "size": 29.86,
+          "side": "SELL",
+          "transactionHash": "0x6a3a6b42907cf7f7f2399e193148a1676717f27ead4c7c8e9df0ec05ecfbd8c0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598715,
+          "price": 0.032,
+          "size": 8.08,
+          "side": "BUY",
+          "transactionHash": "0x6a3a6b42907cf7f7f2399e193148a1676717f27ead4c7c8e9df0ec05ecfbd8c0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598715,
+          "price": 0.04,
+          "size": 3.65,
+          "side": "BUY",
+          "transactionHash": "0x6a3a6b42907cf7f7f2399e193148a1676717f27ead4c7c8e9df0ec05ecfbd8c0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598715,
+          "price": 0.041,
+          "size": 9.06,
+          "side": "BUY",
+          "transactionHash": "0x6a3a6b42907cf7f7f2399e193148a1676717f27ead4c7c8e9df0ec05ecfbd8c0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598715,
+          "price": 0.041,
+          "size": 5.06,
+          "side": "BUY",
+          "transactionHash": "0x6a3a6b42907cf7f7f2399e193148a1676717f27ead4c7c8e9df0ec05ecfbd8c0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598715,
+          "price": 0.041,
+          "size": 4.01,
+          "side": "BUY",
+          "transactionHash": "0x6a3a6b42907cf7f7f2399e193148a1676717f27ead4c7c8e9df0ec05ecfbd8c0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598714,
+          "price": 0.041,
+          "size": 12.33,
+          "side": "SELL",
+          "transactionHash": "0x82981a8c14afa29549983c62ccc65fe6c7ffb46d9fc484d868679076e50407d2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598714,
+          "price": 0.041,
+          "size": 1.02,
+          "side": "BUY",
+          "transactionHash": "0x82981a8c14afa29549983c62ccc65fe6c7ffb46d9fc484d868679076e50407d2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598714,
+          "price": 0.041,
+          "size": 5.15,
+          "side": "BUY",
+          "transactionHash": "0x82981a8c14afa29549983c62ccc65fe6c7ffb46d9fc484d868679076e50407d2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598714,
+          "price": 0.041,
+          "size": 6.16,
+          "side": "BUY",
+          "transactionHash": "0x82981a8c14afa29549983c62ccc65fe6c7ffb46d9fc484d868679076e50407d2",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598709,
+          "price": 0.041,
+          "size": 5,
+          "side": "SELL",
+          "transactionHash": "0x1d65fd2f9e352bea852b64c3237dbbd5a0d5cb53719eea0ec349f5c3e85fc465",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598709,
+          "price": 0.041,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x1d65fd2f9e352bea852b64c3237dbbd5a0d5cb53719eea0ec349f5c3e85fc465",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598694,
+          "price": 0.121,
+          "size": 0.36,
+          "side": "SELL",
+          "transactionHash": "0x4c4a842761fc1caf24b1b709c1073d79a21c665a8903b62e73c1294d141089a7",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598694,
+          "price": 0.121,
+          "size": 0.36,
+          "side": "BUY",
+          "transactionHash": "0x4c4a842761fc1caf24b1b709c1073d79a21c665a8903b62e73c1294d141089a7",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598693,
+          "price": 0.1213352808,
+          "size": 61.62,
+          "side": "SELL",
+          "transactionHash": "0xe1f3fb6417ca47e06f7629fea74f1ad5ce3763ced91aee6b90d2afae90c039d6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598693,
+          "price": 0.121,
+          "size": 40.96,
+          "side": "BUY",
+          "transactionHash": "0xe1f3fb6417ca47e06f7629fea74f1ad5ce3763ced91aee6b90d2afae90c039d6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598693,
+          "price": 0.122,
+          "size": 20.66,
+          "side": "BUY",
+          "transactionHash": "0xe1f3fb6417ca47e06f7629fea74f1ad5ce3763ced91aee6b90d2afae90c039d6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598645,
+          "price": 0.1215362162,
+          "size": 9.25,
+          "side": "SELL",
+          "transactionHash": "0x3d0b7a87f38032c2991e98a1357969124cc850c0bd8a00b0d8462f7672506a02",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598645,
+          "price": 0.121,
+          "size": 4.29,
+          "side": "BUY",
+          "transactionHash": "0x3d0b7a87f38032c2991e98a1357969124cc850c0bd8a00b0d8462f7672506a02",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598645,
+          "price": 0.122,
+          "size": 4.96,
+          "side": "BUY",
+          "transactionHash": "0x3d0b7a87f38032c2991e98a1357969124cc850c0bd8a00b0d8462f7672506a02",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598642,
+          "price": 0.122,
+          "size": 3.04,
+          "side": "SELL",
+          "transactionHash": "0x49cf5a5a1d1661237011b3ca8fc0852bb664a806c87fd852e88d135d89b6863c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598642,
+          "price": 0.122,
+          "size": 3.04,
+          "side": "BUY",
+          "transactionHash": "0x49cf5a5a1d1661237011b3ca8fc0852bb664a806c87fd852e88d135d89b6863c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598609,
+          "price": 0.2999999514,
+          "size": 12.333332,
+          "side": "BUY",
+          "transactionHash": "0x03ab1dd943e67905625e4892e6373dac5dd4babd864cb90de079a0b059ac08ac",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598609,
+          "price": 0.2999998447,
+          "size": 3.863332,
+          "side": "SELL",
+          "transactionHash": "0x03ab1dd943e67905625e4892e6373dac5dd4babd864cb90de079a0b059ac08ac",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598609,
+          "price": 0.3,
+          "size": 8.47,
+          "side": "SELL",
+          "transactionHash": "0x03ab1dd943e67905625e4892e6373dac5dd4babd864cb90de079a0b059ac08ac",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598609,
+          "price": 0.3,
+          "size": 9.25,
+          "side": "BUY",
+          "transactionHash": "0x8376189b1bf26b44b185de1e42fdf0254b3bd0b959b845aaa81717c46b75caf3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598609,
+          "price": 0.3,
+          "size": 9.25,
+          "side": "SELL",
+          "transactionHash": "0x8376189b1bf26b44b185de1e42fdf0254b3bd0b959b845aaa81717c46b75caf3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598607,
+          "price": 0.2999999611,
+          "size": 12.866665,
+          "side": "BUY",
+          "transactionHash": "0x59b15f09d44562bff32f22dfb0c7670b4a0a2006695e755be2347d37da91185f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598607,
+          "price": 0.2999999611,
+          "size": 12.866665,
+          "side": "SELL",
+          "transactionHash": "0x59b15f09d44562bff32f22dfb0c7670b4a0a2006695e755be2347d37da91185f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598607,
+          "price": 0.2999998636,
+          "size": 3.666665,
+          "side": "BUY",
+          "transactionHash": "0xf41caf9acfa875f53190b47b52b63562765064f68c6c0392b86c55eba847ba81",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598607,
+          "price": 0.2999998636,
+          "size": 3.666665,
+          "side": "SELL",
+          "transactionHash": "0xf41caf9acfa875f53190b47b52b63562765064f68c6c0392b86c55eba847ba81",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598607,
+          "price": 0.2999999182,
+          "size": 7.333332,
+          "side": "BUY",
+          "transactionHash": "0x66610c78c483270d84d3a7aa48057267148a2e859dc8ce4523e9f0e67564798a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598607,
+          "price": 0.2999999182,
+          "size": 7.333332,
+          "side": "SELL",
+          "transactionHash": "0x66610c78c483270d84d3a7aa48057267148a2e859dc8ce4523e9f0e67564798a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784598607,
+          "price": 0.299,
+          "size": 19.13,
+          "side": "BUY",
+          "transactionHash": "0xab87b1897931db0e981574652978c8a716d5a004d0702a395ea95e8af842b25b",
+          "outcome": "Yes"
+        }
+      ],
+      "first_yes_trade_after_anchor": {
+        "timestamp": 1784598970,
+        "price": 0.0590997061,
+        "size": 29.780165,
+        "side": "BUY",
+        "transactionHash": "0xfde6e19660e6a98edd7328dfc68c2e4841e82b93bf7fc346c2827cc6cb5a3213",
+        "outcome": "Yes"
+      },
+      "error": null
+    },
+    {
+      "name": "NYC Jul20 82-83F first-lock",
+      "event_slug": "highest-temperature-in-nyc-on-july-20-2026",
+      "needles": [
+        "82",
+        "83"
+      ],
+      "anchor_ts": 1784584260,
+      "anchor_type": "first_winning_bucket_observation",
+      "known_breach_ts": null,
+      "expected_final": "82-83F",
+      "event_title": "Highest temperature in NYC on July 20?",
+      "market_question": "Will the highest temperature in New York City be between 82-83\u00b0F on July 20?",
+      "market_slug": "highest-temperature-in-nyc-on-july-20-2026-82-83f",
+      "condition_id": "0x564564bf6bcd76cd5df03bdd40da7e9aab66412c08a7856825503cb886ac972f",
+      "yes_token": "17750026989324637430239624516804711284957008010968484738128557533693057790497",
+      "no_token": "101205885588399092964556045879319602133720846241869016814565154047489690851098",
+      "token_label_source": "gamma",
+      "marks": [
+        {
+          "horizon_s": -300,
+          "target_ts": 1784583960,
+          "yes": {
+            "t": 1784583965,
+            "price": 0.33,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1784583965,
+            "price": 0.67,
+            "offset_s": 5
+          }
+        },
+        {
+          "horizon_s": 0,
+          "target_ts": 1784584260,
+          "yes": {
+            "t": 1784584264,
+            "price": 0.495,
+            "offset_s": 4
+          },
+          "no": {
+            "t": 1784584264,
+            "price": 0.505,
+            "offset_s": 4
+          }
+        },
+        {
+          "horizon_s": 300,
+          "target_ts": 1784584560,
+          "yes": {
+            "t": 1784584564,
+            "price": 0.9865,
+            "offset_s": 4
+          },
+          "no": {
+            "t": 1784584565,
+            "price": 0.0135,
+            "offset_s": 5
+          }
+        },
+        {
+          "horizon_s": 900,
+          "target_ts": 1784585160,
+          "yes": {
+            "t": 1784585165,
+            "price": 0.9975,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1784585165,
+            "price": 0.0025,
+            "offset_s": 5
+          }
+        },
+        {
+          "horizon_s": 1800,
+          "target_ts": 1784586060,
+          "yes": {
+            "t": 1784586065,
+            "price": 0.9955,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1784586066,
+            "price": 0.0045,
+            "offset_s": 6
+          }
+        },
+        {
+          "horizon_s": 3600,
+          "target_ts": 1784587860,
+          "yes": {
+            "t": 1784587866,
+            "price": 0.9985,
+            "offset_s": 6
+          },
+          "no": {
+            "t": 1784587866,
+            "price": 0.0015,
+            "offset_s": 6
+          }
+        },
+        {
+          "horizon_s": 7200,
+          "target_ts": 1784591460,
+          "yes": {
+            "t": 1784591479,
+            "price": 0.9995,
+            "offset_s": 19
+          },
+          "no": {
+            "t": 1784591479,
+            "price": 0.0005,
+            "offset_s": 19
+          }
+        }
+      ],
+      "market_trade_count_window": 376,
+      "yes_trade_count_window": 222,
+      "yes_trades_near_anchor": [
+        {
+          "timestamp": 1784585158,
+          "price": 0.997,
+          "size": 51.15,
+          "side": "SELL",
+          "transactionHash": "0x31b1b8e3a82921b458e97207f061b31ca1027c6e85a948cc156c985915837b0d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784585158,
+          "price": 0.997,
+          "size": 51.15,
+          "side": "BUY",
+          "transactionHash": "0x31b1b8e3a82921b458e97207f061b31ca1027c6e85a948cc156c985915837b0d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784585068,
+          "price": 0.998,
+          "size": 75,
+          "side": "BUY",
+          "transactionHash": "0x8d663fb36e4a8ec8db49f40e47b19fdede6920f36a783e31b032a8822a3f0c54",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784585052,
+          "price": 0.998,
+          "size": 170,
+          "side": "BUY",
+          "transactionHash": "0x2fa4c8855ddb3ad5c9b2f4687819c9e0fe351b7d917667f4984b3f5d49620f95",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584908,
+          "price": 0.99,
+          "size": 5.4,
+          "side": "SELL",
+          "transactionHash": "0xae2bb2ee8d3ad75f58a712883ff07de8f59aa295a190c857799545428f32e054",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584908,
+          "price": 0.99,
+          "size": 5.4,
+          "side": "BUY",
+          "transactionHash": "0xae2bb2ee8d3ad75f58a712883ff07de8f59aa295a190c857799545428f32e054",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584845,
+          "price": 0.997,
+          "size": 28.084,
+          "side": "BUY",
+          "transactionHash": "0x2d382fa638522b8a2fdda2f5bbcd3a8857a40aa801a9eca04f85b5fb778933d1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584830,
+          "price": 0.997,
+          "size": 1.01,
+          "side": "BUY",
+          "transactionHash": "0xde002b569ceebb35bb9308f856165eb38c42134a60063e24c73c186d252cc027",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584827,
+          "price": 0.99,
+          "size": 81.9,
+          "side": "BUY",
+          "transactionHash": "0x72f70c2563c0b5fbf08ad6727b090e2cd9a080d8859fe48e39fe1c4ab3c28864",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584827,
+          "price": 0.99,
+          "size": 18.1,
+          "side": "BUY",
+          "transactionHash": "0x72f70c2563c0b5fbf08ad6727b090e2cd9a080d8859fe48e39fe1c4ab3c28864",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584771,
+          "price": 0.98,
+          "size": 19.86,
+          "side": "BUY",
+          "transactionHash": "0xa4e2f9d5158d5f444297fc84f18c12379241962babddbe63265ea2e6ea224e8d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584771,
+          "price": 0.982,
+          "size": 10,
+          "side": "BUY",
+          "transactionHash": "0xa4e2f9d5158d5f444297fc84f18c12379241962babddbe63265ea2e6ea224e8d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584771,
+          "price": 0.983,
+          "size": 5.13,
+          "side": "BUY",
+          "transactionHash": "0xa4e2f9d5158d5f444297fc84f18c12379241962babddbe63265ea2e6ea224e8d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584771,
+          "price": 0.983,
+          "size": 5.01,
+          "side": "BUY",
+          "transactionHash": "0xa4e2f9d5158d5f444297fc84f18c12379241962babddbe63265ea2e6ea224e8d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.983186879,
+          "size": 141.91,
+          "side": "SELL",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.98,
+          "size": 28.46,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.982,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.983,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.983,
+          "size": 10,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.984,
+          "size": 25,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.985,
+          "size": 8.03,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.985,
+          "size": 5.06,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.985,
+          "size": 5.17,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.985,
+          "size": 5.19,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.985,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584704,
+          "price": 0.985,
+          "size": 25,
+          "side": "BUY",
+          "transactionHash": "0x24493a9e4eeb9a71ce96c6592dd4372eee43d79272173de9a9a4bcdd6d3c5030",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584662,
+          "price": 0.99,
+          "size": 11.5,
+          "side": "BUY",
+          "transactionHash": "0x4938cc39e5727756c1cc1f3df50c29d9cdf0b8ef63af53fbb214a2e9e095b96c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584662,
+          "price": 0.99,
+          "size": 11.5,
+          "side": "SELL",
+          "transactionHash": "0x4938cc39e5727756c1cc1f3df50c29d9cdf0b8ef63af53fbb214a2e9e095b96c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584614,
+          "price": 0.99,
+          "size": 67,
+          "side": "BUY",
+          "transactionHash": "0x687b9583ada247465f3b9d39b16d8d9fe2715b0bcecbb2be576fceb60aaa3cdf",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584600,
+          "price": 0.99,
+          "size": 125,
+          "side": "BUY",
+          "transactionHash": "0x134cea4441bc862d6da4b2baf6bdb9bc9a5eb7fdef53f4cbc6476cc4c7a56481",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584600,
+          "price": 0.99,
+          "size": 5.79,
+          "side": "SELL",
+          "transactionHash": "0x134cea4441bc862d6da4b2baf6bdb9bc9a5eb7fdef53f4cbc6476cc4c7a56481",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584600,
+          "price": 0.99,
+          "size": 28.41,
+          "side": "SELL",
+          "transactionHash": "0x134cea4441bc862d6da4b2baf6bdb9bc9a5eb7fdef53f4cbc6476cc4c7a56481",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584600,
+          "price": 0.99,
+          "size": 6.49,
+          "side": "SELL",
+          "transactionHash": "0x134cea4441bc862d6da4b2baf6bdb9bc9a5eb7fdef53f4cbc6476cc4c7a56481",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584600,
+          "price": 0.99,
+          "size": 1.31,
+          "side": "SELL",
+          "transactionHash": "0x134cea4441bc862d6da4b2baf6bdb9bc9a5eb7fdef53f4cbc6476cc4c7a56481",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584452,
+          "price": 0.99,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0x7eb635c7ce02d2fc2e1228b56322934908dc5bd4dd066c4c97c3cac4a603812e",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584452,
+          "price": 0.99,
+          "size": 9.41,
+          "side": "SELL",
+          "transactionHash": "0x7eb635c7ce02d2fc2e1228b56322934908dc5bd4dd066c4c97c3cac4a603812e",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584452,
+          "price": 0.99,
+          "size": 5.65,
+          "side": "SELL",
+          "transactionHash": "0x7eb635c7ce02d2fc2e1228b56322934908dc5bd4dd066c4c97c3cac4a603812e",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584440,
+          "price": 0.981,
+          "size": 4.8,
+          "side": "SELL",
+          "transactionHash": "0x8f063c4408eb14ccb2071f1fb9d694691303a05d214637d33265e1ba8314b2a6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584440,
+          "price": 0.981,
+          "size": 4.8,
+          "side": "BUY",
+          "transactionHash": "0x8f063c4408eb14ccb2071f1fb9d694691303a05d214637d33265e1ba8314b2a6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584429,
+          "price": 0.98,
+          "size": 187.87,
+          "side": "BUY",
+          "transactionHash": "0xc7dd2d0b591b8e10b0dec54c4f14979b676df9accf7c03c66b39e0fd3039a4a0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584429,
+          "price": 0.981,
+          "size": 5.06,
+          "side": "BUY",
+          "transactionHash": "0xc7dd2d0b591b8e10b0dec54c4f14979b676df9accf7c03c66b39e0fd3039a4a0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584429,
+          "price": 0.981,
+          "size": 5.02,
+          "side": "BUY",
+          "transactionHash": "0xc7dd2d0b591b8e10b0dec54c4f14979b676df9accf7c03c66b39e0fd3039a4a0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584429,
+          "price": 0.981,
+          "size": 5.05,
+          "side": "BUY",
+          "transactionHash": "0xc7dd2d0b591b8e10b0dec54c4f14979b676df9accf7c03c66b39e0fd3039a4a0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584395,
+          "price": 0.99,
+          "size": 5.0505,
+          "side": "BUY",
+          "transactionHash": "0x4b6e3c9b45d1d3376c26fb61a41a0fa20fe6b38967222d01a5c6ef5e7736576b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584392,
+          "price": 0.99,
+          "size": 9.7878,
+          "side": "BUY",
+          "transactionHash": "0xedc3663ad40cac2a6a090c849fd6c990f09252296e3635e3e8949e374d64ea05",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584383,
+          "price": 0.96,
+          "size": 28,
+          "side": "BUY",
+          "transactionHash": "0x39d302e1cf4b40306fddb353d5e82950e43b3bc9a2859ed8141d49e798d08f18",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584383,
+          "price": 0.96,
+          "size": 8,
+          "side": "BUY",
+          "transactionHash": "0x39d302e1cf4b40306fddb353d5e82950e43b3bc9a2859ed8141d49e798d08f18",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584371,
+          "price": 0.960375,
+          "size": 16,
+          "side": "BUY",
+          "transactionHash": "0xe2c5540eba93feb209025e5c7262b7739e5894276d23e1b13830bb76ccaaefa8",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584371,
+          "price": 0.96,
+          "size": 15.8,
+          "side": "SELL",
+          "transactionHash": "0xe2c5540eba93feb209025e5c7262b7739e5894276d23e1b13830bb76ccaaefa8",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584369,
+          "price": 0.98,
+          "size": 99.01,
+          "side": "BUY",
+          "transactionHash": "0x31fac05c8d8ea331820408d7b97f19404070f99684f1713d2076da70eb52e234",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584360,
+          "price": 0.95,
+          "size": 10.39,
+          "side": "SELL",
+          "transactionHash": "0x3ef30f52cebdf760c01927a93009799cef23be8042de3e0d9eee2fca3e7c7917",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584360,
+          "price": 0.95,
+          "size": 3.56,
+          "side": "BUY",
+          "transactionHash": "0x3ef30f52cebdf760c01927a93009799cef23be8042de3e0d9eee2fca3e7c7917",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584359,
+          "price": 0.95,
+          "size": 3.17,
+          "side": "SELL",
+          "transactionHash": "0xd9ebc4b744fea84d483f1e8dc6612eb100d71e12692e424468a7e27d3117f2d6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584356,
+          "price": 0.9700463415,
+          "size": 82,
+          "side": "BUY",
+          "transactionHash": "0xb1d0c3a8fd0d29ecdd9eb7be14159df707cf233a8167ae89272a11bfd5a592d3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584356,
+          "price": 0.97,
+          "size": 81.62,
+          "side": "SELL",
+          "transactionHash": "0xb1d0c3a8fd0d29ecdd9eb7be14159df707cf233a8167ae89272a11bfd5a592d3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584356,
+          "price": 0.97,
+          "size": 20,
+          "side": "SELL",
+          "transactionHash": "0x75887700ccac4d477dc92758ada66d3db51ca0a285ca03adcfc286d9ddae0a3a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584356,
+          "price": 0.97,
+          "size": 10,
+          "side": "BUY",
+          "transactionHash": "0x75887700ccac4d477dc92758ada66d3db51ca0a285ca03adcfc286d9ddae0a3a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584347,
+          "price": 0.98,
+          "size": 30.3061,
+          "side": "BUY",
+          "transactionHash": "0x7b3abdb207a3e006b8f9e2efc3b2d17af0dbe3ff2b5f86c8ce6e3c581e00f117",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584347,
+          "price": 0.98,
+          "size": 30.3061,
+          "side": "BUY",
+          "transactionHash": "0xf77bf889c1a14d1635e841f2d33a239a349c672978b1a51071cb307ffaf63adc",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584347,
+          "price": 0.9608273885,
+          "size": 157,
+          "side": "BUY",
+          "transactionHash": "0xb9f3e334b936a7b217a8529bbc9558ae8269bda42c6317dc52af5620d4579cf3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584336,
+          "price": 0.91,
+          "size": 15,
+          "side": "BUY",
+          "transactionHash": "0x4750e667329ee9152b285d240a17879cdab107288c199e1e648ff957b3920963",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584335,
+          "price": 0.7600001616,
+          "size": 4.208332,
+          "side": "BUY",
+          "transactionHash": "0xe6cfb339be0b780e26035646d4bfc96540902fa6aa093ccd2d995e4d6df76432",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584333,
+          "price": 0.92,
+          "size": 23.25,
+          "side": "SELL",
+          "transactionHash": "0x7090611aa5b82c3dadd7699b0f49447a42bedc0d87d9a0edb966977d7703a747",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584320,
+          "price": 0.8799999859,
+          "size": 5.681816,
+          "side": "BUY",
+          "transactionHash": "0xc7382eaa280066b606443147e5f51f1892d1099db7603d8268d9ebeaf883d0a0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584315,
+          "price": 0.75,
+          "size": 10.63,
+          "side": "BUY",
+          "transactionHash": "0x097296cd586fccdb01d54089683f1d1ac4a3811b111681b07255478aa113e3f3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584315,
+          "price": 0.75,
+          "size": 10.63,
+          "side": "SELL",
+          "transactionHash": "0x097296cd586fccdb01d54089683f1d1ac4a3811b111681b07255478aa113e3f3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584312,
+          "price": 0.75,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0x86f0cdc0627fd9e16899ec52104ddb54328ad7ffc16ac9b6a33258b3990730a0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584312,
+          "price": 0.75,
+          "size": 20,
+          "side": "SELL",
+          "transactionHash": "0x86f0cdc0627fd9e16899ec52104ddb54328ad7ffc16ac9b6a33258b3990730a0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584311,
+          "price": 0.75,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0xb474f9e4e03f1c57c12d73bea1a6b26a6e9bf6160f983db0336145bc64380928",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584311,
+          "price": 0.75,
+          "size": 20,
+          "side": "SELL",
+          "transactionHash": "0xb474f9e4e03f1c57c12d73bea1a6b26a6e9bf6160f983db0336145bc64380928",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584311,
+          "price": 0.75,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0x5d2d449c80d8c4e68692390cec030cea0af6ee48a22ff61ffa7d473db13fe1a6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584311,
+          "price": 0.75,
+          "size": 20,
+          "side": "SELL",
+          "transactionHash": "0x5d2d449c80d8c4e68692390cec030cea0af6ee48a22ff61ffa7d473db13fe1a6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584311,
+          "price": 0.75,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0xaece85a30b765163711a5ef6c33830b735878a6c3c372e010e428bb7407b65f6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584311,
+          "price": 0.75,
+          "size": 20,
+          "side": "SELL",
+          "transactionHash": "0xaece85a30b765163711a5ef6c33830b735878a6c3c372e010e428bb7407b65f6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584309,
+          "price": 0.75,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0x09228e41a48d9cb08c7dede6d49e7177e453656032a04b2632c938a05b2db71c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584309,
+          "price": 0.75,
+          "size": 20,
+          "side": "SELL",
+          "transactionHash": "0x09228e41a48d9cb08c7dede6d49e7177e453656032a04b2632c938a05b2db71c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584308,
+          "price": 0.75,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0xfbd2ba7b21f8c2ea7394d0a093cf3a843c8acc750b1359ba89f8f81223458498",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584308,
+          "price": 0.75,
+          "size": 20,
+          "side": "SELL",
+          "transactionHash": "0xfbd2ba7b21f8c2ea7394d0a093cf3a843c8acc750b1359ba89f8f81223458498",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584299,
+          "price": 0.8263466715,
+          "size": 11.496382,
+          "side": "BUY",
+          "transactionHash": "0x8006771cc4673a413664a82fce2b67cbb40af6332ecacb35499cbf3b1e99d288",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584299,
+          "price": 0.8199999758,
+          "size": 5.792677,
+          "side": "BUY",
+          "transactionHash": "0x69eb0902af9d8434f869db718184e9f3dcf040643d1c6e7fb53b5f467d278ba1",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584296,
+          "price": 0.79,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0x5f457907ddff011eedffcc38f8c9ad9c1b4a136bcee2572e2a9ec30cb3c2c258",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584273,
+          "price": 0.65,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0xaf18f25ee5b62d2e8911713fb82558e037501744fed15c569c32eb618b262e75",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584272,
+          "price": 0.64,
+          "size": 20,
+          "side": "BUY",
+          "transactionHash": "0x5119b46080d8749c335fb3fc5191ac0943641e226c8f1120220675e4a7261741",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584272,
+          "price": 0.64,
+          "size": 10,
+          "side": "SELL",
+          "transactionHash": "0x5119b46080d8749c335fb3fc5191ac0943641e226c8f1120220675e4a7261741",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.62,
+          "size": 7.7,
+          "side": "BUY",
+          "transactionHash": "0xde0c25c7a3cef99699a44ed815d753a67d4a637bcef8b4511041487d81a1ea98",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.61,
+          "size": 8.1,
+          "side": "BUY",
+          "transactionHash": "0x52013f6b5f8f548abb612116ea628c64c5ec95691ba338e69f790b6b19967f9e",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.61,
+          "size": 8.1,
+          "side": "SELL",
+          "transactionHash": "0x52013f6b5f8f548abb612116ea628c64c5ec95691ba338e69f790b6b19967f9e",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.59,
+          "size": 13.54,
+          "side": "BUY",
+          "transactionHash": "0xf73fe53030a8ae4da226e11b56019529c8e881ede841c2ace0d921d08444a4e8",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.6004508118,
+          "size": 26.180326,
+          "side": "BUY",
+          "transactionHash": "0x2397f6ad8587be4a2eac984711b526f2c20fdfbb71758e032d2b00f653023208",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.6099992714,
+          "size": 1.180326,
+          "side": "SELL",
+          "transactionHash": "0x2397f6ad8587be4a2eac984711b526f2c20fdfbb71758e032d2b00f653023208",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.6,
+          "size": 25,
+          "side": "SELL",
+          "transactionHash": "0x2397f6ad8587be4a2eac984711b526f2c20fdfbb71758e032d2b00f653023208",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.6099998548,
+          "size": 2.409835,
+          "side": "BUY",
+          "transactionHash": "0x953d4cbb6fd89776d229e185e344585dc41bb80a4498c2d44d0bf7f881c920b0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.6099998548,
+          "size": 2.409835,
+          "side": "SELL",
+          "transactionHash": "0x953d4cbb6fd89776d229e185e344585dc41bb80a4498c2d44d0bf7f881c920b0",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.5996389958,
+          "size": 54.57,
+          "side": "BUY",
+          "transactionHash": "0xd9bc78515aa74c2d795ddfde83075146c5b7231e43a247d9f390b1f48a92eb6d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.61,
+          "size": 10,
+          "side": "SELL",
+          "transactionHash": "0xd9bc78515aa74c2d795ddfde83075146c5b7231e43a247d9f390b1f48a92eb6d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584269,
+          "price": 0.61,
+          "size": 8.3,
+          "side": "SELL",
+          "transactionHash": "0xd9bc78515aa74c2d795ddfde83075146c5b7231e43a247d9f390b1f48a92eb6d",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584267,
+          "price": 0.5967907425,
+          "size": 155.55,
+          "side": "BUY",
+          "transactionHash": "0xe5690d71925969a3f59dfa0aa0aafc5302cf3f5703872fc16f507492f2cb0d34",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584267,
+          "price": 0.6,
+          "size": 105.63,
+          "side": "SELL",
+          "transactionHash": "0xe5690d71925969a3f59dfa0aa0aafc5302cf3f5703872fc16f507492f2cb0d34",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584254,
+          "price": 0.59,
+          "size": 7,
+          "side": "BUY",
+          "transactionHash": "0x748f68d1923a247167311fb0bc204651f7b9b11a9d74a31ba4e06326a624e682",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1784584249,
+          "price": 0.59,
+          "size": 4,
+          "side": "BUY",
+          "transactionHash": "0xfe822417904c0080537713b4fa98dc4432513e96abc730e50bf0ae7597328024",
+          "outcome": "Yes"
+        }
+      ],
+      "first_yes_trade_after_anchor": {
+        "timestamp": 1784584267,
+        "price": 0.5967907425,
+        "size": 155.55,
+        "side": "BUY",
+        "transactionHash": "0xe5690d71925969a3f59dfa0aa0aafc5302cf3f5703872fc16f507492f2cb0d34",
+        "outcome": "Yes"
+      },
+      "error": null
+    },
+    {
+      "name": "Chicago Jun29 92-93F first-lock",
+      "event_slug": "highest-temperature-in-chicago-on-june-29-2026",
+      "needles": [
+        "92",
+        "93"
+      ],
+      "anchor_ts": 1782766260,
+      "anchor_type": "first_winning_bucket_observation",
+      "known_breach_ts": null,
+      "expected_final": "92-93F",
+      "event_title": "Highest temperature in Chicago on June 29?",
+      "market_question": "Will the highest temperature in Chicago be between 92-93\u00b0F on June 29?",
+      "market_slug": "highest-temperature-in-chicago-on-june-29-2026-92-93f",
+      "condition_id": "0x827eb218c55d9bef7b7064ad41465f1544b4c01f8f99e293d5ad1f3dfef13ada",
+      "yes_token": "104731151991775829530898867001308797559508505585986273054939511693211358463775",
+      "no_token": "111970341469210255683890058949462310633722660469246655697543989423813693120742",
+      "token_label_source": "gamma",
+      "marks": [
+        {
+          "horizon_s": -300,
+          "target_ts": 1782765960,
+          "yes": {
+            "t": 1782765966,
+            "price": 0.525,
+            "offset_s": 6
+          },
+          "no": {
+            "t": 1782765965,
+            "price": 0.475,
+            "offset_s": 5
+          }
+        },
+        {
+          "horizon_s": 0,
+          "target_ts": 1782766260,
+          "yes": {
+            "t": 1782766265,
+            "price": 0.505,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1782766265,
+            "price": 0.495,
+            "offset_s": 5
+          }
+        },
+        {
+          "horizon_s": 300,
+          "target_ts": 1782766560,
+          "yes": {
+            "t": 1782766565,
+            "price": 0.8,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1782766565,
+            "price": 0.2,
+            "offset_s": 5
+          }
+        },
+        {
+          "horizon_s": 900,
+          "target_ts": 1782767160,
+          "yes": {
+            "t": 1782767165,
+            "price": 0.92,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1782767165,
+            "price": 0.08,
+            "offset_s": 5
+          }
+        },
+        {
+          "horizon_s": 1800,
+          "target_ts": 1782768060,
+          "yes": {
+            "t": 1782768065,
+            "price": 0.785,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1782768064,
+            "price": 0.215,
+            "offset_s": 4
+          }
+        },
+        {
+          "horizon_s": 3600,
+          "target_ts": 1782769860,
+          "yes": {
+            "t": 1782769865,
+            "price": 0.595,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1782769864,
+            "price": 0.405,
+            "offset_s": 4
+          }
+        },
+        {
+          "horizon_s": 7200,
+          "target_ts": 1782773460,
+          "yes": {
+            "t": 1782773464,
+            "price": 0.969,
+            "offset_s": 4
+          },
+          "no": {
+            "t": 1782773464,
+            "price": 0.032,
+            "offset_s": 4
+          }
+        }
+      ],
+      "market_trade_count_window": 253,
+      "yes_trade_count_window": 128,
+      "yes_trades_near_anchor": [
+        {
+          "timestamp": 1782766916,
+          "price": 0.95,
+          "size": 0.81,
+          "side": "BUY",
+          "transactionHash": "0x02c24df7e93e400e9a5a8d81c83fe0129aa3e4fe83ee79be2a22ddcec40961ed",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766916,
+          "price": 0.95,
+          "size": 15,
+          "side": "BUY",
+          "transactionHash": "0xb467ca4bbd1970939de277761ce2cd78e2d123e099bf07c884de78984a502f7f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766916,
+          "price": 0.96,
+          "size": 47.395825,
+          "side": "BUY",
+          "transactionHash": "0x7fd4ecaa9134b7a4041ba78a4600786d7ce637efdb365c9a1d0009032dd6a8f5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766916,
+          "price": 0.95,
+          "size": 8,
+          "side": "BUY",
+          "transactionHash": "0x3f0284ca60b4cbfe49835c174c848f87da4f511675ed95bbece23b9d67d6af76",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766916,
+          "price": 0.95,
+          "size": 15,
+          "side": "BUY",
+          "transactionHash": "0xf6bd6ce7b73e7978748f4ab233091cc8df319e60d9eb82908adf953354193308",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766916,
+          "price": 0.95,
+          "size": 13.19,
+          "side": "BUY",
+          "transactionHash": "0x7936dccc00ba9ae81276ab267cc95da65d08f10b9dd19911a950323f11829fa6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766900,
+          "price": 0.8905882353,
+          "size": 5.1,
+          "side": "BUY",
+          "transactionHash": "0x81431452358c11f2ea21834bea88e9c1a4620fbb6d06a1d2731ac60fa2240028",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766900,
+          "price": 0.89,
+          "size": 5,
+          "side": "SELL",
+          "transactionHash": "0x81431452358c11f2ea21834bea88e9c1a4620fbb6d06a1d2731ac60fa2240028",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766895,
+          "price": 0.8314026149,
+          "size": 578.99,
+          "side": "BUY",
+          "transactionHash": "0x1bbd813bb3be4dad772489f0c89a2690447fb921e255c970069ad56943a1cd36",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766813,
+          "price": 0.82,
+          "size": 2.43,
+          "side": "BUY",
+          "transactionHash": "0x899e3a30a40229dfc20b7368055c5ce71f1178ba0f806c32ecea3af40c322090",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766742,
+          "price": 0.84,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x0becf974fb6cc105e336441b1dd67fac22bc60d9d6654df31afab1f41d5c23ab",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766741,
+          "price": 0.7,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x7e8eb8cc404a5fb368860f1a1422af0e8df65fd8a7024c6cf2a5d5ed4f64934f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766739,
+          "price": 0.83,
+          "size": 38,
+          "side": "BUY",
+          "transactionHash": "0x09cfe7cdc8c4375163b761b66fe4129b3720bce8c04c064b5c66659d98cffa54",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766571,
+          "price": 0.8299999929,
+          "size": 7.084335,
+          "side": "BUY",
+          "transactionHash": "0x59ae9e2f0c1a7ff7d8486f76b896e8a7006309aa9b56006563cb0a813baab3bd",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766546,
+          "price": 0.8339536827,
+          "size": 29.6779,
+          "side": "BUY",
+          "transactionHash": "0x604fcd9cdbc84dbfb6a5c12f246621d1c528ac497d2c9c16d8b22f12e9008656",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766475,
+          "price": 0.7700000815,
+          "size": 7.608694,
+          "side": "BUY",
+          "transactionHash": "0x0b43190fa34d6df9846a749470d308b60e9af97aed3bc7771c6b6d3efcbc2aa5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766403,
+          "price": 0.77,
+          "size": 18.4,
+          "side": "BUY",
+          "transactionHash": "0xa50947e8dfd0cc49e1a0e2f64b5288048f209cc6ab76af6328739ad4b723ecdc",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766391,
+          "price": 0.77,
+          "size": 3.34,
+          "side": "BUY",
+          "transactionHash": "0xdf3d3bd03f4f7b42b541600c26af082c4af6213219916fc497861098579dfef5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766364,
+          "price": 0.71,
+          "size": 5,
+          "side": "SELL",
+          "transactionHash": "0x03e495588915deec9abf5ebc02d4cebdebd805f491ae00eedeff9f18348e1c14",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766364,
+          "price": 0.71,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x03e495588915deec9abf5ebc02d4cebdebd805f491ae00eedeff9f18348e1c14",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766364,
+          "price": 0.7711569097,
+          "size": 19.451293,
+          "side": "BUY",
+          "transactionHash": "0x9bd4cc85660899237f3e71db21fafd096aad38fa2a13e8cf833fc64128b037e8",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766364,
+          "price": 0.76,
+          "size": 4.49,
+          "side": "BUY",
+          "transactionHash": "0x02b73037ebbbc16a01ba6993dc6a1a08daa11b69089a1b6ffd45e9086ea9c87b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782766364,
+          "price": 0.7540968123,
+          "size": 8.47,
+          "side": "BUY",
+          "transactionHash": "0x5475b2164200839cab0c8c9038fb36a1e714faee8073f2bfd5f5253437b2db8c",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765851,
+          "price": 0.7559405976,
+          "size": 39.685654,
+          "side": "BUY",
+          "transactionHash": "0x13971438204df58e852390911d0db3fbd34829d47ddf3fa31bc2184a57ff2c86",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765823,
+          "price": 0.6999999767,
+          "size": 4.285713,
+          "side": "BUY",
+          "transactionHash": "0x1e0c6a711b64da44a2772665113a2cbaed6d478ee382a1d083eee9471517788b",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765739,
+          "price": 0.26,
+          "size": 1.1,
+          "side": "BUY",
+          "transactionHash": "0x148cc4da4d22a7c0ab84b907dde59d36465228247757b5ef1e726b48d86d4a33",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765679,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x5222f97ca1e3612941449b0f10538e03e66710a9285bdacd72e688b3eaf1930f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765679,
+          "price": 0.74,
+          "size": 3.41,
+          "side": "BUY",
+          "transactionHash": "0x289108317bae81642ad93cd4792463099fb7d983dbe8e9859e6c0419021ae6e4",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765679,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x898e1f34708d0ffccae4a121a689dc519fcba6104e94c5a30823ea1003abf3e4",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765679,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xbc5d92e888e90d4105357029ab0502919f1925c6dcee49a7f419384a935b4da9",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765679,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x9369a178c02a088f42084b65f0c20791c581e58c17cb1b78fea06c32e392b7e5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765679,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x4658a652754ba189cce4c3c783a3df80209c4036647b1843e68a17916aaeadc5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765679,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xf312bcf4a0f85661c168156dd61366380892571b0b5c776147aa2995143e7164",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765679,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x33a086421d4959db6a2ce67f388155fe784fe75de475f8f8045e6b210320bf52",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765677,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xea0072e9cae0868afcd4744cf2150f145b84d93d246371b331be26b06bcae521",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765676,
+          "price": 0.74,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x69137f9a752e26b3e9bc3f524257848160aad8f2fae4a1525a30c7b067332974",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765676,
+          "price": 0.74,
+          "size": 2,
+          "side": "BUY",
+          "transactionHash": "0x21b09d0e07369881c819f94a78f1eed5371631ca3aa5a82dabcbec1455f2c580",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765676,
+          "price": 0.75,
+          "size": 3,
+          "side": "BUY",
+          "transactionHash": "0x21b09d0e07369881c819f94a78f1eed5371631ca3aa5a82dabcbec1455f2c580",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765676,
+          "price": 0.75,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xe683961662a9703e4978c68223d34934c8e7853d32bef272eda6022f458cff88",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765659,
+          "price": 0.7,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x2adc7fc8c2147e747502f1c48760b5a6b892f52eb640862dde2bcdd557b845c3",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765658,
+          "price": 0.69,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x3cb9135894525eede826f4a82eb0681d9faceda845c359f33b1a3eada2ab87a6",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765658,
+          "price": 0.69,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xd3b3bd596e625cafeb0baa8d9d42d74ff62325430935774563a268424c9ad3ed",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765571,
+          "price": 0.69,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xe70ded4f46ff348c136e1b074338ef79fdf6a34e9a65bfd14bc9551753882fcb",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765571,
+          "price": 0.69,
+          "size": 2,
+          "side": "BUY",
+          "transactionHash": "0x7f6efeac4defc7e55056fe55c6f527594a23acba38b251d310381de69d156f3f",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765569,
+          "price": 0.69,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xf1bf4d5de1eb858a149422f3056450a317ab84034b30221a555eb54e4309bf03",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765568,
+          "price": 0.69,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0x7c18d011d8be1cbded0e417520dd273d03d1182daaa3cc0c2f505d0be51c7519",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765568,
+          "price": 0.69,
+          "size": 5,
+          "side": "BUY",
+          "transactionHash": "0xb8e072f395e90b46b6e0e7b468ab3fc01103e1550bba5840361b87242e3210d5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765568,
+          "price": 0.6,
+          "size": 3.04,
+          "side": "BUY",
+          "transactionHash": "0x3e5356c2536b9953639b5566e49a39357e6764173d4c20a60a01bfe3b73eb90a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765568,
+          "price": 0.6,
+          "size": 3.04,
+          "side": "SELL",
+          "transactionHash": "0x3e5356c2536b9953639b5566e49a39357e6764173d4c20a60a01bfe3b73eb90a",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765568,
+          "price": 0.69,
+          "size": 1.66,
+          "side": "BUY",
+          "transactionHash": "0x37cadfdcb7be96d3feb100b5960b2a51127e5d0527bcd96727d7ec6d0ba8dcec",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1782765500,
+          "price": 0.59,
+          "size": 7.17,
+          "side": "BUY",
+          "transactionHash": "0xb17dd04eeba3c80add91a15338b531df2677ce46a65725eb186a6e468dd6dd15",
+          "outcome": "Yes"
+        }
+      ],
+      "first_yes_trade_after_anchor": {
+        "timestamp": 1782766364,
+        "price": 0.71,
+        "size": 5,
+        "side": "SELL",
+        "transactionHash": "0x03e495588915deec9abf5ebc02d4cebdebd805f491ae00eedeff9f18348e1c14",
+        "outcome": "Yes"
+      },
+      "error": null
+    },
+    {
+      "name": "Chicago Jun20 76-77F late-extrema",
+      "event_slug": "highest-temperature-in-chicago-on-june-20-2026",
+      "needles": [
+        "76",
+        "77"
+      ],
+      "anchor_ts": 1781999460,
+      "anchor_type": "late_extrema_candidate",
+      "known_breach_ts": null,
+      "expected_final": "76-77F",
+      "event_title": "Highest temperature in Chicago on June 20?",
+      "market_question": "Will the highest temperature in Chicago be between 76-77\u00b0F on June 20?",
+      "market_slug": "highest-temperature-in-chicago-on-june-20-2026-76-77f",
+      "condition_id": "0x37165a2f57e84236aedc3317ff89c82348d27e10f73a846332a3cb1f5b654395",
+      "yes_token": "60063171740228927599588563655122511401376816368472476092382143157293330443901",
+      "no_token": "94855304731286917317077058810591603519207104137117611184432262045212542944565",
+      "token_label_source": "gamma",
+      "marks": [
+        {
+          "horizon_s": -300,
+          "target_ts": 1781999160,
+          "yes": {
+            "t": 1781999164,
+            "price": 0.996,
+            "offset_s": 4
+          },
+          "no": {
+            "t": 1781999163,
+            "price": 0.004,
+            "offset_s": 3
+          }
+        },
+        {
+          "horizon_s": 0,
+          "target_ts": 1781999460,
+          "yes": {
+            "t": 1781999464,
+            "price": 0.996,
+            "offset_s": 4
+          },
+          "no": {
+            "t": 1781999463,
+            "price": 0.004,
+            "offset_s": 3
+          }
+        },
+        {
+          "horizon_s": 300,
+          "target_ts": 1781999760,
+          "yes": {
+            "t": 1781999765,
+            "price": 0.996,
+            "offset_s": 5
+          },
+          "no": {
+            "t": 1781999764,
+            "price": 0.004,
+            "offset_s": 4
+          }
+        },
+        {
+          "horizon_s": 900,
+          "target_ts": 1782000360,
+          "yes": {
+            "t": 1782000364,
+            "price": 0.996,
+            "offset_s": 4
+          },
+          "no": {
+            "t": 1782000364,
+            "price": 0.004,
+            "offset_s": 4
+          }
+        },
+        {
+          "horizon_s": 1800,
+          "target_ts": 1782001260,
+          "yes": {
+            "t": 1782001263,
+            "price": 0.996,
+            "offset_s": 3
+          },
+          "no": {
+            "t": 1782001263,
+            "price": 0.004,
+            "offset_s": 3
+          }
+        },
+        {
+          "horizon_s": 3600,
+          "target_ts": 1782003060,
+          "yes": {
+            "t": 1782003063,
+            "price": 0.996,
+            "offset_s": 3
+          },
+          "no": {
+            "t": 1782003063,
+            "price": 0.004,
+            "offset_s": 3
+          }
+        },
+        {
+          "horizon_s": 7200,
+          "target_ts": 1782006660,
+          "yes": {
+            "t": 1782006664,
+            "price": 0.9965,
+            "offset_s": 4
+          },
+          "no": {
+            "t": 1782006663,
+            "price": 0.0035,
+            "offset_s": 3
+          }
+        }
+      ],
+      "market_trade_count_window": 17,
+      "yes_trade_count_window": 12,
+      "yes_trades_near_anchor": [
+        {
+          "timestamp": 1781999593,
+          "price": 0.993,
+          "size": 233.17,
+          "side": "SELL",
+          "transactionHash": "0xae4bde87b148d548264ba116d1ee7f1db6db15441e054b8e9161454e8c7b73a5",
+          "outcome": "Yes"
+        },
+        {
+          "timestamp": 1781999593,
+          "price": 0.993,
+          "size": 233.17,
+          "side": "BUY",
+          "transactionHash": "0xae4bde87b148d548264ba116d1ee7f1db6db15441e054b8e9161454e8c7b73a5",
+          "outcome": "Yes"
+        }
+      ],
+      "first_yes_trade_after_anchor": {
+        "timestamp": 1781999593,
+        "price": 0.993,
+        "size": 233.17,
+        "side": "SELL",
+        "transactionHash": "0xae4bde87b148d548264ba116d1ee7f1db6db15441e054b8e9161454e8c7b73a5",
+        "outcome": "Yes"
+      },
+      "error": null
+    }
+  ]
+}
