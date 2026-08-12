@@ -1,0 +1,60 @@
+name: One-shot Open-Meteo ensemble run error detail
+
+on:
+  push:
+    paths:
+      - '.github/workflows/milan-ensemble-error-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture exact API response
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          import pathlib
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          params = {
+              'latitude': 45.61667,
+              'longitude': 8.73333,
+              'hourly': 'temperature_2m,temperature_2m_spread',
+              'models': 'ecmwf_ifs025_ensemble_mean',
+              'run': '2026-06-24T18:00',
+              'forecast_days': 4,
+              'timezone': 'Europe/Rome',
+          }
+          url = 'https://ensemble-api.open-meteo.com/v1/ensemble?' + urllib.parse.urlencode(params)
+          req = urllib.request.Request(url, headers={'User-Agent':'polymarket-weather-research/1.0'})
+          out = {'url': url}
+          try:
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  out['status'] = r.status
+                  out['body'] = r.read().decode('utf-8')[:4000]
+          except urllib.error.HTTPError as e:
+              out['status'] = e.code
+              out['body'] = e.read().decode('utf-8', errors='replace')[:4000]
+          except Exception as e:
+              out['error'] = repr(e)
+
+          path = pathlib.Path('research/data/milan-ensemble-run-error.json')
+          path.parent.mkdir(parents=True, exist_ok=True)
+          path.write_text(json.dumps(out, indent=2), encoding='utf-8')
+          PY
+      - name: Commit response
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/milan-ensemble-run-error.json
+          git diff --cached --quiet && exit 0
+          git commit -m "data: capture ensemble run API rejection detail"
+          git push
