@@ -1,0 +1,259 @@
+{
+  "source": "Iowa Environmental Mesonet ASOS archive",
+  "station": "EGLC",
+  "fill_time": "2026-07-12T13:16:32Z",
+  "request_url": "https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station=EGLC&data=tmpc&year1=2026&month1=7&day1=12&year2=2026&month2=7&day2=13&tz=Etc%2FUTC&format=onlycomma&latlon=no&elev=no&missing=empty&trace=empty&direct=no&report_type=1&report_type=2",
+  "observations": [
+    {
+      "valid": "2026-07-12T00:20:00Z",
+      "timestamp": 1783815600,
+      "tmpc": 18.0
+    },
+    {
+      "valid": "2026-07-12T00:50:00Z",
+      "timestamp": 1783817400,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T01:20:00Z",
+      "timestamp": 1783819200,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T01:50:00Z",
+      "timestamp": 1783821000,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T02:20:00Z",
+      "timestamp": 1783822800,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T02:50:00Z",
+      "timestamp": 1783824600,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T03:20:00Z",
+      "timestamp": 1783826400,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T03:50:00Z",
+      "timestamp": 1783828200,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T04:20:00Z",
+      "timestamp": 1783830000,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T04:50:00Z",
+      "timestamp": 1783831800,
+      "tmpc": 17.0
+    },
+    {
+      "valid": "2026-07-12T05:20:00Z",
+      "timestamp": 1783833600,
+      "tmpc": 18.0
+    },
+    {
+      "valid": "2026-07-12T05:50:00Z",
+      "timestamp": 1783835400,
+      "tmpc": 18.0
+    },
+    {
+      "valid": "2026-07-12T06:20:00Z",
+      "timestamp": 1783837200,
+      "tmpc": 18.0
+    },
+    {
+      "valid": "2026-07-12T06:50:00Z",
+      "timestamp": 1783839000,
+      "tmpc": 18.0
+    },
+    {
+      "valid": "2026-07-12T07:20:00Z",
+      "timestamp": 1783840800,
+      "tmpc": 19.0
+    },
+    {
+      "valid": "2026-07-12T07:50:00Z",
+      "timestamp": 1783842600,
+      "tmpc": 19.0
+    },
+    {
+      "valid": "2026-07-12T08:20:00Z",
+      "timestamp": 1783844400,
+      "tmpc": 20.0
+    },
+    {
+      "valid": "2026-07-12T08:50:00Z",
+      "timestamp": 1783846200,
+      "tmpc": 22.0
+    },
+    {
+      "valid": "2026-07-12T09:20:00Z",
+      "timestamp": 1783848000,
+      "tmpc": 22.0
+    },
+    {
+      "valid": "2026-07-12T09:50:00Z",
+      "timestamp": 1783849800,
+      "tmpc": 24.0
+    },
+    {
+      "valid": "2026-07-12T10:20:00Z",
+      "timestamp": 1783851600,
+      "tmpc": 25.0
+    },
+    {
+      "valid": "2026-07-12T10:50:00Z",
+      "timestamp": 1783853400,
+      "tmpc": 26.0
+    },
+    {
+      "valid": "2026-07-12T11:20:00Z",
+      "timestamp": 1783855200,
+      "tmpc": 26.0
+    },
+    {
+      "valid": "2026-07-12T11:50:00Z",
+      "timestamp": 1783857000,
+      "tmpc": 27.0
+    },
+    {
+      "valid": "2026-07-12T12:20:00Z",
+      "timestamp": 1783858800,
+      "tmpc": 27.0
+    },
+    {
+      "valid": "2026-07-12T12:50:00Z",
+      "timestamp": 1783860600,
+      "tmpc": 27.0
+    },
+    {
+      "valid": "2026-07-12T13:20:00Z",
+      "timestamp": 1783862400,
+      "tmpc": 28.0
+    },
+    {
+      "valid": "2026-07-12T13:50:00Z",
+      "timestamp": 1783864200,
+      "tmpc": 28.0
+    },
+    {
+      "valid": "2026-07-12T14:20:00Z",
+      "timestamp": 1783866000,
+      "tmpc": 28.0
+    },
+    {
+      "valid": "2026-07-12T14:50:00Z",
+      "timestamp": 1783867800,
+      "tmpc": 28.0
+    },
+    {
+      "valid": "2026-07-12T15:20:00Z",
+      "timestamp": 1783869600,
+      "tmpc": 27.0
+    },
+    {
+      "valid": "2026-07-12T15:50:00Z",
+      "timestamp": 1783871400,
+      "tmpc": 27.0
+    },
+    {
+      "valid": "2026-07-12T16:20:00Z",
+      "timestamp": 1783873200,
+      "tmpc": 27.0
+    },
+    {
+      "valid": "2026-07-12T16:50:00Z",
+      "timestamp": 1783875000,
+      "tmpc": 26.0
+    },
+    {
+      "valid": "2026-07-12T17:20:00Z",
+      "timestamp": 1783876800,
+      "tmpc": 26.0
+    },
+    {
+      "valid": "2026-07-12T17:50:00Z",
+      "timestamp": 1783878600,
+      "tmpc": 26.0
+    },
+    {
+      "valid": "2026-07-12T18:20:00Z",
+      "timestamp": 1783880400,
+      "tmpc": 25.0
+    },
+    {
+      "valid": "2026-07-12T18:50:00Z",
+      "timestamp": 1783882200,
+      "tmpc": 24.0
+    },
+    {
+      "valid": "2026-07-12T19:20:00Z",
+      "timestamp": 1783884000,
+      "tmpc": 24.0
+    },
+    {
+      "valid": "2026-07-12T19:50:00Z",
+      "timestamp": 1783885800,
+      "tmpc": 23.0
+    },
+    {
+      "valid": "2026-07-12T20:20:00Z",
+      "timestamp": 1783887600,
+      "tmpc": 23.0
+    },
+    {
+      "valid": "2026-07-12T20:50:00Z",
+      "timestamp": 1783889400,
+      "tmpc": 22.0
+    },
+    {
+      "valid": "2026-07-12T21:20:00Z",
+      "timestamp": 1783891200,
+      "tmpc": 21.0
+    },
+    {
+      "valid": "2026-07-12T21:50:00Z",
+      "timestamp": 1783893000,
+      "tmpc": 20.0
+    },
+    {
+      "valid": "2026-07-12T22:20:00Z",
+      "timestamp": 1783894800,
+      "tmpc": 19.0
+    },
+    {
+      "valid": "2026-07-12T22:50:00Z",
+      "timestamp": 1783896600,
+      "tmpc": 19.0
+    },
+    {
+      "valid": "2026-07-12T23:20:00Z",
+      "timestamp": 1783898400,
+      "tmpc": 18.0
+    },
+    {
+      "valid": "2026-07-12T23:50:00Z",
+      "timestamp": 1783900200,
+      "tmpc": 18.0
+    }
+  ],
+  "max_before_fill": {
+    "valid": "2026-07-12T11:50:00Z",
+    "timestamp": 1783857000,
+    "tmpc": 27.0
+  },
+  "first_observation_ge_28c": {
+    "valid": "2026-07-12T13:20:00Z",
+    "timestamp": 1783862400,
+    "tmpc": 28.0
+  },
+  "already_ge_28_before_fill": false
+}
