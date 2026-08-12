@@ -1,0 +1,66 @@
+name: One-shot NYC live boundary tape
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nyc-live-boundary-tape-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  tape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch boundary tape
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt, json, pathlib, urllib.parse, urllib.request
+          UA='polymarket-weather-boundary-tape/1.0'
+          out=pathlib.Path('research/data');out.mkdir(parents=True,exist_ok=True)
+          cases={
+            '80-81':{'condition':'0xa19347cb80f2fde79bce92bdb66e802e46b625fefde53e3963db2cb2b6487bef','token':'5360983761973233433933284334431204159657285350654223889862005413088864155151'},
+            '82-83':{'condition':'0x3316b8bdf16d34f1b026f335c80f54dd945ffacd9d24c0b300dcef63df4532ab','token':'53534855080366851665456323521150354512295770820828421362567238048107866778676'},
+            '84-85':{'condition':'0x2256ebc80ac44235c6e2063bd4e2d3b1306e856ebc436f69c76f95534a5b9318','token':'33568972688159887588962168155892170503899634452117790066959504013982484657340'},
+            '86-87':{'condition':'0xe531cc4a9c1a45e3f22494d78a58f070ae34a77cc4f33681d80067ea05d651d1','token':'94896913112090174028906405663517419730902565191105229699412977669862836756721'},
+            '88-89':{'condition':'0x8e403f86ed378c0991598cea0336c1a9812880aa0ecff5e427fff7ff4407d7ec','token':'75080551296567978821161597326960050387571785520124504044270607105256139381291'},
+          }
+          start=int(dt.datetime(2026,8,12,16,48,tzinfo=dt.timezone.utc).timestamp());end=int(dt.datetime(2026,8,12,16,57,tzinfo=dt.timezone.utc).timestamp())
+          def get(url):
+              req=urllib.request.Request(url,headers={'Accept':'application/json','User-Agent':UA})
+              with urllib.request.urlopen(req,timeout=20) as r:return json.load(r)
+          result={'start':start,'end':end,'cases':{}}
+          lines=['# NYC Aug 12 boundary tape — 16:48–16:57 UTC','', 'Nominal METAR: 16:51Z. NOAA station-file Last-Modified: **16:54:29Z**.','']
+          for label,c in cases.items():
+              q=urllib.parse.urlencode({'market':c['condition'],'start':start,'end':end,'limit':1000,'offset':0})
+              trades=get('https://data-api.polymarket.com/trades?'+q)
+              hq=urllib.parse.urlencode({'market':c['token'],'startTs':start,'endTs':end,'fidelity':1})
+              hist=get('https://clob.polymarket.com/prices-history?'+hq).get('history',[])
+              rows=[]
+              for x in trades if isinstance(trades,list) else []:
+                  if str(x.get('asset'))==c['token'] and str(x.get('outcome','')).lower()=='yes':
+                      rows.append({k:x.get(k) for k in ['timestamp','price','size','side','outcome','transactionHash']})
+              rows.sort(key=lambda x:int(x['timestamp']))
+              result['cases'][label]={'trades':rows,'history':hist}
+              lines += [f'## {label} YES','',f'Trades: **{len(rows)}**.','', '| UTC | Side | Qty | Price |','|---|---|---:|---:|']
+              for x in rows:
+                  ts=dt.datetime.fromtimestamp(int(x['timestamp']),dt.timezone.utc).isoformat()
+                  lines.append(f'| {ts} | {x["side"]} | {float(x["size"]):.2f} | {float(x["price"]):.4f} |')
+              lines += ['', 'Minute history:', '', '| UTC | Price |','|---|---:|']
+              for x in hist:
+                  ts=dt.datetime.fromtimestamp(int(x['t']),dt.timezone.utc).isoformat()
+                  lines.append(f'| {ts} | {float(x["p"]):.4f} |')
+              lines.append('')
+          (out/'nyc-live-boundary-tape-2026-08-12.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+          (out/'nyc-live-boundary-tape-2026-08-12.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+      - name: Commit tape
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/nyc-live-boundary-tape-2026-08-12.*
+          git diff --cached --quiet && exit 0
+          git commit -m "data: capture NYC live boundary tape"
+          git push
