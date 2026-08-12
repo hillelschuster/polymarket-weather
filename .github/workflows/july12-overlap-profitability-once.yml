@@ -1,0 +1,157 @@
+name: One-shot July 12 overlap profitability
+
+on:
+  push:
+    paths:
+      - '.github/workflows/july12-overlap-profitability-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  reconstruct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve event and reconstruct market path
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import pathlib
+          import sys
+          import time
+          import urllib.parse
+          import urllib.request
+
+          sys.path.insert(0, 'scripts')
+          from enrich_v2_wallet_orders import resolve_token, request_json
+
+          TOKEN = '91076181803621459956200090324917139595424901620108017335569536029558392706177'
+          TARGET = '0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4f'
+          POLIGARCH = '0xb40e89677d59665d5188541ad860450a6e2a7cc9'
+          TRADE_TS = int(dt.datetime(2026,7,12,13,16,32,tzinfo=dt.timezone.utc).timestamp())
+          RAW_PRICE = 44.274 / 166.68
+          ALL_IN_PRICE = 45.89969 / 166.68
+
+          out = pathlib.Path('research/data')
+          out.mkdir(parents=True, exist_ok=True)
+
+          meta = resolve_token(TOKEN, timeout=30)
+          condition = meta['condition_id']
+          yes_token = meta['primary_yes_token_id']
+          no_token = meta['secondary_no_token_id']
+
+          def get(url):
+              req = urllib.request.Request(url, headers={'Accept':'application/json','User-Agent':'polymarket-weather-profitability/1.0'})
+              with urllib.request.urlopen(req, timeout=30) as r:
+                  return json.load(r)
+
+          def data_trades(user=None, start=None, end=None):
+              q = {'market': condition, 'limit': 10000, 'offset': 0, 'takerOnly': 'false'}
+              if user: q['user'] = user
+              if start is not None: q['start'] = start
+              if end is not None: q['end'] = end
+              return get('https://data-api.polymarket.com/trades?' + urllib.parse.urlencode(q))
+
+          start = TRADE_TS - 6*3600
+          end = TRADE_TS + 6*3600
+          target_trades = data_trades(TARGET, start, end)
+          poligarch_trades = data_trades(POLIGARCH, start, end)
+          market_trades = data_trades(None, start, end)
+
+          def price_history(token):
+              q = {'market': token, 'startTs': start, 'endTs': end, 'fidelity': 1}
+              return get('https://clob.polymarket.com/prices-history?' + urllib.parse.urlencode(q)).get('history', [])
+
+          histories = {'yes': price_history(yes_token), 'no': price_history(no_token)}
+          traded_side = 'yes' if TOKEN == yes_token else 'no'
+          history = histories[traded_side]
+
+          def nearest_point(ts):
+              if not history: return None
+              p = min(history, key=lambda x: abs(int(x['t']) - ts))
+              return {'requested_ts': ts, 't': int(p['t']), 'price': float(p['p']), 'age_seconds': int(p['t'])-ts}
+
+          marks = {
+              'entry_history_nearest': nearest_point(TRADE_TS),
+              'plus_1m': nearest_point(TRADE_TS+60),
+              'plus_5m': nearest_point(TRADE_TS+300),
+              'plus_30m': nearest_point(TRADE_TS+1800),
+              'plus_2h': nearest_point(TRADE_TS+7200),
+          }
+          for key, m in marks.items():
+              if m:
+                  m['raw_markout_vs_trade'] = m['price'] - RAW_PRICE
+                  m['markout_vs_all_in'] = m['price'] - ALL_IN_PRICE
+
+          def compact_trade(x):
+              return {k:x.get(k) for k in ['proxyWallet','side','asset','conditionId','size','price','timestamp','title','slug','eventSlug','outcome','transactionHash']}
+
+          result = {
+              'generated_at': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'known_onchain_fill': {
+                  'timestamp': TRADE_TS,
+                  'timestamp_iso': '2026-07-12T13:16:32Z',
+                  'target_wallet': TARGET,
+                  'poligarch_wallet': POLIGARCH,
+                  'token': TOKEN,
+                  'raw_price': RAW_PRICE,
+                  'all_in_price': ALL_IN_PRICE,
+                  'shares': 166.68,
+                  'fee_usd': 1.62569,
+              },
+              'market': meta,
+              'window': {'start':start,'end':end},
+              'traded_side': traded_side,
+              'price_history': histories,
+              'marks': marks,
+              'target_trades': [compact_trade(x) for x in target_trades],
+              'poligarch_trades': [compact_trade(x) for x in poligarch_trades],
+              'market_trade_count': len(market_trades),
+              'market_trades_near_fill': [compact_trade(x) for x in market_trades if abs(int(x.get('timestamp') or 0)-TRADE_TS) <= 900],
+          }
+
+          (out/'july12-overlap-profitability.json').write_text(json.dumps(result, indent=2), encoding='utf-8')
+
+          q = meta.get('question') or meta.get('bucket_label') or 'unknown'
+          event = meta.get('event') or {}
+          lines = [
+              '# July 12 target-wallet / Poligarch overlap profitability reconstruction','',
+              f'Generated: **{result["generated_at"]}**','',
+              f'Event: **{event.get("title") or "unknown"}**','',
+              f'Market: **{q}**','',
+              f'Traded token outcome: **{meta.get("token_outcome")}**','',
+              f'Known target-wallet taker fill: **166.68 shares @ {RAW_PRICE:.4f} raw; {ALL_IN_PRICE:.4f} all-in** at `2026-07-12T13:16:32Z`.','',
+              f'Public Data API trades in ±6h window: target **{len(target_trades)}**, Poligarch **{len(poligarch_trades)}**, market **{len(market_trades)}**.','',
+              '## Markout on the traded token','',
+              '| Horizon | Historical price | Raw markout | Markout vs all-in | Sample offset |','|---|---:|---:|---:|---:|'
+          ]
+          for key, label in [('entry_history_nearest','entry'),('plus_1m','+1m'),('plus_5m','+5m'),('plus_30m','+30m'),('plus_2h','+2h')]:
+              m=marks.get(key)
+              if m:
+                  lines.append(f'| {label} | {m["price"]:.4f} | {m["raw_markout_vs_trade"]:+.4f} | {m["markout_vs_all_in"]:+.4f} | {m["age_seconds"]:+d}s |')
+              else:
+                  lines.append(f'| {label} | NA | NA | NA | NA |')
+          lines += ['', '## Target wallet trades in window','']
+          for x in target_trades:
+              lines.append(f'- `{dt.datetime.fromtimestamp(int(x["timestamp"]),dt.timezone.utc).isoformat()}` {x.get("side")} {x.get("outcome")} {float(x.get("size") or 0):.3f} @ {float(x.get("price") or 0):.4f} tx `{x.get("transactionHash")}`')
+          lines += ['', '## Poligarch trades in window','']
+          for x in poligarch_trades[:200]:
+              lines.append(f'- `{dt.datetime.fromtimestamp(int(x["timestamp"]),dt.timezone.utc).isoformat()}` {x.get("side")} {x.get("outcome")} {float(x.get("size") or 0):.3f} @ {float(x.get("price") or 0):.4f} tx `{x.get("transactionHash")}`')
+          lines += ['', '## Interpretation rule','',
+                    'Positive markout vs all-in means the target-wallet immediate taker entry was ahead of subsequent market price by that horizon. Negative means the fee-paying cross did not earn back its execution hurdle over that horizon. This is market-price markout, not settlement PnL or historical executable-book reconstruction.','']
+          (out/'july12-overlap-profitability.md').write_text('\n'.join(lines), encoding='utf-8')
+          PY
+
+      - name: Commit reconstruction
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/july12-overlap-profitability.json research/data/july12-overlap-profitability.md
+          git diff --cached --quiet && exit 0
+          git commit -m "data: reconstruct July 12 overlap profitability"
+          git push
