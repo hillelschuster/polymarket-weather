@@ -1,0 +1,239 @@
+name: One-shot T+0 observation markout sample
+
+on:
+  push:
+    paths:
+      - '.github/workflows/t0-observation-sample-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  sample:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct observation-aligned market paths
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import pathlib
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          UA = 'polymarket-weather-t0-observation-sample/1.0'
+          GAMMA = 'https://gamma-api.polymarket.com'
+          CLOB = 'https://clob.polymarket.com'
+          DATA = 'https://data-api.polymarket.com'
+
+          def ts(s):
+              return int(dt.datetime.fromisoformat(s.replace('Z','+00:00')).timestamp())
+
+          cases = [
+              {
+                  'name':'London Jul12 27C pre-breach',
+                  'event_slug':'highest-temperature-in-london-on-july-12-2026',
+                  'needles':['27'],
+                  'anchor_ts':ts('2026-07-12T13:16:32Z'),
+                  'anchor_type':'pre_breach_trade',
+                  'known_breach_ts':ts('2026-07-12T13:20:00Z'),
+                  'expected_final':'28C',
+              },
+              {
+                  'name':'Wellington Jul21 11C pre-breach',
+                  'event_slug':'highest-temperature-in-wellington-on-july-21-2026',
+                  'needles':['11'],
+                  'anchor_ts':ts('2026-07-21T01:56:10Z'),
+                  'anchor_type':'pre_breach_trade',
+                  'known_breach_ts':ts('2026-07-21T02:30:00Z'),
+                  'expected_final':'12C+',
+              },
+              {
+                  'name':'NYC Jul20 82-83F first-lock',
+                  'event_slug':'highest-temperature-in-nyc-on-july-20-2026',
+                  'needles':['82','83'],
+                  'anchor_ts':ts('2026-07-20T21:51:00Z'),
+                  'anchor_type':'first_winning_bucket_observation',
+                  'known_breach_ts':None,
+                  'expected_final':'82-83F',
+              },
+              {
+                  'name':'Chicago Jun29 92-93F first-lock',
+                  'event_slug':'highest-temperature-in-chicago-on-june-29-2026',
+                  'needles':['92','93'],
+                  'anchor_ts':ts('2026-06-29T20:51:00Z'),
+                  'anchor_type':'first_winning_bucket_observation',
+                  'known_breach_ts':None,
+                  'expected_final':'92-93F',
+              },
+              {
+                  'name':'Chicago Jun20 76-77F late-extrema',
+                  'event_slug':'highest-temperature-in-chicago-on-june-20-2026',
+                  'needles':['76','77'],
+                  'anchor_ts':ts('2026-06-20T23:51:00Z'),
+                  'anchor_type':'late_extrema_candidate',
+                  'known_breach_ts':None,
+                  'expected_final':'76-77F',
+              },
+          ]
+
+          def get(url, retries=4):
+              req=urllib.request.Request(url,headers={'Accept':'application/json','User-Agent':UA})
+              for attempt in range(retries+1):
+                  try:
+                      with urllib.request.urlopen(req,timeout=30) as r:
+                          return json.load(r)
+                  except urllib.error.HTTPError as e:
+                      if e.code not in (429,500,502,503,504) or attempt == retries:
+                          body=e.read().decode('utf-8','replace')[:500]
+                          raise RuntimeError(f'HTTP {e.code} {url}: {body}')
+                  except urllib.error.URLError:
+                      if attempt == retries: raise
+                  time.sleep(min(2**attempt,8))
+              raise RuntimeError('unreachable')
+
+          def parse_jsonish(v):
+              if isinstance(v,list): return v
+              if isinstance(v,str):
+                  try:
+                      x=json.loads(v)
+                      return x if isinstance(x,list) else [x]
+                  except Exception:
+                      return [v]
+              return []
+
+          def text_for_market(m):
+              return ' '.join(str(m.get(k) or '') for k in ('question','groupItemTitle','slug')).lower()
+
+          def choose_market(event, needles):
+              markets=[m for m in event.get('markets',[]) if isinstance(m,dict)]
+              hits=[]
+              for m in markets:
+                  txt=text_for_market(m)
+                  if all(n.lower() in txt for n in needles):
+                      hits.append(m)
+              if len(hits) != 1:
+                  compact=[{'question':m.get('question'),'groupItemTitle':m.get('groupItemTitle'),'slug':m.get('slug')} for m in markets]
+                  raise RuntimeError(f'market selector {needles} matched {len(hits)}; candidates={compact}')
+              return hits[0]
+
+          def side_tokens(m):
+              toks=[str(x) for x in parse_jsonish(m.get('clobTokenIds'))]
+              outs=[str(x) for x in parse_jsonish(m.get('outcomes'))]
+              if len(toks)==len(outs) and toks:
+                  mp={o.lower():t for t,o in zip(toks,outs)}
+                  if 'yes' in mp and 'no' in mp:
+                      return mp['yes'],mp['no'],'gamma'
+              cid=str(m.get('conditionId') or '')
+              if not cid: raise RuntimeError('market missing conditionId')
+              cm=get(f'{CLOB}/clob-markets/{urllib.parse.quote(cid,safe="")}')
+              mp={str(x.get('o') or '').lower():str(x.get('t') or '') for x in cm.get('t',[]) if isinstance(x,dict)}
+              if not mp.get('yes') or not mp.get('no'):
+                  raise RuntimeError(f'explicit CLOB Yes/No labels unavailable for {cid}')
+              return mp['yes'],mp['no'],'clob'
+
+          def history(token,start,end):
+              q=urllib.parse.urlencode({'market':token,'startTs':start,'endTs':end,'fidelity':1})
+              return get(f'{CLOB}/prices-history?{q}').get('history',[])
+
+          def nearest(hist,target,max_abs=180):
+              if not hist: return None
+              p=min(hist,key=lambda x:abs(int(x['t'])-target))
+              off=int(p['t'])-target
+              if abs(off)>max_abs: return None
+              return {'t':int(p['t']),'price':float(p['p']),'offset_s':off}
+
+          def market_trades(condition,start,end):
+              q=urllib.parse.urlencode({'market':condition,'start':start,'end':end,'limit':10000,'offset':0,'takerOnly':'false'})
+              rows=get(f'{DATA}/trades?{q}')
+              return rows if isinstance(rows,list) else []
+
+          horizons=[-300,0,300,900,1800,3600,7200]
+          results=[]
+          for c in cases:
+              try:
+                  evs=get(f'{GAMMA}/events?'+urllib.parse.urlencode({'slug':c['event_slug']}))
+                  if not isinstance(evs,list) or not evs:
+                      raise RuntimeError('Gamma event lookup empty')
+                  event=evs[0]
+                  market=choose_market(event,c['needles'])
+                  condition=str(market.get('conditionId') or '')
+                  yes_token,no_token,label_source=side_tokens(market)
+                  start=c['anchor_ts']-1800
+                  end=c['anchor_ts']+3*3600
+                  hy=history(yes_token,start,end)
+                  hn=history(no_token,start,end)
+                  marks=[]
+                  for h in horizons:
+                      target=c['anchor_ts']+h
+                      y=nearest(hy,target)
+                      n=nearest(hn,target)
+                      marks.append({'horizon_s':h,'target_ts':target,'yes':y,'no':n})
+                  trades=market_trades(condition,start,end)
+                  asset_trades=[x for x in trades if str(x.get('asset') or '')==yes_token]
+                  near=[x for x in asset_trades if abs(int(x.get('timestamp') or 0)-c['anchor_ts'])<=900]
+                  first_after=None
+                  after=sorted([x for x in asset_trades if int(x.get('timestamp') or 0)>=c['anchor_ts']],key=lambda x:int(x.get('timestamp') or 0))
+                  if after:
+                      x=after[0]
+                      first_after={k:x.get(k) for k in ('timestamp','price','size','side','transactionHash','outcome')}
+                  row={
+                      **c,
+                      'event_title':event.get('title'),
+                      'market_question':market.get('question'),
+                      'market_slug':market.get('slug'),
+                      'condition_id':condition,
+                      'yes_token':yes_token,
+                      'no_token':no_token,
+                      'token_label_source':label_source,
+                      'marks':marks,
+                      'market_trade_count_window':len(trades),
+                      'yes_trade_count_window':len(asset_trades),
+                      'yes_trades_near_anchor':[ {k:x.get(k) for k in ('timestamp','price','size','side','transactionHash','outcome')} for x in near[:100] ],
+                      'first_yes_trade_after_anchor':first_after,
+                      'error':None,
+                  }
+              except Exception as e:
+                  row={**c,'error':str(e)}
+              results.append(row)
+
+          out=pathlib.Path('research/data')
+          out.mkdir(parents=True,exist_ok=True)
+          payload={'generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),'cases':results}
+          (out/'t0-observation-markout-sample.json').write_text(json.dumps(payload,indent=2),encoding='utf-8')
+
+          lines=['# T+0 observation-aligned markout sample','',f'Generated: **{payload["generated_at"]}**','',
+                 'Price marks are CLOB historical token prices sampled within ±180 seconds of each requested horizon. They are market marks, not reconstructed historical bid/ask depth.','',
+                 '| Case | Anchor | YES -5m | YES 0m | YES +5m | +15m | +30m | +60m | +120m |','|---|---|---:|---:|---:|---:|---:|---:|---:|']
+          for r in results:
+              if r.get('error'):
+                  lines.append(f'| {r["name"]} | ERROR | {r["error"]} | | | | | | |')
+                  continue
+              vals=[]
+              for m in r['marks']:
+                  vals.append('NA' if not m['yes'] else f'{m["yes"]["price"]:.4f}')
+              lines.append('| '+r['name']+' | '+r['anchor_type']+' | '+' | '.join(vals)+' |')
+          lines += ['','## Event details','']
+          for r in results:
+              lines += [f'### {r["name"]}','']
+              if r.get('error'):
+                  lines += [f'- error: `{r["error"]}`','']
+                  continue
+              lines += [f'- market: **{r["market_question"]}**',f'- token labels: `{r["token_label_source"]}` explicit mapping',f'- market trades in window: **{r["market_trade_count_window"]}**; YES-token trades: **{r["yes_trade_count_window"]}**',f'- first YES trade after anchor: `{json.dumps(r["first_yes_trade_after_anchor"],sort_keys=True)}`','']
+          (out/'t0-observation-markout-sample.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+
+      - name: Commit sample
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/t0-observation-markout-sample.json research/data/t0-observation-markout-sample.md
+          git diff --cached --quiet && exit 0
+          git commit -m "data: capture T+0 observation markout sample"
+          git push
