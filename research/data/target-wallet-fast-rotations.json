@@ -1,0 +1,18 @@
+[
+  {
+    "event": "highest-temperature-in-milan-on-june-25-2026",
+    "lag_seconds": 15,
+    "sell_title": "Will the highest temperature in Milan be 33\u00b0C on June 25?",
+    "sell_bucket": 33,
+    "sell_price": 0.114191351,
+    "sell_size": 193.78,
+    "sell_role": "TAKER",
+    "buy_title": "Will the highest temperature in Milan be 34\u00b0C on June 25?",
+    "buy_bucket": 34,
+    "buy_price": 0.4599999939,
+    "buy_size": 65.21739,
+    "buy_role": "TAKER",
+    "bucket_delta": 1,
+    "timestamp": 1782349907
+  }
+]
