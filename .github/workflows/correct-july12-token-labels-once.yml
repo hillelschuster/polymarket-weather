@@ -1,0 +1,52 @@
+name: One-shot correct July 12 token labels
+
+on:
+  push:
+    paths:
+      - '.github/workflows/correct-july12-token-labels-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remap history by explicit CLOB outcome labels
+        shell: bash
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          p = Path('research/data/july12-overlap-profitability.json')
+          d = json.loads(p.read_text(encoding='utf-8'))
+          m = d['market']
+          primary = m['markets_by_token']['primary_token_id']
+          secondary = m['markets_by_token']['secondary_token_id']
+          labels = {str(x['t']): str(x['o']) for x in m['clob_market']['t']}
+          yes_token = next(t for t,o in labels.items() if o.lower() == 'yes')
+          no_token = next(t for t,o in labels.items() if o.lower() == 'no')
+          old = d['price_history']
+          by_token = {primary: old['yes'], secondary: old['no']}
+          d['price_history'] = {'yes': by_token[yes_token], 'no': by_token[no_token]}
+          m['primary_token_id'] = primary
+          m['secondary_token_id'] = secondary
+          m['yes_token'] = yes_token
+          m['no_token'] = no_token
+          target = d['known_onchain_fill']['token']
+          m['traded_side'] = 'yes' if target == yes_token else 'no'
+          d['traded_side'] = m['traded_side']
+          d['token_label_correction'] = 'Yes/No derived from clob_market.t explicit outcome labels; primary/secondary ordering is not semantic.'
+          assert m['traded_side'] == 'yes'
+          p.write_text(json.dumps(d, indent=2) + '\n', encoding='utf-8')
+          PY
+      - name: Commit corrected artifact
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/july12-overlap-profitability.json
+          git diff --cached --quiet && exit 0
+          git commit -m "data: correct July 12 Yes/No token attribution"
+          git push
