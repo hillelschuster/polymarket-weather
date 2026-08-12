@@ -1,0 +1,116 @@
+name: One-shot wallet research backfill
+
+on:
+  push:
+    paths:
+      - '.github/workflows/research-backfill-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch and distill official Polymarket wallet trades
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv
+          import datetime as dt
+          import json
+          import pathlib
+          import urllib.parse
+          import urllib.request
+
+          WALLET = '0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4f'
+          outdir = pathlib.Path('research/data')
+          outdir.mkdir(parents=True, exist_ok=True)
+
+          def get_json(base, params):
+              url = base + '?' + urllib.parse.urlencode(params)
+              req = urllib.request.Request(url, headers={'User-Agent': 'polymarket-weather-research/1.0'})
+              with urllib.request.urlopen(req, timeout=60) as r:
+                  return json.load(r), url
+
+          trades, trades_url = get_json(
+              'https://data-api.polymarket.com/trades',
+              {'user': WALLET, 'limit': 10000, 'offset': 0, 'takerOnly': 'false'},
+          )
+
+          def is_weather(row):
+              text = ' '.join(str(row.get(k, '')) for k in ('title','slug','eventSlug')).lower()
+              needles = (
+                  'highest temperature', 'lowest temperature', 'temperature in ',
+                  'precipitation', 'rainfall', 'snowfall', 'weather',
+              )
+              return any(n in text for n in needles)
+
+          weather = [r for r in trades if is_weather(r)]
+          weather.sort(key=lambda r: int(r.get('timestamp') or 0))
+
+          fields = [
+              'timestamp','timestamp_utc','proxyWallet','side','asset','conditionId','size','price',
+              'title','slug','eventSlug','outcome','outcomeIndex','transactionHash','name','pseudonym'
+          ]
+          with (outdir / 'target-wallet-weather-trades.csv').open('w', newline='', encoding='utf-8') as f:
+              w = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
+              w.writeheader()
+              for r0 in weather:
+                  r = dict(r0)
+                  ts = int(r.get('timestamp') or 0)
+                  r['timestamp_utc'] = dt.datetime.fromtimestamp(ts, dt.timezone.utc).isoformat() if ts else ''
+                  w.writerow(r)
+
+          exact = []
+          for r in weather:
+              text = ' '.join(str(r.get(k,'')) for k in ('title','slug','eventSlug')).lower()
+              if ('milan' in text and ('june 25' in text or 'june-25' in text or 'june 30' in text or 'june-30' in text)):
+                  exact.append(r)
+          (outdir / 'target-wallet-milan-june-trades.json').write_text(json.dumps(exact, indent=2), encoding='utf-8')
+
+          def fmt_ts(x):
+              if not x: return ''
+              return dt.datetime.fromtimestamp(int(x), dt.timezone.utc).isoformat()
+
+          lines = [
+              '# Official Polymarket target-wallet backfill', '',
+              f'Generated: **{dt.datetime.now(dt.timezone.utc).isoformat()}**', '',
+              f'Wallet: `{WALLET}`', '',
+              'Source: official public Polymarket Data API `/trades` with `takerOnly=false`.', '',
+              f'- rows returned by API: **{len(trades):,}**',
+              f'- weather-classified rows: **{len(weather):,}**',
+              f'- response hit 10,000-row cap: **{len(trades) == 10000}**',
+          ]
+          if weather:
+              lines += [
+                  f'- earliest classified weather fill: **{fmt_ts(weather[0].get("timestamp"))}**',
+                  f'- latest classified weather fill: **{fmt_ts(weather[-1].get("timestamp"))}**',
+              ]
+          lines += ['', '## Milan June 25 / June 30 rows', '']
+          if not exact:
+              lines.append('No matching rows returned in this API page.')
+          else:
+              for r in exact:
+                  lines += [
+                      f'- `{fmt_ts(r.get("timestamp"))}` — **{r.get("side")} {r.get("size")} @ {r.get("price")}** — {r.get("title")} / {r.get("outcome")} — tx `{r.get("transactionHash")}`',
+                  ]
+          lines += [
+              '', '## Acquisition note', '',
+              'The API URL is intentionally not persisted with any credentials because this endpoint is public and unauthenticated.',
+              'If the response hits 10,000 rows, the next backfill should page by timestamp windows rather than treating this file as complete.',
+          ]
+          (outdir / 'target-wallet-official-backfill.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+          PY
+
+      - name: Commit research output
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/target-wallet-weather-trades.csv research/data/target-wallet-milan-june-trades.json research/data/target-wallet-official-backfill.md
+          git diff --cached --quiet && exit 0
+          git commit -m "data: backfill target wallet weather trades from official API"
+          git push
