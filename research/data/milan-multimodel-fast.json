@@ -1,0 +1,354 @@
+{
+  "generated_at": "2026-08-12T11:11:24.609963+00:00",
+  "resolver_proxy": "LIMC",
+  "rows": [
+    {
+      "case": "milan_june25",
+      "stage": "pre_12z",
+      "provider_model": "ECMWF IFS",
+      "model_id": "ecmwf_ifs",
+      "run": "2026-06-24T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=ecmwf_ifs&run=2026-06-24T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 33.3,
+      "max_local_time": "2026-06-25T16:00"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "post_18z",
+      "provider_model": "ECMWF IFS",
+      "model_id": "ecmwf_ifs",
+      "run": "2026-06-24T18:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=ecmwf_ifs&run=2026-06-24T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "error": "HTTP 429: {\"error\":true,\"reason\":\"Too many concurrent requests\"}"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "pre_12z",
+      "provider_model": "DWD ICON-EU",
+      "model_id": "dwd_icon_eu",
+      "run": "2026-06-24T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-24T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "error": "HTTP 429: {\"reason\":\"Too many concurrent requests\",\"error\":true}"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "post_18z",
+      "provider_model": "DWD ICON-EU",
+      "model_id": "dwd_icon_eu",
+      "run": "2026-06-24T18:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-24T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "error": "HTTP 429: {\"reason\":\"Too many concurrent requests\",\"error\":true}"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "pre_12z",
+      "provider_model": "DWD ICON Global",
+      "model_id": "dwd_icon_global",
+      "run": "2026-06-24T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_global&run=2026-06-24T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 32.9,
+      "max_local_time": "2026-06-25T13:00"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "post_18z",
+      "provider_model": "DWD ICON Global",
+      "model_id": "dwd_icon_global",
+      "run": "2026-06-24T18:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_global&run=2026-06-24T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 34.6,
+      "max_local_time": "2026-06-25T16:00"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "pre_12z",
+      "provider_model": "ARPEGE Europe",
+      "model_id": "meteofrance_arpege_europe",
+      "run": "2026-06-24T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=meteofrance_arpege_europe&run=2026-06-24T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 32.5,
+      "max_local_time": "2026-06-25T17:00"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "post_18z",
+      "provider_model": "ARPEGE Europe",
+      "model_id": "meteofrance_arpege_europe",
+      "run": "2026-06-24T18:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=meteofrance_arpege_europe&run=2026-06-24T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 33.9,
+      "max_local_time": "2026-06-25T17:00"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "pre_12z",
+      "provider_model": "ItaliaMeteo ICON-2I",
+      "model_id": "italia_meteo_arpae_icon_2i",
+      "run": "2026-06-24T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=italia_meteo_arpae_icon_2i&run=2026-06-24T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "error": "HTTP 429: {\"error\":true,\"reason\":\"Too many concurrent requests\"}"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "post_18z",
+      "provider_model": "ItaliaMeteo ICON-2I",
+      "model_id": "italia_meteo_arpae_icon_2i",
+      "run": "2026-06-24T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=italia_meteo_arpae_icon_2i&run=2026-06-24T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "error": "HTTP 429: {\"reason\":\"Too many concurrent requests\",\"error\":true}"
+    },
+    {
+      "case": "milan_june25",
+      "stage": "icon_eu_21z_candidate",
+      "provider_model": "DWD ICON-EU",
+      "model_id": "dwd_icon_eu",
+      "run": "2026-06-24T21:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-24T21%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "error": "HTTP 429: {\"reason\":\"Too many concurrent requests\",\"error\":true}"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "pre_12z",
+      "provider_model": "ECMWF IFS",
+      "model_id": "ecmwf_ifs",
+      "run": "2026-06-28T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=ecmwf_ifs&run=2026-06-28T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 34.3,
+      "max_local_time": "2026-06-30T13:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "post_18z",
+      "provider_model": "ECMWF IFS",
+      "model_id": "ecmwf_ifs",
+      "run": "2026-06-28T18:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=ecmwf_ifs&run=2026-06-28T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 33.9,
+      "max_local_time": "2026-06-30T13:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "pre_12z",
+      "provider_model": "DWD ICON-EU",
+      "model_id": "dwd_icon_eu",
+      "run": "2026-06-28T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-28T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 31.8,
+      "max_local_time": "2026-06-30T17:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "post_18z",
+      "provider_model": "DWD ICON-EU",
+      "model_id": "dwd_icon_eu",
+      "run": "2026-06-28T18:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-28T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 32.7,
+      "max_local_time": "2026-06-30T12:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "pre_12z",
+      "provider_model": "DWD ICON Global",
+      "model_id": "dwd_icon_global",
+      "run": "2026-06-28T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_global&run=2026-06-28T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 31.6,
+      "max_local_time": "2026-06-30T16:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "post_18z",
+      "provider_model": "DWD ICON Global",
+      "model_id": "dwd_icon_global",
+      "run": "2026-06-28T18:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_global&run=2026-06-28T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 32.6,
+      "max_local_time": "2026-06-30T14:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "pre_12z",
+      "provider_model": "ARPEGE Europe",
+      "model_id": "meteofrance_arpege_europe",
+      "run": "2026-06-28T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=meteofrance_arpege_europe&run=2026-06-28T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 34.1,
+      "max_local_time": "2026-06-30T18:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "post_18z",
+      "provider_model": "ARPEGE Europe",
+      "model_id": "meteofrance_arpege_europe",
+      "run": "2026-06-28T18:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=meteofrance_arpege_europe&run=2026-06-28T18%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "error": "HTTP 429: {\"error\":true,\"reason\":\"Too many concurrent requests\"}"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "pre_12z",
+      "provider_model": "ItaliaMeteo ICON-2I",
+      "model_id": "italia_meteo_arpae_icon_2i",
+      "run": "2026-06-28T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=italia_meteo_arpae_icon_2i&run=2026-06-28T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 34.4,
+      "max_local_time": "2026-06-30T16:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "post_18z",
+      "provider_model": "ItaliaMeteo ICON-2I",
+      "model_id": "italia_meteo_arpae_icon_2i",
+      "run": "2026-06-28T12:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=italia_meteo_arpae_icon_2i&run=2026-06-28T12%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 34.4,
+      "max_local_time": "2026-06-30T16:00"
+    },
+    {
+      "case": "milan_june30",
+      "stage": "icon_eu_21z_candidate",
+      "provider_model": "DWD ICON-EU",
+      "model_id": "dwd_icon_eu",
+      "run": "2026-06-28T21:00",
+      "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-28T21%3A00&forecast_days=4&timezone=Europe%2FRome",
+      "max_c": 27.9,
+      "max_local_time": "2026-06-30T00:00"
+    }
+  ],
+  "cases": {
+    "milan_june25": {
+      "run_date": "2026-06-24",
+      "target_date": "2026-06-25",
+      "trade": "2026-06-25T01:12:00Z",
+      "actions": [
+        [
+          "SELL",
+          33,
+          0.114191351,
+          193.78
+        ],
+        [
+          "BUY",
+          34,
+          0.4599999939,
+          65.21739
+        ]
+      ],
+      "pre": {
+        "n": 3,
+        "mean": 32.9,
+        "median": 32.9,
+        "votes": {
+          "33": 3
+        },
+        "bucket": {
+          "33": {
+            "votes": 3,
+            "mean_abs_distance_c": 0.29999999999999954,
+            "within_0_75c": 3,
+            "within_1_25c": 3
+          },
+          "34": {
+            "votes": 0,
+            "mean_abs_distance_c": 1.1000000000000014,
+            "within_0_75c": 1,
+            "within_1_25c": 2
+          }
+        }
+      },
+      "post": {
+        "n": 2,
+        "mean": 34.25,
+        "median": 34.25,
+        "votes": {
+          "35": 1,
+          "34": 1
+        },
+        "bucket": {
+          "33": {
+            "votes": 0,
+            "mean_abs_distance_c": 1.25,
+            "within_0_75c": 0,
+            "within_1_25c": 1
+          },
+          "34": {
+            "votes": 1,
+            "mean_abs_distance_c": 0.3500000000000014,
+            "within_0_75c": 2,
+            "within_1_25c": 2
+          }
+        }
+      },
+      "changes": {
+        "33": {
+          "vote_delta": -3,
+          "mean_abs_distance_delta_c": 0.9500000000000004,
+          "within_0_75c_delta": -3,
+          "within_1_25c_delta": -2
+        },
+        "34": {
+          "vote_delta": 1,
+          "mean_abs_distance_delta_c": -0.75,
+          "within_0_75c_delta": 1,
+          "within_1_25c_delta": 0
+        }
+      }
+    },
+    "milan_june30": {
+      "run_date": "2026-06-28",
+      "target_date": "2026-06-30",
+      "trade": "2026-06-29T01:55:11Z",
+      "actions": [
+        [
+          "BUY",
+          35,
+          0.2937835403,
+          102.116
+        ]
+      ],
+      "pre": {
+        "n": 5,
+        "mean": 33.24,
+        "median": 34.1,
+        "votes": {
+          "34": 3,
+          "32": 2
+        },
+        "bucket": {
+          "35": {
+            "votes": 0,
+            "mean_abs_distance_c": 1.7600000000000002,
+            "within_0_75c": 2,
+            "within_1_25c": 3
+          }
+        }
+      },
+      "post": {
+        "n": 4,
+        "mean": 33.4,
+        "median": 33.3,
+        "votes": {
+          "34": 2,
+          "33": 2
+        },
+        "bucket": {
+          "35": {
+            "votes": 0,
+            "mean_abs_distance_c": 1.5999999999999996,
+            "within_0_75c": 1,
+            "within_1_25c": 2
+          }
+        }
+      },
+      "changes": {
+        "35": {
+          "vote_delta": 0,
+          "mean_abs_distance_delta_c": -0.1600000000000006,
+          "within_0_75c_delta": -1,
+          "within_1_25c_delta": -1
+        }
+      }
+    }
+  }
+}
