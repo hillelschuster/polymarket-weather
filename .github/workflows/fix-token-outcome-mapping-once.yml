@@ -1,0 +1,180 @@
+name: One-shot fix NegRisk token outcome mapping
+
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-token-outcome-mapping-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch enrichment and validate London token
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/enrich_v2_wallet_orders.py')
+          text = path.read_text(encoding='utf-8')
+          text = text.replace(
+              'USER_AGENT = "polymarket-weather-enrich-v2-wallet-orders/1.0"\n',
+              'USER_AGENT = "polymarket-weather-enrich-v2-wallet-orders/1.1"\nMETADATA_SCHEMA_VERSION = 2\n'
+          )
+          start = text.index('def resolve_token(token_id: str, *, timeout: float) -> dict[str, Any]:\n')
+          end = text.index('\n\ndef load_cache(', start)
+          replacement = '''def resolve_token(token_id: str, *, timeout: float) -> dict[str, Any]:
+    parent = request_json(
+        f"{CLOB_BASE}/markets-by-token/{urllib.parse.quote(token_id, safe='')}",
+        timeout=timeout,
+    )
+    if not isinstance(parent, dict):
+        raise RuntimeError(f"unexpected markets-by-token response for {token_id}")
+
+    condition_id = str(parent.get("condition_id") or "")
+    primary = str(parent.get("primary_token_id") or "")
+    secondary = str(parent.get("secondary_token_id") or "")
+    if not condition_id or not primary or not secondary:
+        raise RuntimeError(f"incomplete markets-by-token response for {token_id}: {parent!r}")
+    if token_id not in {primary, secondary}:
+        raise RuntimeError(
+            f"token {token_id} is neither primary nor secondary for condition {condition_id}"
+        )
+
+    # primary/secondary identify the two tokens but do NOT reliably encode Yes/No,
+    # especially on NegRisk markets. Canonical side comes from explicit CLOB labels.
+    clob_market = request_json(
+        f"{CLOB_BASE}/clob-markets/{urllib.parse.quote(condition_id, safe='')}",
+        timeout=timeout,
+    )
+    if not isinstance(clob_market, dict):
+        raise RuntimeError(f"unexpected CLOB market response for {condition_id}")
+    clob_map = clob_outcomes(clob_market)
+    clob_outcome = clob_map.get(token_id)
+
+    query = urllib.parse.urlencode({"condition_ids": condition_id})
+    gamma_market: dict[str, Any] = {}
+    gamma_lookup_error: str | None = None
+    try:
+        gamma_market = select_gamma_market(
+            request_json(f"{GAMMA_BASE}/markets?{query}", timeout=timeout), condition_id
+        )
+    except (RuntimeError, urllib.error.URLError) as exc:
+        # Archived conditions can disappear from Gamma while CLOB still has exact labels.
+        gamma_lookup_error = str(exc)
+
+    gamma_outcome = gamma_token_outcome(gamma_market, token_id) if gamma_market else None
+    explicit_outcomes = [x for x in (clob_outcome, gamma_outcome) if x]
+    if not explicit_outcomes:
+        raise RuntimeError(f"no explicit outcome label available for token {token_id}")
+    canonical_outcome = clob_outcome or gamma_outcome
+
+    side_checks = {"gamma": gamma_outcome, "clob_market": clob_outcome}
+    known_outcomes = [value.lower() for value in side_checks.values() if value]
+    side_consistent = bool(known_outcomes) and len(set(known_outcomes)) == 1
+
+    def token_for(label: str) -> str | None:
+        wanted = label.lower()
+        for tid, outcome in clob_map.items():
+            if str(outcome).lower() == wanted:
+                return tid
+        if gamma_market:
+            tokens = [str(x) for x in parse_jsonish(gamma_market.get("clobTokenIds"))]
+            outcomes = [str(x) for x in parse_jsonish(gamma_market.get("outcomes"))]
+            if len(tokens) == len(outcomes):
+                for tid, outcome in zip(tokens, outcomes):
+                    if outcome.lower() == wanted:
+                        return tid
+        return None
+
+    yes_token = token_for("Yes")
+    no_token = token_for("No")
+    if not yes_token or not no_token:
+        raise RuntimeError(f"could not derive explicit Yes/No token IDs for {condition_id}")
+
+    events = [x for x in (gamma_market.get("events") or []) if isinstance(x, dict)]
+    event = events[0] if len(events) == 1 else None
+    event_summary = compact_event(event) if event else None
+    weather_match = weather_evidence(gamma_market, event) if gamma_market else []
+
+    return {
+        "metadata_schema_version": METADATA_SCHEMA_VERSION,
+        "condition_id": condition_id,
+        "token_outcome": canonical_outcome,
+        "token_side_checks": side_checks,
+        "token_side_consistent": side_consistent,
+        "primary_token_id": primary,
+        "secondary_token_id": secondary,
+        "yes_token_id": yes_token,
+        "no_token_id": no_token,
+        # Backward-compatible aliases; values now mean actual Yes/No IDs, not ordering.
+        "primary_yes_token_id": yes_token,
+        "secondary_no_token_id": no_token,
+        "gamma_lookup_error": gamma_lookup_error,
+        "market_id": gamma_market.get("id"),
+        "market_slug": gamma_market.get("slug"),
+        "question": gamma_market.get("question"),
+        "bucket_label": gamma_market.get("groupItemTitle") or gamma_market.get("question"),
+        "group_item_threshold": gamma_market.get("groupItemThreshold"),
+        "market_category": gamma_market.get("category"),
+        "resolution_source": gamma_market.get("resolutionSource"),
+        "start_date": gamma_market.get("startDate"),
+        "end_date": gamma_market.get("endDate"),
+        "active": gamma_market.get("active"),
+        "closed": gamma_market.get("closed"),
+        "fees_enabled": gamma_market.get("feesEnabled"),
+        "gamma_fee_schedule": gamma_market.get("feeSchedule"),
+        "market_description": gamma_market.get("description"),
+        "event_count": len(events),
+        "event": event_summary,
+        "weather_evidence": weather_match,
+        "is_weather_metadata_match": bool(weather_match),
+        "clob_min_order_size": clob_market.get("mos"),
+        "clob_min_tick_size": clob_market.get("mts"),
+        "clob_maker_base_fee_bips": clob_market.get("mbf"),
+        "clob_taker_base_fee_bips": clob_market.get("tbf"),
+        "clob_fee_details": clob_market.get("fd"),
+        "clob_rewards": clob_market.get("r"),
+        "clob_taker_order_delay_enabled": clob_market.get("itode"),
+        "clob_min_order_age_seconds": clob_market.get("oas"),
+    }
+'''
+          text = text[:start] + replacement + text[end:]
+          old = '            metadata = cache.get(token_id)\n            enrichment_error = None\n'
+          new = '''            metadata = cache.get(token_id)
+            if metadata is not None and metadata.get("metadata_schema_version") != METADATA_SCHEMA_VERSION:
+                metadata = None
+            enrichment_error = None
+'''
+          if old not in text:
+              raise SystemExit('cache block not found')
+          text = text.replace(old, new, 1)
+          path.write_text(text, encoding='utf-8')
+          PY
+
+          python -m py_compile scripts/enrich_v2_wallet_orders.py
+          python - <<'PY'
+          import sys
+          sys.path.insert(0, 'scripts')
+          from enrich_v2_wallet_orders import resolve_token
+          token='91076181803621459956200090324917139595424901620108017335569536029558392706177'
+          m=resolve_token(token, timeout=30)
+          assert m['token_outcome'].lower() == 'yes', m
+          assert m['yes_token_id'] == token, m
+          assert m['secondary_token_id'] == token, m
+          assert m['gamma_lookup_error'], m
+          print('validated London NegRisk token: secondary token is explicit Yes')
+          PY
+      - name: Commit fix
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add scripts/enrich_v2_wallet_orders.py
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: derive token outcomes from explicit CLOB labels"
+          git push
