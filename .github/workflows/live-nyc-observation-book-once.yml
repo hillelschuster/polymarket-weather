@@ -1,0 +1,296 @@
+name: One-shot live NYC observation/book latency
+
+on:
+  push:
+    paths:
+      - '.github/workflows/live-nyc-observation-book-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 28
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Capture KLGA source arrival and NYC CLOB books
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import math
+          import pathlib
+          import re
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          DATE = '2026-08-12'
+          STATION = 'KLGA'
+          DURATION = 20 * 60
+          INTERVAL = 2.0
+          UA = 'polymarket-weather-live-latency/1.0'
+          OUT = pathlib.Path('research/data')
+          OUT.mkdir(parents=True, exist_ok=True)
+
+          def utcnow():
+              return dt.datetime.now(dt.timezone.utc)
+
+          def req_json(url, timeout=15, data=None, headers=None):
+              h = {'Accept':'application/json','User-Agent':UA,'Cache-Control':'no-cache'}
+              if headers: h.update(headers)
+              req = urllib.request.Request(url, data=data, headers=h, method='POST' if data is not None else 'GET')
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  raw = r.read()
+                  return json.loads(raw), dict(r.headers)
+
+          def req_text(url, timeout=10):
+              req = urllib.request.Request(url, headers={
+                  'Accept':'text/plain,*/*','User-Agent':UA,'Cache-Control':'no-cache','Pragma':'no-cache'
+              })
+              with urllib.request.urlopen(req, timeout=timeout) as r:
+                  return r.read().decode('utf-8','replace'), dict(r.headers)
+
+          def jsonish(v):
+              if isinstance(v, list): return v
+              if isinstance(v, str):
+                  try:
+                      x=json.loads(v)
+                      return x if isinstance(x,list) else [x]
+                  except Exception: return [v]
+              return []
+
+          slugs = [
+              'highest-temperature-in-nyc-on-august-12-2026',
+              'highest-temperature-in-new-york-city-on-august-12-2026',
+          ]
+          event = None
+          resolved_slug = None
+          errors=[]
+          for slug in slugs:
+              try:
+                  event,_ = req_json('https://gamma-api.polymarket.com/events/slug/'+slug)
+                  if isinstance(event,dict) and event.get('markets'):
+                      resolved_slug=slug; break
+              except Exception as e:
+                  errors.append(f'event slug {slug}: {e}')
+          if not event:
+              params=urllib.parse.urlencode({'active':'true','closed':'false','limit':500})
+              events,_=req_json('https://gamma-api.polymarket.com/events?'+params)
+              for e in events if isinstance(events,list) else []:
+                  title=str(e.get('title') or '').lower()
+                  slug=str(e.get('slug') or '')
+                  if ('highest temperature' in title and ('new york' in title or 'nyc' in title)
+                      and ('august 12' in title or 'august-12-2026' in slug)):
+                      event=e; resolved_slug=slug; break
+          if not event:
+              raise SystemExit('could not resolve active NYC Aug 12 temperature event: '+repr(errors))
+
+          markets=[]
+          book_requests=[]
+          for m in event.get('markets') or []:
+              if not isinstance(m,dict): continue
+              tokens=[str(x) for x in jsonish(m.get('clobTokenIds'))]
+              outcomes=[str(x) for x in jsonish(m.get('outcomes'))]
+              token_map=dict(zip(outcomes,tokens)) if len(tokens)==len(outcomes) else {}
+              yes=token_map.get('Yes') or token_map.get('YES')
+              no=token_map.get('No') or token_map.get('NO')
+              if not yes: continue
+              label=m.get('groupItemTitle') or m.get('question')
+              row={'condition_id':str(m.get('conditionId') or ''),'market_id':str(m.get('id') or ''),
+                   'label':label,'question':m.get('question'),'yes_token':yes,'no_token':no,
+                   'fees_enabled':m.get('feesEnabled')}
+              markets.append(row)
+              book_requests.append({'token_id':yes})
+          if not markets:
+              raise SystemExit('resolved event has no Yes tokens')
+
+          # Current fee parameters and explicit CLOB token labels, one call per condition.
+          for m in markets:
+              try:
+                  cm,_=req_json('https://clob.polymarket.com/clob-markets/'+urllib.parse.quote(m['condition_id'],safe=''))
+                  m['clob_fee_details']=cm.get('fd') if isinstance(cm,dict) else None
+                  m['clob_tokens']=cm.get('t') if isinstance(cm,dict) else None
+              except Exception as e:
+                  m['clob_error']=str(e)
+
+          # Seed running maximum from official AWC recent METAR history. One bounded call only.
+          awc=[]
+          try:
+              q=urllib.parse.urlencode({'ids':STATION,'format':'json','hours':12})
+              awc,_=req_json('https://aviationweather.gov/api/data/metar?'+q)
+          except Exception as e:
+              errors.append('awc seed: '+str(e))
+
+          def temp_c_from_raw(raw):
+              # Prefer precise T group: TsnTTTsnDDD; temperature is first signed 0.1 C value.
+              ms=re.findall(r'(?:^|\s)T([01])(\d{3})([01])(\d{3})(?:\s|$)', raw or '')
+              if ms:
+                  s,t,_,_=ms[-1]
+                  v=int(t)/10.0
+                  return -v if s=='1' else v
+              # Fall back to mandatory whole-C temp/dew group.
+              m=re.search(r'\s(M?\d{2})/(M?\d{2}|//)\s', raw or '')
+              if m:
+                  a=m.group(1); return -float(a[1:]) if a.startswith('M') else float(a)
+              return None
+
+          seed_obs=[]
+          for x in awc if isinstance(awc,list) else []:
+              raw=str(x.get('rawOb') or x.get('raw_text') or '')
+              tc=temp_c_from_raw(raw)
+              if tc is not None:
+                  seed_obs.append({'obsTime':x.get('obsTime'),'raw':raw,'temp_c':tc,'temp_f':tc*9/5+32})
+          seed_running_max_f=max((x['temp_f'] for x in seed_obs),default=None)
+
+          def best_levels(book):
+              def clean(side, reverse=False):
+                  xs=[]
+                  for x in side or []:
+                      try: xs.append((float(x['price']),float(x['size'])))
+                      except Exception: pass
+                  xs.sort(key=lambda z:z[0], reverse=reverse)
+                  return [{'p':p,'s':s} for p,s in xs[:3]]
+              bids=clean(book.get('bids'),True); asks=clean(book.get('asks'),False)
+              return {'asset_id':book.get('asset_id'),'timestamp':book.get('timestamp'),'hash':book.get('hash'),
+                      'bid':bids[0] if bids else None,'ask':asks[0] if asks else None,
+                      'bids':bids,'asks':asks,'last_trade_price':book.get('last_trade_price')}
+
+          station_changes=[]
+          snapshots=[]
+          start=utcnow(); deadline=time.monotonic()+DURATION
+          last_station=None; last_book_hashes=None
+          iteration=0
+          while time.monotonic() < deadline:
+              tick=time.monotonic(); now=utcnow()
+              station_text=None; station_headers={}
+              try:
+                  # Tiny official NOAA station file; cache-busting query avoids intermediary stale responses.
+                  station_text,station_headers=req_text(
+                      f'https://tgftp.nws.noaa.gov/data/observations/metar/stations/{STATION}.TXT?cb={time.time_ns()}'
+                  )
+                  norm=station_text.strip()
+                  if norm and norm != last_station:
+                      lines=[x.strip() for x in norm.splitlines() if x.strip()]
+                      raw=lines[-1] if lines else norm
+                      tc=temp_c_from_raw(raw)
+                      station_changes.append({
+                          'first_seen_utc':now.isoformat(),
+                          'first_seen_epoch':now.timestamp(),
+                          'header_date':station_headers.get('Date'),
+                          'last_modified':station_headers.get('Last-Modified'),
+                          'age':station_headers.get('Age'),
+                          'text':norm,
+                          'raw':raw,
+                          'temp_c':tc,
+                          'temp_f':None if tc is None else tc*9/5+32,
+                      })
+                      last_station=norm
+              except Exception as e:
+                  errors.append(f'station {now.isoformat()}: {e}')
+
+              books=[]
+              try:
+                  payload=json.dumps(book_requests).encode()
+                  got,_=req_json('https://clob.polymarket.com/books',data=payload,
+                                 headers={'Content-Type':'application/json'},timeout=12)
+                  if isinstance(got,list): books=[best_levels(x) for x in got if isinstance(x,dict)]
+              except Exception as e:
+                  errors.append(f'books {now.isoformat()}: {e}')
+              hashes=tuple((b.get('asset_id'),b.get('hash')) for b in books)
+              # Keep every sample for latency work; compact top-3 levels only.
+              snapshots.append({'capture_utc':utcnow().isoformat(),'capture_epoch':time.time(),'books':books})
+              last_book_hashes=hashes
+              iteration += 1
+              delay=max(0.0, INTERVAL-(time.monotonic()-tick))
+              time.sleep(delay)
+
+          end=utcnow()
+
+          # Fetch actual prints during the capture window, condition by condition.
+          trades=[]
+          start_ts=int(start.timestamp())-30; end_ts=int(end.timestamp())+30
+          for m in markets:
+              try:
+                  q=urllib.parse.urlencode({'market':m['condition_id'],'start':start_ts,'end':end_ts,'limit':10000,'offset':0})
+                  xs,_=req_json('https://data-api.polymarket.com/trades?'+q)
+                  for x in xs if isinstance(xs,list) else []:
+                      trades.append({k:x.get(k) for k in ['conditionId','asset','side','outcome','size','price','timestamp','transactionHash','title','slug']})
+              except Exception as e:
+                  errors.append('trades '+m['condition_id']+': '+str(e))
+
+          token_to_market={m['yes_token']:m for m in markets}
+          # Build observation-change economics: nearest book before/after first_seen.
+          impacts=[]
+          def snapshot_near(epoch, direction):
+              cand=[s for s in snapshots if (s['capture_epoch']<=epoch if direction=='before' else s['capture_epoch']>=epoch)]
+              if not cand: return None
+              return max(cand,key=lambda s:s['capture_epoch']) if direction=='before' else min(cand,key=lambda s:s['capture_epoch'])
+          for ch in station_changes[1:]:
+              ep=ch['first_seen_epoch']
+              imp={'observation':ch,'before':snapshot_near(ep,'before'),'after':snapshot_near(ep,'after')}
+              for sec in [10,30,60,120,300]:
+                  imp[f'plus_{sec}s']=snapshot_near(ep+sec,'after')
+              impacts.append(imp)
+
+          result={
+              'generated_at':utcnow().isoformat(),'capture_start':start.isoformat(),'capture_end':end.isoformat(),
+              'interval_seconds':INTERVAL,'station':STATION,'event_slug':resolved_slug,'event_title':event.get('title'),
+              'event_resolution_source':event.get('resolutionSource'),'markets':markets,
+              'awc_seed_observations':seed_obs,'seed_running_max_f':seed_running_max_f,
+              'station_changes':station_changes,'observation_impacts':impacts,'book_snapshots':snapshots,
+              'trades':trades,'errors':errors[-200:],
+          }
+          (OUT/'live-nyc-observation-book-2026-08-12.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+
+          # Compact human report.
+          lines=['# Live NYC observation-to-book capture — 2026-08-12','',
+                 f'Capture: `{start.isoformat()}` → `{end.isoformat()}`; polling **{INTERVAL:.1f}s**.','',
+                 f'Event: **{event.get("title")}** (`{resolved_slug}`).','',
+                 f'Resolver/source metadata: `{event.get("resolutionSource")}`. Direct station feed measured: **{STATION}** official NOAA station TXT.','',
+                 f'AWC 12h seed running maximum: **{seed_running_max_f:.1f}°F**.' if seed_running_max_f is not None else 'AWC seed maximum unavailable.','',
+                 f'Captured **{len(snapshots)}** batched book snapshots, **{len(station_changes)}** distinct station-file states, **{len(trades)}** event trade prints.','',
+                 '## Station file changes','',
+                 '| First seen UTC | NOAA Last-Modified | Temp F | Raw |','|---|---|---:|---|']
+          for ch in station_changes:
+              raw=(ch.get('raw') or '').replace('|','/')
+              tf=ch.get('temp_f')
+              lines.append(f'| {ch["first_seen_utc"]} | {ch.get("last_modified") or ""} | {"NA" if tf is None else f"{tf:.1f}"} | `{raw}` |')
+          lines += ['', '## Observation changes captured', '']
+          if not impacts:
+              lines.append('No new station-file state arrived after the initial state during this bounded capture.')
+          for imp in impacts:
+              ch=imp['observation']; lines.append(f'### First seen {ch["first_seen_utc"]} — {ch.get("temp_f")}°F')
+              lines.append('')
+              lines.append('| Bucket | Bid before | Ask before | Bid +10s | Ask +10s | Bid +60s | Ask +60s |')
+              lines.append('|---|---:|---:|---:|---:|---:|---:|')
+              def bm(s, token):
+                  if not s:return (None,None)
+                  for b in s.get('books') or []:
+                      if str(b.get('asset_id'))==str(token):
+                          return ((b.get('bid') or {}).get('p'),(b.get('ask') or {}).get('p'))
+                  return (None,None)
+              for m in markets:
+                  bb,ba=bm(imp.get('before'),m['yes_token']); b10,a10=bm(imp.get('plus_10s'),m['yes_token']); b60,a60=bm(imp.get('plus_60s'),m['yes_token'])
+                  fmt=lambda x:'NA' if x is None else f'{x:.4f}'
+                  lines.append(f'| {m["label"]} | {fmt(bb)} | {fmt(ba)} | {fmt(b10)} | {fmt(a10)} | {fmt(b60)} | {fmt(a60)} |')
+              lines.append('')
+          lines += ['## Interpretation','',
+                    'This is a live synchronized measurement. `first_seen_utc` is when this GitHub runner first observed a changed official NOAA station file, not the station observation timestamp. CLOB rows are real public resting books sampled around that same wall clock. This directly measures an implementable public-feed latency path, with ±2s polling uncertainty plus network latency.','',
+                    'The AWC seed call is only for pre-run running-max context; it was not polled faster than the documented API rate guidance.','']
+          (OUT/'live-nyc-observation-book-2026-08-12.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+
+      - name: Commit live capture
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/live-nyc-observation-book-2026-08-12.json research/data/live-nyc-observation-book-2026-08-12.md
+          git diff --cached --quiet && exit 0
+          git commit -m "data: capture live NYC observation-to-book latency"
+          git push
