@@ -1,0 +1,57 @@
+[
+  {
+    "case": "june25",
+    "label": "DWD ICON-EU 12Z",
+    "model": "dwd_icon_eu",
+    "run": "2026-06-24T12:00",
+    "target_date": "2026-06-25",
+    "max_c": 33.2,
+    "max_local_time": "2026-06-25T16:00",
+    "target_hours": 24,
+    "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-24T12%3A00&forecast_days=4&timezone=Europe%2FRome"
+  },
+  {
+    "case": "june25",
+    "label": "DWD ICON-EU 18Z",
+    "model": "dwd_icon_eu",
+    "run": "2026-06-24T18:00",
+    "target_date": "2026-06-25",
+    "max_c": 35.2,
+    "max_local_time": "2026-06-25T16:00",
+    "target_hours": 24,
+    "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-24T18%3A00&forecast_days=4&timezone=Europe%2FRome"
+  },
+  {
+    "case": "june25",
+    "label": "DWD ICON-EU 21Z",
+    "model": "dwd_icon_eu",
+    "run": "2026-06-24T21:00",
+    "target_date": "2026-06-25",
+    "max_c": 35.4,
+    "max_local_time": "2026-06-25T15:00",
+    "target_hours": 24,
+    "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=dwd_icon_eu&run=2026-06-24T21%3A00&forecast_days=4&timezone=Europe%2FRome"
+  },
+  {
+    "case": "june25",
+    "label": "ItaliaMeteo ICON-2I 12Z",
+    "model": "italia_meteo_arpae_icon_2i",
+    "run": "2026-06-24T12:00",
+    "target_date": "2026-06-25",
+    "max_c": 35.3,
+    "max_local_time": "2026-06-25T17:00",
+    "target_hours": 24,
+    "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=italia_meteo_arpae_icon_2i&run=2026-06-24T12%3A00&forecast_days=4&timezone=Europe%2FRome"
+  },
+  {
+    "case": "june30",
+    "label": "ARPEGE Europe 18Z",
+    "model": "meteofrance_arpege_europe",
+    "run": "2026-06-28T18:00",
+    "target_date": "2026-06-30",
+    "max_c": 32.2,
+    "max_local_time": "2026-06-30T18:00",
+    "target_hours": 24,
+    "url": "https://single-runs-api.open-meteo.com/v1/forecast?latitude=45.61667&longitude=8.73333&hourly=temperature_2m&models=meteofrance_arpege_europe&run=2026-06-28T18%3A00&forecast_days=4&timezone=Europe%2FRome"
+  }
+]
