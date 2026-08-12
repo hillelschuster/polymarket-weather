@@ -1,0 +1,73 @@
+name: One-shot NYC live NO-side execution
+
+on:
+  push:
+    paths:
+      - '.github/workflows/nyc-live-no-side-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  no_side:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch NO-side tape
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt, json, pathlib, urllib.parse, urllib.request
+          UA='polymarket-weather-no-side/1.0';out=pathlib.Path('research/data');out.mkdir(parents=True,exist_ok=True)
+          t0=dt.datetime.fromisoformat('2026-08-12T16:54:31.136858+00:00').timestamp(); end=t0+300
+          def get(url):
+              req=urllib.request.Request(url,headers={'Accept':'application/json','User-Agent':UA})
+              with urllib.request.urlopen(req,timeout=20) as r:return json.load(r)
+          def jl(v):
+              if isinstance(v,list):return v
+              if isinstance(v,str):
+                  try:
+                      x=json.loads(v);return x if isinstance(x,list) else []
+                  except:return []
+              return []
+          event=get('https://gamma-api.polymarket.com/events/slug/highest-temperature-in-nyc-on-august-12-2026')
+          focus={'84-85°F','86-87°F','88-89°F','82-83°F','80-81°F'}
+          result={};lines=['# NYC Aug 12 complementary NO execution after source first-seen','',f'Anchor: `{dt.datetime.fromtimestamp(t0,dt.timezone.utc).isoformat()}`.','']
+          for m in event.get('markets') or []:
+              label=str(m.get('groupItemTitle') or m.get('question') or '')
+              if label not in focus:continue
+              tokens=[str(x) for x in jl(m.get('clobTokenIds'))];outs=[str(x) for x in jl(m.get('outcomes'))]
+              mp=dict(zip(outs,tokens)) if len(tokens)==len(outs) else {};no=mp.get('No') or mp.get('NO')
+              cond=str(m.get('conditionId') or '')
+              q=urllib.parse.urlencode({'market':cond,'start':int(t0)-5,'end':int(end)+5,'limit':1000,'offset':0,'takerOnly':'false'})
+              xs=get('https://data-api.polymarket.com/trades?'+q)
+              no_trades=[]
+              for x in xs if isinstance(xs,list) else []:
+                  if str(x.get('outcome','')).lower()=='no':
+                      no_trades.append({k:x.get(k) for k in ['timestamp','price','size','side','outcome','asset','transactionHash']})
+              no_trades.sort(key=lambda x:int(x['timestamp']))
+              hist=[]
+              if no:
+                  hq=urllib.parse.urlencode({'market':no,'startTs':int(t0)-60,'endTs':int(end)+60,'fidelity':1})
+                  hist=get('https://clob.polymarket.com/prices-history?'+hq).get('history',[])
+              result[label]={'condition':cond,'no_token':no,'no_trades':no_trades,'no_history':hist}
+              lines += [f'## {label} NO','',f'NO trades in +5m: **{len(no_trades)}**.','', '| Relative sec | Side | Qty | NO price |','|---:|---|---:|---:|']
+              for x in no_trades:
+                  rel=int(x['timestamp'])-t0
+                  lines.append(f'| {rel:+.1f} | {x["side"]} | {float(x["size"]):.2f} | {float(x["price"]):.4f} |')
+              lines += ['', 'NO minute marks:', '', '| Relative sec | Price |','|---:|---:|']
+              for x in hist:
+                  lines.append(f'| {int(x["t"])-t0:+.1f} | {float(x["p"]):.4f} |')
+              lines.append('')
+          (out/'nyc-live-no-side-2026-08-12.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+          (out/'nyc-live-no-side-2026-08-12.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+      - name: Commit NO-side tape
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/nyc-live-no-side-2026-08-12.*
+          git diff --cached --quiet && exit 0
+          git commit -m "data: capture NYC live NO-side execution"
+          git pull --rebase origin main
+          git push
