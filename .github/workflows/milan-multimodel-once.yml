@@ -1,0 +1,256 @@
+name: One-shot Milan multi-model revision probe
+
+on:
+  push:
+    paths:
+      - '.github/workflows/milan-multimodel-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch archived point-in-time model runs
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import math
+          import pathlib
+          import statistics
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          OUT = pathlib.Path('research/data')
+          OUT.mkdir(parents=True, exist_ok=True)
+
+          LAT = 45.61667
+          LON = 8.73333
+          ENDPOINT = 'https://single-runs-api.open-meteo.com/v1/forecast'
+
+          # Deliberately small: resolver-site deterministic guidance from providers that
+          # plausibly matter for Milan. ItaliaMeteo only runs every 12h, so its 12Z
+          # value is carried unchanged into the post-18Z comparison.
+          MODELS = {
+              'ECMWF IFS': 'ecmwf_ifs',
+              'DWD ICON-EU': 'dwd_icon_eu',
+              'DWD ICON Global': 'dwd_icon_global',
+              'MeteoFrance ARPEGE Europe': 'meteofrance_arpege_europe',
+              'ItaliaMeteo ICON-2I': 'italia_meteo_arpae_icon_2i',
+          }
+
+          CASES = {
+              'milan_june25': {
+                  'run_date': '2026-06-24',
+                  'target_date': '2026-06-25',
+                  'trade_time': '2026-06-25T01:12:00Z',
+                  'wallet_actions': [
+                      {'action':'SELL','bucket_c':33,'price':0.114191351,'size':193.78},
+                      {'action':'BUY','bucket_c':34,'price':0.4599999939,'size':65.21739},
+                  ],
+              },
+              'milan_june30': {
+                  'run_date': '2026-06-28',
+                  'target_date': '2026-06-30',
+                  'trade_time': '2026-06-29T01:55:11Z',
+                  'wallet_actions': [
+                      {'action':'BUY','bucket_c':35,'price':0.2937835403,'size':102.116},
+                  ],
+              },
+          }
+
+          def get_json(url):
+              req = urllib.request.Request(url, headers={'User-Agent':'polymarket-weather-research/1.0'})
+              try:
+                  with urllib.request.urlopen(req, timeout=120) as r:
+                      return json.loads(r.read())
+              except urllib.error.HTTPError as e:
+                  body = e.read().decode('utf-8', errors='replace')
+                  raise RuntimeError(f'HTTP {e.code}: {body}') from None
+
+          def fetch_max(model_id, run, target_date):
+              params = {
+                  'latitude': LAT,
+                  'longitude': LON,
+                  'hourly': 'temperature_2m',
+                  'models': model_id,
+                  'run': run,
+                  'forecast_days': 4,
+                  'timezone': 'Europe/Rome',
+              }
+              url = ENDPOINT + '?' + urllib.parse.urlencode(params)
+              payload = get_json(url)
+              pairs = [
+                  (t, v) for t, v in zip(payload['hourly']['time'], payload['hourly']['temperature_2m'])
+                  if t[:10] == target_date and v is not None
+              ]
+              if not pairs:
+                  raise RuntimeError('no target-date temperature rows')
+              max_t, max_v = max(pairs, key=lambda x: x[1])
+              return {'max_c': float(max_v), 'max_local_time': max_t, 'url': url}
+
+          def rounded_bucket(x):
+              # Diagnostic only: nearest whole degree, half-up for positive Celsius.
+              return int(math.floor(x + 0.5))
+
+          def summarize(rows, wallet_buckets):
+              good = [r for r in rows if 'max_c' in r]
+              vals = [r['max_c'] for r in good]
+              out = {
+                  'n_models': len(good),
+                  'mean_max_c': statistics.mean(vals) if vals else None,
+                  'median_max_c': statistics.median(vals) if vals else None,
+                  'rounded_votes': {},
+                  'wallet_bucket_diagnostics': {},
+              }
+              for r in good:
+                  b = str(rounded_bucket(r['max_c']))
+                  out['rounded_votes'][b] = out['rounded_votes'].get(b, 0) + 1
+              for bucket in wallet_buckets:
+                  d = [abs(v - bucket) for v in vals]
+                  out['wallet_bucket_diagnostics'][str(bucket)] = {
+                      'nearest_degree_votes': sum(rounded_bucket(v) == bucket for v in vals),
+                      'mean_abs_distance_c': statistics.mean(d) if d else None,
+                      'within_0_75c': sum(x <= 0.75 for x in d),
+                      'within_1_25c': sum(x <= 1.25 for x in d),
+                  }
+              return out
+
+          result = {
+              'generated_at': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'endpoint': ENDPOINT,
+              'resolver_proxy': {'station':'LIMC', 'latitude':LAT, 'longitude':LON},
+              'method': 'deterministic resolver-site model maxima; no invented calibrated probability sigma',
+              'cases': {},
+          }
+
+          for case_name, case in CASES.items():
+              run_date = case['run_date']
+              target_date = case['target_date']
+              wallet_buckets = sorted({a['bucket_c'] for a in case['wallet_actions']})
+              stages = {'pre_12z': [], 'post_18z': [], 'late_21z_candidate': []}
+
+              for label, model_id in MODELS.items():
+                  # PRE: all providers at 12Z.
+                  run = f'{run_date}T12:00'
+                  row = {'provider_model':label, 'model_id':model_id, 'run':run}
+                  try:
+                      row.update(fetch_max(model_id, run, target_date))
+                  except Exception as e:
+                      row['error'] = repr(e)
+                  stages['pre_12z'].append(row)
+
+                  # POST: 18Z where the provider has that cycle. ICON-2I is 12-hourly,
+                  # so carry its latest 12Z forecast rather than manufacture an 18Z run.
+                  post_run = run if model_id == 'italia_meteo_arpae_icon_2i' else f'{run_date}T18:00'
+                  row = {'provider_model':label, 'model_id':model_id, 'run':post_run,
+                         'carried_from_12z': model_id == 'italia_meteo_arpae_icon_2i'}
+                  try:
+                      row.update(fetch_max(model_id, post_run, target_date))
+                  except Exception as e:
+                      row['error'] = repr(e)
+                  stages['post_18z'].append(row)
+
+              # ICON-EU updates every 3h. Preserve its 21Z run separately because
+              # historical exact availability is not established here; do not silently
+              # include it in the clean 12Z->18Z comparison.
+              run = f'{run_date}T21:00'
+              row = {'provider_model':'DWD ICON-EU', 'model_id':'dwd_icon_eu', 'run':run}
+              try:
+                  row.update(fetch_max('dwd_icon_eu', run, target_date))
+              except Exception as e:
+                  row['error'] = repr(e)
+              stages['late_21z_candidate'].append(row)
+
+              summaries = {
+                  'pre_12z': summarize(stages['pre_12z'], wallet_buckets),
+                  'post_18z': summarize(stages['post_18z'], wallet_buckets),
+              }
+
+              # Purely mechanical deltas, not claims of calibrated settlement probability.
+              changes = {}
+              for bucket in wallet_buckets:
+                  k = str(bucket)
+                  a = summaries['pre_12z']['wallet_bucket_diagnostics'][k]
+                  b = summaries['post_18z']['wallet_bucket_diagnostics'][k]
+                  changes[k] = {
+                      'nearest_degree_vote_delta': b['nearest_degree_votes'] - a['nearest_degree_votes'],
+                      'mean_abs_distance_delta_c': (
+                          None if a['mean_abs_distance_c'] is None or b['mean_abs_distance_c'] is None
+                          else b['mean_abs_distance_c'] - a['mean_abs_distance_c']
+                      ),
+                      'within_0_75c_delta': b['within_0_75c'] - a['within_0_75c'],
+                      'within_1_25c_delta': b['within_1_25c'] - a['within_1_25c'],
+                  }
+
+              result['cases'][case_name] = {
+                  **case,
+                  'stages': stages,
+                  'summaries': summaries,
+                  'bucket_support_changes_12z_to_18z': changes,
+              }
+
+          json_path = OUT / 'milan-multimodel-revision-probe.json'
+          json_path.write_text(json.dumps(result, indent=2), encoding='utf-8')
+
+          lines = [
+              '# Milan point-in-time multi-model revision probe', '',
+              f'Generated: **{result["generated_at"]}**', '',
+              'Resolver-site proxy: **LIMC / Malpensa**.', '',
+              'This is intentionally not a calibrated probability model. It measures whether independent deterministic guidance moved toward or away from the wallet bucket across the 12Z→18Z information update.', '',
+              'ItaliaMeteo ICON-2I is 12-hourly, so its 12Z value is carried into the post snapshot. ICON-EU 21Z is reported separately and is not included in the clean comparison because this probe does not establish its exact historical availability timestamp.', '',
+          ]
+
+          for case_name, case in result['cases'].items():
+              lines += [f'## {case_name} — target {case["target_date"]}', '',
+                        f'Wallet time: `{case["trade_time"]}`', '', '### Wallet actions', '']
+              for a in case['wallet_actions']:
+                  lines.append(f'- **{a["action"]} {a["bucket_c"]}°C** — {a["size"]:.3f} @ {a["price"]:.4f}')
+              for stage_key, stage_title in [('pre_12z','12Z snapshot'),('post_18z','18Z snapshot')]:
+                  lines += ['', f'### {stage_title}', '', '| Model | Run | Daily max | Nearest °C |', '|---|---|---:|---:|']
+                  for r in case['stages'][stage_key]:
+                      if 'max_c' in r:
+                          carry = ' (carried)' if r.get('carried_from_12z') else ''
+                          lines.append(f'| {r["provider_model"]}{carry} | {r["run"]} | {r["max_c"]:.2f}°C | {rounded_bucket(r["max_c"])}°C |')
+                      else:
+                          lines.append(f'| {r["provider_model"]} | {r["run"]} | ERROR | — |')
+                  s = case['summaries'][stage_key]
+                  lines += ['', f'- successful models: **{s["n_models"]}**',
+                            f'- mean max: **{s["mean_max_c"]:.2f}°C**' if s['mean_max_c'] is not None else '- mean max: NA',
+                            f'- median max: **{s["median_max_c"]:.2f}°C**' if s['median_max_c'] is not None else '- median max: NA',
+                            f'- nearest-degree votes: `{json.dumps(s["rounded_votes"], sort_keys=True)}`', '']
+
+              lines += ['### Wallet-bucket support change, 12Z → 18Z', '',
+                        '| Bucket | Vote Δ | Mean-distance Δ | ≤0.75°C Δ | ≤1.25°C Δ |',
+                        '|---:|---:|---:|---:|---:|']
+              for bucket, ch in case['bucket_support_changes_12z_to_18z'].items():
+                  d = ch['mean_abs_distance_delta_c']
+                  dtxt = 'NA' if d is None else f'{d:+.3f}°C'
+                  lines.append(f'| {bucket}°C | {ch["nearest_degree_vote_delta"]:+d} | {dtxt} | {ch["within_0_75c_delta"]:+d} | {ch["within_1_25c_delta"]:+d} |')
+
+              late = case['stages']['late_21z_candidate'][0]
+              lines += ['', '### ICON-EU 21Z candidate', '']
+              if 'max_c' in late:
+                  lines.append(f'- `{late["run"]}` → **{late["max_c"]:.2f}°C**, nearest **{rounded_bucket(late["max_c"])}°C**.')
+              else:
+                  lines.append(f'- unavailable/error: `{late.get("error")}`')
+              lines += ['', 'Interpretation: a negative mean-distance delta means the multi-model guidance moved closer to that bucket. A positive delta means it moved away. Vote counts are diagnostic, not settlement probabilities.', '']
+
+          (OUT / 'milan-multimodel-revision-probe.md').write_text('\n'.join(lines), encoding='utf-8')
+          PY
+
+      - name: Commit probe output
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/milan-multimodel-revision-probe.json research/data/milan-multimodel-revision-probe.md
+          git diff --cached --quiet && exit 0
+          git commit -m "data: capture Milan multi-model forecast revisions"
+          git push
