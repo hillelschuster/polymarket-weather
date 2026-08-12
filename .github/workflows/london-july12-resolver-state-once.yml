@@ -1,0 +1,74 @@
+name: One-shot London July 12 resolver state
+
+on:
+  push:
+    paths:
+      - '.github/workflows/london-july12-resolver-state-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fetch EGLC observations before target fill
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv, datetime as dt, io, json, pathlib, urllib.parse, urllib.request
+
+          FILL = dt.datetime(2026,7,12,13,16,32,tzinfo=dt.timezone.utc)
+          base = 'https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py'
+          params = [
+              ('station','EGLC'),('data','tmpc'),('year1','2026'),('month1','7'),('day1','12'),
+              ('year2','2026'),('month2','7'),('day2','13'),('tz','Etc/UTC'),('format','onlycomma'),
+              ('latlon','no'),('elev','no'),('missing','empty'),('trace','empty'),('direct','no'),
+              ('report_type','1'),('report_type','2')
+          ]
+          url = base + '?' + urllib.parse.urlencode(params)
+          req = urllib.request.Request(url, headers={'User-Agent':'polymarket-weather-profitability/1.0'})
+          with urllib.request.urlopen(req, timeout=30) as r:
+              text = r.read().decode('utf-8')
+          rows = list(csv.DictReader(io.StringIO(text)))
+          parsed=[]
+          for row in rows:
+              valid = row.get('valid') or row.get('valid(UTC)')
+              temp = row.get('tmpc')
+              if not valid or temp in (None,'','M'):
+                  continue
+              try:
+                  t=dt.datetime.strptime(valid[:19],'%Y-%m-%d %H:%M').replace(tzinfo=dt.timezone.utc)
+              except ValueError:
+                  try: t=dt.datetime.fromisoformat(valid).replace(tzinfo=dt.timezone.utc)
+                  except Exception: continue
+              try: c=float(temp)
+              except ValueError: continue
+              parsed.append({'valid':t.isoformat().replace('+00:00','Z'),'timestamp':int(t.timestamp()),'tmpc':c})
+          before=[r for r in parsed if r['timestamp'] <= int(FILL.timestamp())]
+          max_before=max(before,key=lambda x:x['tmpc']) if before else None
+          first_28=next((r for r in sorted(parsed,key=lambda x:x['timestamp']) if r['tmpc']>=28.0),None)
+          result={'source':'Iowa Environmental Mesonet ASOS archive','station':'EGLC','fill_time':'2026-07-12T13:16:32Z','request_url':url,'observations':parsed,'max_before_fill':max_before,'first_observation_ge_28c':first_28,'already_ge_28_before_fill':bool(first_28 and first_28['timestamp'] <= int(FILL.timestamp()))}
+          out=pathlib.Path('research/data'); out.mkdir(parents=True,exist_ok=True)
+          (out/'london-july12-resolver-state.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+          lines=['# London July 12 resolver-state proxy','',f'Target fill: `{result["fill_time"]}` — London City Airport **27°C YES**.','',f'IEM station: **{result["station"]}**. IEM is an observation proxy; contractual resolver was Wunderground at the same EGLC station.','']
+          if max_before:
+              lines += [f'Max reported temperature before fill: **{max_before["tmpc"]:.1f}°C** at `{max_before["valid"]}`.','']
+          if first_28:
+              lines += [f'First archived observation at or above 28°C: **{first_28["tmpc"]:.1f}°C** at `{first_28["valid"]}`.','']
+          lines += [f'28°C observed before fill: **{result["already_ge_28_before_fill"]}**.','', '## Observations near fill','', '| UTC | temp °C |','|---|---:|']
+          for r in parsed:
+              if abs(r['timestamp']-int(FILL.timestamp())) <= 3*3600:
+                  lines.append(f'| {r["valid"]} | {r["tmpc"]:.1f} |')
+          (out/'london-july12-resolver-state.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+      - name: Commit resolver state
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/london-july12-resolver-state.json research/data/london-july12-resolver-state.md
+          git diff --cached --quiet && exit 0
+          git commit -m "data: capture London July 12 resolver-state proxy"
+          git push
