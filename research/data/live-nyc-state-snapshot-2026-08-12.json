@@ -1,0 +1,225 @@
+{
+  "captured_at": "2026-08-12T16:55:26.216887+00:00",
+  "event_slug": "highest-temperature-in-nyc-on-august-12-2026",
+  "event_title": "Highest temperature in NYC on August 12?",
+  "resolutionSource": "https://www.wunderground.com/history/daily/us/ny/new-york-city/KLGA",
+  "station_text": "2026/08/12 16:51\nKLGA 121651Z 36010G14KT 10SM FEW050 BKN300 28/14 A2984 RMK AO2 SLP106 FU BKN300 T02830144 $",
+  "station_last_modified": "Wed, 12 Aug 2026 16:54:29 GMT",
+  "station_temp_f": 82.94,
+  "awc_running_max_f": 82.94,
+  "markets": [
+    {
+      "label": "79\u00b0F or below",
+      "yes_token": "80585180571638814560917064938150784064972557569977617910027204865717849912792",
+      "condition_id": "0x5b2fdf44cd2a64c6f7fb01111e1590001c53e77000d5562a553cc0cc8d625091",
+      "bid": null,
+      "ask": [
+        0.001,
+        18196.31
+      ],
+      "last_trade_price": "0.001"
+    },
+    {
+      "label": "94-95\u00b0F",
+      "yes_token": "58662151989311059533144673517966968599793096307145281380920928053292697034134",
+      "condition_id": "0x16937ba40f620a95a660a920aba34d1266a05024022c958c2fb99675784cd4cd",
+      "bid": null,
+      "ask": [
+        0.001,
+        1154.56
+      ],
+      "last_trade_price": "0.001"
+    },
+    {
+      "label": "80-81\u00b0F",
+      "yes_token": "5360983761973233433933284334431204159657285350654223889862005413088864155151",
+      "condition_id": "0xa19347cb80f2fde79bce92bdb66e802e46b625fefde53e3963db2cb2b6487bef",
+      "bid": null,
+      "ask": [
+        0.001,
+        13362.44
+      ],
+      "last_trade_price": "0.001"
+    },
+    {
+      "label": "84-85\u00b0F",
+      "yes_token": "33568972688159887588962168155892170503899634452117790066959504013982484657340",
+      "condition_id": "0x2256ebc80ac44235c6e2063bd4e2d3b1306e856ebc436f69c76f95534a5b9318",
+      "bid": [
+        0.08,
+        20.5
+      ],
+      "ask": [
+        0.13,
+        6.45
+      ],
+      "last_trade_price": "0.060"
+    },
+    {
+      "label": "86-87\u00b0F",
+      "yes_token": "94896913112090174028906405663517419730902565191105229699412977669862836756721",
+      "condition_id": "0xe531cc4a9c1a45e3f22494d78a58f070ae34a77cc4f33681d80067ea05d651d1",
+      "bid": [
+        0.41,
+        20.25
+      ],
+      "ask": [
+        0.5,
+        12.43
+      ],
+      "last_trade_price": "0.470"
+    },
+    {
+      "label": "88-89\u00b0F",
+      "yes_token": "75080551296567978821161597326960050387571785520124504044270607105256139381291",
+      "condition_id": "0x8e403f86ed378c0991598cea0336c1a9812880aa0ecff5e427fff7ff4407d7ec",
+      "bid": [
+        0.39,
+        20.0
+      ],
+      "ask": [
+        0.46,
+        39.64
+      ],
+      "last_trade_price": "0.640"
+    },
+    {
+      "label": "92-93\u00b0F",
+      "yes_token": "8683573126393719206083668535806706975157733884096348247819318839464015463175",
+      "condition_id": "0x5607061e95809e3b52817aba465849633274e64e2a95f3e7c6dac08e4b161835",
+      "bid": [
+        0.004,
+        2815.08
+      ],
+      "ask": [
+        0.005,
+        72.21
+      ],
+      "last_trade_price": "0.995"
+    },
+    {
+      "label": "96-97\u00b0F",
+      "yes_token": "93234936014665894403984099395242243714118752413653441944052178976919173935686",
+      "condition_id": "0x9174fede013a86d8c7cdbaa3ffefc103742a0950d9f3bcffe63fe12b9f29069a",
+      "bid": null,
+      "ask": [
+        0.001,
+        1479.58
+      ],
+      "last_trade_price": "0.001"
+    },
+    {
+      "label": "98\u00b0F or higher",
+      "yes_token": "64293897013827307459878351688375077230881292939510896012783126771556640555492",
+      "condition_id": "0x6532409599f3a24be521e4ab3e2a09d9fc9b64f97d8f2e384d533a7c78a2cd04",
+      "bid": null,
+      "ask": [
+        0.001,
+        1734.44
+      ],
+      "last_trade_price": "0.001"
+    },
+    {
+      "label": "90-91\u00b0F",
+      "yes_token": "91488504875041610605211720090153501387473998539089760694118693483348176962622",
+      "condition_id": "0xe2710363d4f5c4cdc9dd40d0f229ea380e0b0f79bbf77ee0bde5b0c56cfec8e2",
+      "bid": [
+        0.041,
+        30.0
+      ],
+      "ask": [
+        0.051,
+        5.0
+      ],
+      "last_trade_price": "0.041"
+    },
+    {
+      "label": "82-83\u00b0F",
+      "yes_token": "53534855080366851665456323521150354512295770820828421362567238048107866778676",
+      "condition_id": "0x3316b8bdf16d34f1b026f335c80f54dd945ffacd9d24c0b300dcef63df4532ab",
+      "bid": [
+        0.001,
+        136.13
+      ],
+      "ask": [
+        0.004,
+        38.78
+      ],
+      "last_trade_price": "0.004"
+    }
+  ],
+  "awc_observations": [
+    {
+      "obsTime": 1786553460,
+      "temp_c": 28.3,
+      "temp_f": 82.94,
+      "raw": "METAR KLGA 121651Z 36010G14KT 10SM FEW050 BKN300 28/14 A2984 RMK AO2 SLP106 FU BKN300 T02830144 $"
+    },
+    {
+      "obsTime": 1786549860,
+      "temp_c": 27.2,
+      "temp_f": 80.96,
+      "raw": "METAR KLGA 121551Z 01008KT 10SM FEW250 27/14 A2986 RMK AO2 SLP110 T02720139 $"
+    },
+    {
+      "obsTime": 1786546260,
+      "temp_c": 26.1,
+      "temp_f": 78.98,
+      "raw": "METAR KLGA 121451Z 32007KT 10SM SCT250 26/14 A2986 RMK AO2 SLP111 T02610139 51008 $"
+    },
+    {
+      "obsTime": 1786542660,
+      "temp_c": 25.6,
+      "temp_f": 78.08,
+      "raw": "METAR KLGA 121351Z 33006KT 10SM FEW095 BKN190 BKN250 26/14 A2986 RMK AO2 SLP110 T02560144 $"
+    },
+    {
+      "obsTime": 1786539060,
+      "temp_c": 24.4,
+      "temp_f": 75.92,
+      "raw": "METAR KLGA 121251Z 31007KT 10SM FEW095 BKN190 BKN250 24/15 A2985 RMK AO2 SLP109 T02440150 $"
+    },
+    {
+      "obsTime": 1786535460,
+      "temp_c": 23.9,
+      "temp_f": 75.02,
+      "raw": "METAR KLGA 121151Z COR 33008KT 10SM FEW095 BKN160 BKN250 24/15 A2984 RMK AO2 SLP103 T02390150 10250 20233 51014 $"
+    },
+    {
+      "obsTime": 1786531860,
+      "temp_c": 23.3,
+      "temp_f": 73.94,
+      "raw": "METAR KLGA 121051Z COR 32007KT 10SM FEW095 BKN160 BKN250 23/16 A2982 RMK AO2 SLP099 T02330161 $"
+    },
+    {
+      "obsTime": 1786528260,
+      "temp_c": 23.3,
+      "temp_f": 73.94,
+      "raw": "METAR KLGA 120951Z 33007KT 10SM FEW160 BKN200 OVC250 23/16 A2981 RMK AO2 SLP096 T02330161 $"
+    },
+    {
+      "obsTime": 1786524660,
+      "temp_c": 23.9,
+      "temp_f": 75.02,
+      "raw": "METAR KLGA 120851Z 33004KT 10SM BKN160 OVC250 24/17 A2980 RMK AO2 SLP090 T02390167 56007 $"
+    },
+    {
+      "obsTime": 1786521060,
+      "temp_c": 23.9,
+      "temp_f": 75.02,
+      "raw": "METAR KLGA 120751Z 35008KT 10SM BKN200 OVC250 24/17 A2980 RMK AO2 SLP092 T02390172 $"
+    },
+    {
+      "obsTime": 1786517460,
+      "temp_c": 24.4,
+      "temp_f": 75.92,
+      "raw": "METAR KLGA 120651Z 01007KT 10SM BKN200 OVC250 24/18 A2980 RMK AO2 SLP090 T02440178 $"
+    },
+    {
+      "obsTime": 1786513860,
+      "temp_c": 25.0,
+      "temp_f": 77.0,
+      "raw": "METAR KLGA 120551Z 32008KT 10SM SCT075 BKN250 25/18 A2982 RMK AO2 SLP097 T02500183 10289 20250 50001 $"
+    }
+  ]
+}
