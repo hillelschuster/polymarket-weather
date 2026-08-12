@@ -13,161 +13,41 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch enrichment and validate London token
+      - name: Patch enrichment
         shell: bash
         run: |
           python - <<'PY'
+          import base64
           from pathlib import Path
-
-          path = Path('scripts/enrich_v2_wallet_orders.py')
-          text = path.read_text(encoding='utf-8')
-          text = text.replace(
-              'USER_AGENT = "polymarket-weather-enrich-v2-wallet-orders/1.0"\n',
-              'USER_AGENT = "polymarket-weather-enrich-v2-wallet-orders/1.1"\nMETADATA_SCHEMA_VERSION = 2\n'
-          )
-          start = text.index('def resolve_token(token_id: str, *, timeout: float) -> dict[str, Any]:\n')
-          end = text.index('\n\ndef load_cache(', start)
-          replacement = '''def resolve_token(token_id: str, *, timeout: float) -> dict[str, Any]:
-    parent = request_json(
-        f"{CLOB_BASE}/markets-by-token/{urllib.parse.quote(token_id, safe='')}",
-        timeout=timeout,
-    )
-    if not isinstance(parent, dict):
-        raise RuntimeError(f"unexpected markets-by-token response for {token_id}")
-
-    condition_id = str(parent.get("condition_id") or "")
-    primary = str(parent.get("primary_token_id") or "")
-    secondary = str(parent.get("secondary_token_id") or "")
-    if not condition_id or not primary or not secondary:
-        raise RuntimeError(f"incomplete markets-by-token response for {token_id}: {parent!r}")
-    if token_id not in {primary, secondary}:
-        raise RuntimeError(
-            f"token {token_id} is neither primary nor secondary for condition {condition_id}"
-        )
-
-    # primary/secondary identify the two tokens but do NOT reliably encode Yes/No,
-    # especially on NegRisk markets. Canonical side comes from explicit CLOB labels.
-    clob_market = request_json(
-        f"{CLOB_BASE}/clob-markets/{urllib.parse.quote(condition_id, safe='')}",
-        timeout=timeout,
-    )
-    if not isinstance(clob_market, dict):
-        raise RuntimeError(f"unexpected CLOB market response for {condition_id}")
-    clob_map = clob_outcomes(clob_market)
-    clob_outcome = clob_map.get(token_id)
-
-    query = urllib.parse.urlencode({"condition_ids": condition_id})
-    gamma_market: dict[str, Any] = {}
-    gamma_lookup_error: str | None = None
-    try:
-        gamma_market = select_gamma_market(
-            request_json(f"{GAMMA_BASE}/markets?{query}", timeout=timeout), condition_id
-        )
-    except (RuntimeError, urllib.error.URLError) as exc:
-        # Archived conditions can disappear from Gamma while CLOB still has exact labels.
-        gamma_lookup_error = str(exc)
-
-    gamma_outcome = gamma_token_outcome(gamma_market, token_id) if gamma_market else None
-    explicit_outcomes = [x for x in (clob_outcome, gamma_outcome) if x]
-    if not explicit_outcomes:
-        raise RuntimeError(f"no explicit outcome label available for token {token_id}")
-    canonical_outcome = clob_outcome or gamma_outcome
-
-    side_checks = {"gamma": gamma_outcome, "clob_market": clob_outcome}
-    known_outcomes = [value.lower() for value in side_checks.values() if value]
-    side_consistent = bool(known_outcomes) and len(set(known_outcomes)) == 1
-
-    def token_for(label: str) -> str | None:
-        wanted = label.lower()
-        for tid, outcome in clob_map.items():
-            if str(outcome).lower() == wanted:
-                return tid
-        if gamma_market:
-            tokens = [str(x) for x in parse_jsonish(gamma_market.get("clobTokenIds"))]
-            outcomes = [str(x) for x in parse_jsonish(gamma_market.get("outcomes"))]
-            if len(tokens) == len(outcomes):
-                for tid, outcome in zip(tokens, outcomes):
-                    if outcome.lower() == wanted:
-                        return tid
-        return None
-
-    yes_token = token_for("Yes")
-    no_token = token_for("No")
-    if not yes_token or not no_token:
-        raise RuntimeError(f"could not derive explicit Yes/No token IDs for {condition_id}")
-
-    events = [x for x in (gamma_market.get("events") or []) if isinstance(x, dict)]
-    event = events[0] if len(events) == 1 else None
-    event_summary = compact_event(event) if event else None
-    weather_match = weather_evidence(gamma_market, event) if gamma_market else []
-
-    return {
-        "metadata_schema_version": METADATA_SCHEMA_VERSION,
-        "condition_id": condition_id,
-        "token_outcome": canonical_outcome,
-        "token_side_checks": side_checks,
-        "token_side_consistent": side_consistent,
-        "primary_token_id": primary,
-        "secondary_token_id": secondary,
-        "yes_token_id": yes_token,
-        "no_token_id": no_token,
-        # Backward-compatible aliases; values now mean actual Yes/No IDs, not ordering.
-        "primary_yes_token_id": yes_token,
-        "secondary_no_token_id": no_token,
-        "gamma_lookup_error": gamma_lookup_error,
-        "market_id": gamma_market.get("id"),
-        "market_slug": gamma_market.get("slug"),
-        "question": gamma_market.get("question"),
-        "bucket_label": gamma_market.get("groupItemTitle") or gamma_market.get("question"),
-        "group_item_threshold": gamma_market.get("groupItemThreshold"),
-        "market_category": gamma_market.get("category"),
-        "resolution_source": gamma_market.get("resolutionSource"),
-        "start_date": gamma_market.get("startDate"),
-        "end_date": gamma_market.get("endDate"),
-        "active": gamma_market.get("active"),
-        "closed": gamma_market.get("closed"),
-        "fees_enabled": gamma_market.get("feesEnabled"),
-        "gamma_fee_schedule": gamma_market.get("feeSchedule"),
-        "market_description": gamma_market.get("description"),
-        "event_count": len(events),
-        "event": event_summary,
-        "weather_evidence": weather_match,
-        "is_weather_metadata_match": bool(weather_match),
-        "clob_min_order_size": clob_market.get("mos"),
-        "clob_min_tick_size": clob_market.get("mts"),
-        "clob_maker_base_fee_bips": clob_market.get("mbf"),
-        "clob_taker_base_fee_bips": clob_market.get("tbf"),
-        "clob_fee_details": clob_market.get("fd"),
-        "clob_rewards": clob_market.get("r"),
-        "clob_taker_order_delay_enabled": clob_market.get("itode"),
-        "clob_min_order_age_seconds": clob_market.get("oas"),
-    }
-'''
-          text = text[:start] + replacement + text[end:]
+          p = Path('scripts/enrich_v2_wallet_orders.py')
+          t = p.read_text(encoding='utf-8')
+          t = t.replace('USER_AGENT = "polymarket-weather-enrich-v2-wallet-orders/1.0"\n', 'USER_AGENT = "polymarket-weather-enrich-v2-wallet-orders/1.1"\nMETADATA_SCHEMA_VERSION = 2\n')
+          s = t.index('def resolve_token(token_id: str, *, timeout: float) -> dict[str, Any]:\n')
+          e = t.index('\n\ndef load_cache(', s)
+          replacement = base64.b64decode('ZGVmIHJlc29sdmVfdG9rZW4odG9rZW5faWQ6IHN0ciwgKiwgdGltZW91dDogZmxvYXQpIC0+IGRpY3Rbc3RyLCBBbnldOgogICAgcGFyZW50ID0gcmVxdWVzdF9qc29uKAogICAgICAgIGYie0NMT0JfQkFTRX0vbWFya2V0cy1ieS10b2tlbi97dXJsbGliLnBhcnNlLnF1b3RlKHRva2VuX2lkLCBzYWZlPScnKX0iLAogICAgICAgIHRpbWVvdXQ9dGltZW91dCwKICAgICkKICAgIGlmIG5vdCBpc2luc3RhbmNlKHBhcmVudCwgZGljdCk6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKGYidW5leHBlY3RlZCBtYXJrZXRzLWJ5LXRva2VuIHJlc3BvbnNlIGZvciB7dG9rZW5faWR9IikKCiAgICBjb25kaXRpb25faWQgPSBzdHIocGFyZW50LmdldCgiY29uZGl0aW9uX2lkIikgb3IgIiIpCiAgICBwcmltYXJ5ID0gc3RyKHBhcmVudC5nZXQoInByaW1hcnlfdG9rZW5faWQiKSBvciAiIikKICAgIHNlY29uZGFyeSA9IHN0cihwYXJlbnQuZ2V0KCJzZWNvbmRhcnlfdG9rZW5faWQiKSBvciAiIikKICAgIGlmIG5vdCBjb25kaXRpb25faWQgb3Igbm90IHByaW1hcnkgb3Igbm90IHNlY29uZGFyeToKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoZiJpbmNvbXBsZXRlIG1hcmtldHMtYnktdG9rZW4gcmVzcG9uc2UgZm9yIHt0b2tlbl9pZH06IHtwYXJlbnQhcn0iKQogICAgaWYgdG9rZW5faWQgbm90IGluIHtwcmltYXJ5LCBzZWNvbmRhcnl9OgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcigKICAgICAgICAgICAgZiJ0b2tlbiB7dG9rZW5faWR9IGlzIG5laXRoZXIgcHJpbWFyeSBub3Igc2Vjb25kYXJ5IGZvciBjb25kaXRpb24ge2NvbmRpdGlvbl9pZH0iCiAgICAgICAgKQoKICAgICMgcHJpbWFyeS9zZWNvbmRhcnkgaWRlbnRpZnkgdG9rZW4gbWVtYmVyc2hpcCwgbm90IFllcy9ObyBzZW1hbnRpY3MuCiAgICBjbG9iX21hcmtldCA9IHJlcXVlc3RfanNvbigKICAgICAgICBmIntDTE9CX0JBU0V9L2Nsb2ItbWFya2V0cy97dXJsbGliLnBhcnNlLnF1b3RlKGNvbmRpdGlvbl9pZCwgc2FmZT0nJyl9IiwKICAgICAgICB0aW1lb3V0PXRpbWVvdXQsCiAgICApCiAgICBpZiBub3QgaXNpbnN0YW5jZShjbG9iX21hcmtldCwgZGljdCk6CiAgICAgICAgcmFpc2UgUnVudGltZUVycm9yKGYidW5leHBlY3RlZCBDTE9CIG1hcmtldCByZXNwb25zZSBmb3Ige2NvbmRpdGlvbl9pZH0iKQogICAgY2xvYl9tYXAgPSBjbG9iX291dGNvbWVzKGNsb2JfbWFya2V0KQogICAgY2xvYl9vdXRjb21lID0gY2xvYl9tYXAuZ2V0KHRva2VuX2lkKQoKICAgIHF1ZXJ5ID0gdXJsbGliLnBhcnNlLnVybGVuY29kZSh7ImNvbmRpdGlvbl9pZHMiOiBjb25kaXRpb25faWR9KQogICAgZ2FtbWFfbWFya2V0OiBkaWN0W3N0ciwgQW55XSA9IHt9CiAgICBnYW1tYV9sb29rdXBfZXJyb3I6IHN0ciB8IE5vbmUgPSBOb25lCiAgICB0cnk6CiAgICAgICAgZ2FtbWFfbWFya2V0ID0gc2VsZWN0X2dhbW1hX21hcmtldCgKICAgICAgICAgICAgcmVxdWVzdF9qc29uKGYie0dBTU1BX0JBU0V9L21hcmtldHM/e3F1ZXJ5fSIsIHRpbWVvdXQ9dGltZW91dCksIGNvbmRpdGlvbl9pZAogICAgICAgICkKICAgIGV4Y2VwdCAoUnVudGltZUVycm9yLCB1cmxsaWIuZXJyb3IuVVJMRXJyb3IpIGFzIGV4YzoKICAgICAgICBnYW1tYV9sb29rdXBfZXJyb3IgPSBzdHIoZXhjKQoKICAgIGdhbW1hX291dGNvbWUgPSBnYW1tYV90b2tlbl9vdXRjb21lKGdhbW1hX21hcmtldCwgdG9rZW5faWQpIGlmIGdhbW1hX21hcmtldCBlbHNlIE5vbmUKICAgIGlmIG5vdCBjbG9iX291dGNvbWUgYW5kIG5vdCBnYW1tYV9vdXRjb21lOgogICAgICAgIHJhaXNlIFJ1bnRpbWVFcnJvcihmIm5vIGV4cGxpY2l0IG91dGNvbWUgbGFiZWwgYXZhaWxhYmxlIGZvciB0b2tlbiB7dG9rZW5faWR9IikKICAgIGNhbm9uaWNhbF9vdXRjb21lID0gY2xvYl9vdXRjb21lIG9yIGdhbW1hX291dGNvbWUKCiAgICBzaWRlX2NoZWNrcyA9IHsiZ2FtbWEiOiBnYW1tYV9vdXRjb21lLCAiY2xvYl9tYXJrZXQiOiBjbG9iX291dGNvbWV9CiAgICBrbm93bl9vdXRjb21lcyA9IFt2YWx1ZS5sb3dlcigpIGZvciB2YWx1ZSBpbiBzaWRlX2NoZWNrcy52YWx1ZXMoKSBpZiB2YWx1ZV0KICAgIHNpZGVfY29uc2lzdGVudCA9IGJvb2woa25vd25fb3V0Y29tZXMpIGFuZCBsZW4oc2V0KGtub3duX291dGNvbWVzKSkgPT0gMQoKICAgIGRlZiB0b2tlbl9mb3IobGFiZWw6IHN0cikgLT4gc3RyIHwgTm9uZToKICAgICAgICB3YW50ZWQgPSBsYWJlbC5sb3dlcigpCiAgICAgICAgZm9yIHRpZCwgb3V0Y29tZSBpbiBjbG9iX21hcC5pdGVtcygpOgogICAgICAgICAgICBpZiBzdHIob3V0Y29tZSkubG93ZXIoKSA9PSB3YW50ZWQ6CiAgICAgICAgICAgICAgICByZXR1cm4gdGlkCiAgICAgICAgaWYgZ2FtbWFfbWFya2V0OgogICAgICAgICAgICB0b2tlbnMgPSBbc3RyKHgpIGZvciB4IGluIHBhcnNlX2pzb25pc2goZ2FtbWFfbWFya2V0LmdldCgiY2xvYlRva2VuSWRzIikpXQogICAgICAgICAgICBvdXRjb21lcyA9IFtzdHIoeCkgZm9yIHggaW4gcGFyc2VfanNvbmlzaChnYW1tYV9tYXJrZXQuZ2V0KCJvdXRjb21lcyIpKV0KICAgICAgICAgICAgaWYgbGVuKHRva2VucykgPT0gbGVuKG91dGNvbWVzKToKICAgICAgICAgICAgICAgIGZvciB0aWQsIG91dGNvbWUgaW4gemlwKHRva2Vucywgb3V0Y29tZXMpOgogICAgICAgICAgICAgICAgICAgIGlmIG91dGNvbWUubG93ZXIoKSA9PSB3YW50ZWQ6CiAgICAgICAgICAgICAgICAgICAgICAgIHJldHVybiB0aWQKICAgICAgICByZXR1cm4gTm9uZQoKICAgIHllc190b2tlbiA9IHRva2VuX2ZvcigiWWVzIikKICAgIG5vX3Rva2VuID0gdG9rZW5fZm9yKCJObyIpCiAgICBpZiBub3QgeWVzX3Rva2VuIG9yIG5vdCBub190b2tlbjoKICAgICAgICByYWlzZSBSdW50aW1lRXJyb3IoZiJjb3VsZCBub3QgZGVyaXZlIGV4cGxpY2l0IFllcy9ObyB0b2tlbiBJRHMgZm9yIHtjb25kaXRpb25faWR9IikKCiAgICBldmVudHMgPSBbeCBmb3IgeCBpbiAoZ2FtbWFfbWFya2V0LmdldCgiZXZlbnRzIikgb3IgW10pIGlmIGlzaW5zdGFuY2UoeCwgZGljdCldCiAgICBldmVudCA9IGV2ZW50c1swXSBpZiBsZW4oZXZlbnRzKSA9PSAxIGVsc2UgTm9uZQogICAgZXZlbnRfc3VtbWFyeSA9IGNvbXBhY3RfZXZlbnQoZXZlbnQpIGlmIGV2ZW50IGVsc2UgTm9uZQogICAgd2VhdGhlcl9tYXRjaCA9IHdlYXRoZXJfZXZpZGVuY2UoZ2FtbWFfbWFya2V0LCBldmVudCkgaWYgZ2FtbWFfbWFya2V0IGVsc2UgW10KCiAgICByZXR1cm4gewogICAgICAgICJtZXRhZGF0YV9zY2hlbWFfdmVyc2lvbiI6IE1FVEFEQVRBX1NDSEVNQV9WRVJTSU9OLAogICAgICAgICJjb25kaXRpb25faWQiOiBjb25kaXRpb25faWQsCiAgICAgICAgInRva2VuX291dGNvbWUiOiBjYW5vbmljYWxfb3V0Y29tZSwKICAgICAgICAidG9rZW5fc2lkZV9jaGVja3MiOiBzaWRlX2NoZWNrcywKICAgICAgICAidG9rZW5fc2lkZV9jb25zaXN0ZW50Ijogc2lkZV9jb25zaXN0ZW50LAogICAgICAgICJwcmltYXJ5X3Rva2VuX2lkIjogcHJpbWFyeSwKICAgICAgICAic2Vjb25kYXJ5X3Rva2VuX2lkIjogc2Vjb25kYXJ5LAogICAgICAgICJ5ZXNfdG9rZW5faWQiOiB5ZXNfdG9rZW4sCiAgICAgICAgIm5vX3Rva2VuX2lkIjogbm9fdG9rZW4sCiAgICAgICAgIyBDb21wYXRpYmlsaXR5IGFsaWFzZXM6IGFjdHVhbCBzaWRlIElEcywgbm90IHByaW1hcnkvc2Vjb25kYXJ5IG9yZGVyaW5nLgogICAgICAgICJwcmltYXJ5X3llc190b2tlbl9pZCI6IHllc190b2tlbiwKICAgICAgICAic2Vjb25kYXJ5X25vX3Rva2VuX2lkIjogbm9fdG9rZW4sCiAgICAgICAgImdhbW1hX2xvb2t1cF9lcnJvciI6IGdhbW1hX2xvb2t1cF9lcnJvciwKICAgICAgICAibWFya2V0X2lkIjogZ2FtbWFfbWFya2V0LmdldCgiaWQiKSwKICAgICAgICAibWFya2V0X3NsdWciOiBnYW1tYV9tYXJrZXQuZ2V0KCJzbHVnIiksCiAgICAgICAgInF1ZXN0aW9uIjogZ2FtbWFfbWFya2V0LmdldCgicXVlc3Rpb24iKSwKICAgICAgICAiYnVja2V0X2xhYmVsIjogZ2FtbWFfbWFya2V0LmdldCgiZ3JvdXBJdGVtVGl0bGUiKSBvciBnYW1tYV9tYXJrZXQuZ2V0KCJxdWVzdGlvbiIpLAogICAgICAgICJncm91cF9pdGVtX3RocmVzaG9sZCI6IGdhbW1hX21hcmtldC5nZXQoImdyb3VwSXRlbVRocmVzaG9sZCIpLAogICAgICAgICJtYXJrZXRfY2F0ZWdvcnkiOiBnYW1tYV9tYXJrZXQuZ2V0KCJjYXRlZ29yeSIpLAogICAgICAgICJyZXNvbHV0aW9uX3NvdXJjZSI6IGdhbW1hX21hcmtldC5nZXQoInJlc29sdXRpb25Tb3VyY2UiKSwKICAgICAgICAic3RhcnRfZGF0ZSI6IGdhbW1hX21hcmtldC5nZXQoInN0YXJ0RGF0ZSIpLAogICAgICAgICJlbmRfZGF0ZSI6IGdhbW1hX21hcmtldC5nZXQoImVuZERhdGUiKSwKICAgICAgICAiYWN0aXZlIjogZ2FtbWFfbWFya2V0LmdldCgiYWN0aXZlIiksCiAgICAgICAgImNsb3NlZCI6IGdhbW1hX21hcmtldC5nZXQoImNsb3NlZCIpLAogICAgICAgICJmZWVzX2VuYWJsZWQiOiBnYW1tYV9tYXJrZXQuZ2V0KCJmZWVzRW5hYmxlZCIpLAogICAgICAgICJnYW1tYV9mZWVfc2NoZWR1bGUiOiBnYW1tYV9tYXJrZXQuZ2V0KCJmZWVTY2hlZHVsZSIpLAogICAgICAgICJtYXJrZXRfZGVzY3JpcHRpb24iOiBnYW1tYV9tYXJrZXQuZ2V0KCJkZXNjcmlwdGlvbiIpLAogICAgICAgICJldmVudF9jb3VudCI6IGxlbihldmVudHMpLAogICAgICAgICJldmVudCI6IGV2ZW50X3N1bW1hcnksCiAgICAgICAgIndlYXRoZXJfZXZpZGVuY2UiOiB3ZWF0aGVyX21hdGNoLAogICAgICAgICJpc193ZWF0aGVyX21ldGFkYXRhX21hdGNoIjogYm9vbCh3ZWF0aGVyX21hdGNoKSwKICAgICAgICAiY2xvYl9taW5fb3JkZXJfc2l6ZSI6IGNsb2JfbWFya2V0LmdldCgibW9zIiksCiAgICAgICAgImNsb2JfbWluX3RpY2tfc2l6ZSI6IGNsb2JfbWFya2V0LmdldCgibXRzIiksCiAgICAgICAgImNsb2JfbWFrZXJfYmFzZV9mZWVfYmlwcyI6IGNsb2JfbWFya2V0LmdldCgibWJmIiksCiAgICAgICAgImNsb2JfdGFrZXJfYmFzZV9mZWVfYmlwcyI6IGNsb2JfbWFya2V0LmdldCgidGJmIiksCiAgICAgICAgImNsb2JfZmVlX2RldGFpbHMiOiBjbG9iX21hcmtldC5nZXQoImZkIiksCiAgICAgICAgImNsb2JfcmV3YXJkcyI6IGNsb2JfbWFya2V0LmdldCgiciIpLAogICAgICAgICAgICJjbG9iX3Rha2VyX29yZGVyX2RlbGF5X2VuYWJsZWQiOiBjbG9iX21hcmtldC5nZXQoIml0b2RlIiksCiAgICAgICAgImNsb2JfbWluX29yZGVyX2FnZV9zZWNvbmRzIjogY2xvYl9tYXJrZXQuZ2V0KCJvYXMiKSwKICAgIH0K').decode('utf-8')
+          t = t[:s] + replacement + t[e:]
           old = '            metadata = cache.get(token_id)\n            enrichment_error = None\n'
-          new = '''            metadata = cache.get(token_id)
-            if metadata is not None and metadata.get("metadata_schema_version") != METADATA_SCHEMA_VERSION:
-                metadata = None
-            enrichment_error = None
-'''
-          if old not in text:
+          new = '            metadata = cache.get(token_id)\n            if metadata is not None and metadata.get("metadata_schema_version") != METADATA_SCHEMA_VERSION:\n                metadata = None\n            enrichment_error = None\n'
+          if old not in t:
               raise SystemExit('cache block not found')
-          text = text.replace(old, new, 1)
-          path.write_text(text, encoding='utf-8')
+          t = t.replace(old, new, 1)
+          p.write_text(t, encoding='utf-8')
           PY
-
           python -m py_compile scripts/enrich_v2_wallet_orders.py
+      - name: Validate London NegRisk side
+        shell: bash
+        run: |
           python - <<'PY'
           import sys
           sys.path.insert(0, 'scripts')
           from enrich_v2_wallet_orders import resolve_token
-          token='91076181803621459956200090324917139595424901620108017335569536029558392706177'
-          m=resolve_token(token, timeout=30)
+          token = '91076181803621459956200090324917139595424901620108017335569536029558392706177'
+          m = resolve_token(token, timeout=30)
           assert m['token_outcome'].lower() == 'yes', m
           assert m['yes_token_id'] == token, m
           assert m['secondary_token_id'] == token, m
           assert m['gamma_lookup_error'], m
-          print('validated London NegRisk token: secondary token is explicit Yes')
+          print('validated: secondary token is explicit Yes')
           PY
       - name: Commit fix
         shell: bash
