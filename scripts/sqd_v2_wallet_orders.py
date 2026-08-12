@@ -6,7 +6,7 @@ topic2 is the owner/maker field of the order being reported for both passive
 maker orders and the active takerOrder rollup. This yields the wallet's own
 order fills without summing same-transaction counterparty legs.
 
-Output is append-free JSONL: one decoded OrderFilled row per line.
+Output is JSONL: one decoded OrderFilled row per line.
 
 No third-party dependencies.
 """
@@ -22,7 +22,7 @@ import urllib.request
 from datetime import datetime, timezone
 from decimal import Decimal, getcontext
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Iterator
 
 PORTAL_BASE = "https://portal.sqd.dev/datasets/polygon-mainnet"
 FINALIZED_STREAM_URL = f"{PORTAL_BASE}/finalized-stream"
@@ -98,7 +98,7 @@ def finalized_head(timeout: float) -> int:
 
 def stream_request(
     payload: dict[str, Any], *, timeout: float, retries: int = 5
-) -> urllib.response.addinfourl | None:
+) -> Any | None:
     body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     req = urllib.request.Request(
         FINALIZED_STREAM_URL,
@@ -121,9 +121,7 @@ def stream_request(
         except urllib.error.HTTPError as exc:
             if exc.code not in (429, 500, 503) or attempt >= retries:
                 detail = exc.read().decode("utf-8", errors="replace")
-                raise RuntimeError(
-                    f"SQD HTTP {exc.code}: {detail[:1000]}"
-                ) from exc
+                raise RuntimeError(f"SQD HTTP {exc.code}: {detail[:1000]}") from exc
             retry_after = exc.headers.get("Retry-After")
             try:
                 delay = float(retry_after) if retry_after else min(2**attempt, 10)
@@ -137,7 +135,7 @@ def stream_request(
     return None
 
 
-def iter_response_blocks(response: Iterable[bytes]) -> Iterable[dict[str, Any]]:
+def iter_response_blocks(response: Iterable[bytes]) -> Iterator[dict[str, Any]]:
     for raw_line in response:
         line = raw_line.decode("utf-8").strip()
         if not line:
@@ -272,15 +270,14 @@ def query_payload(wallet: str, from_block: int, to_block: int) -> dict[str, Any]
     }
 
 
-def backfill(
+def iter_wallet_orders(
     wallet: str,
     *,
     from_block: int,
     to_block: int,
     chunk_blocks: int,
     timeout: float,
-) -> list[dict[str, Any]]:
-    rows: list[dict[str, Any]] = []
+) -> Iterator[dict[str, Any]]:
     cursor = from_block
 
     while cursor <= to_block:
@@ -304,7 +301,7 @@ def backfill(
                     else max(max_returned_block, block_number)
                 )
                 for log in block.get("logs") or []:
-                    rows.append(decode_order_filled(block, log, wallet))
+                    yield decode_order_filled(block, log, wallet)
         finally:
             response.close()
 
@@ -319,9 +316,6 @@ def backfill(
             cursor = max_returned_block + 1
         else:
             raise RuntimeError("SQD response contained blocks without block numbers")
-
-    rows.sort(key=lambda row: (row["block_number"], row["log_index"]))
-    return rows
 
 
 def parse_args() -> argparse.Namespace:
@@ -367,24 +361,24 @@ def main() -> int:
         if to_block < args.from_block:
             raise ValueError("--to-block is before --from-block")
 
-        rows = backfill(
-            wallet,
-            from_block=args.from_block,
-            to_block=to_block,
-            chunk_blocks=args.chunk_blocks,
-            timeout=args.timeout,
-        )
-
         out = args.output.open("w", encoding="utf-8") if args.output else sys.stdout
+        count = 0
         try:
-            for row in rows:
+            for row in iter_wallet_orders(
+                wallet,
+                from_block=args.from_block,
+                to_block=to_block,
+                chunk_blocks=args.chunk_blocks,
+                timeout=args.timeout,
+            ):
                 out.write(json.dumps(row, separators=(",", ":"), sort_keys=True) + "\n")
+                count += 1
         finally:
             if args.output:
                 out.close()
 
         print(
-            f"wallet={wallet} rows={len(rows)} blocks={args.from_block}-{to_block}",
+            f"wallet={wallet} rows={count} blocks={args.from_block}-{to_block}",
             file=sys.stderr,
         )
         return 0
