@@ -1,0 +1,190 @@
+name: One-shot Milan ECMWF ensemble mean probe
+
+on:
+  push:
+    paths:
+      - '.github/workflows/milan-ensemble-mean-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch archived ECMWF ensemble mean and spread
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import math
+          import pathlib
+          import urllib.parse
+          import urllib.request
+
+          OUT = pathlib.Path('research/data')
+          OUT.mkdir(parents=True, exist_ok=True)
+
+          STATIONS = {
+              'LIMC': {'lat': 45.61667, 'lon': 8.73333, 'label': 'Malpensa resolver proxy'},
+              'LIML': {'lat': 45.43333, 'lon': 9.28333, 'label': 'Linate comparator'},
+          }
+
+          CASES = {
+              'milan_june25': {
+                  'target_date': '2026-06-25',
+                  'bucket_c': 34,
+                  'runs': ['2026-06-24T12:00', '2026-06-24T18:00'],
+                  'wallet_actions': [
+                      {'ts':'2026-06-25T01:11:47Z','action':'SELL','bucket_c':33,'price':0.114191351,'size':193.78},
+                      {'ts':'2026-06-25T01:12:02Z','action':'BUY','bucket_c':34,'price':0.4599999939,'size':65.21739},
+                  ],
+              },
+              'milan_june30': {
+                  'target_date': '2026-06-30',
+                  'bucket_c': 35,
+                  'runs': ['2026-06-28T12:00', '2026-06-28T18:00'],
+                  'wallet_actions': [
+                      {'ts':'2026-06-29T01:55:11Z','action':'BUY','bucket_c':35,'price':0.2937835403,'size':102.116},
+                  ],
+              },
+          }
+
+          MODEL = 'ecmwf_ifs025_ensemble_mean'
+          ENDPOINT = 'https://ensemble-api.open-meteo.com/v1/ensemble'
+
+          def get_json(url):
+              req = urllib.request.Request(url, headers={'User-Agent':'polymarket-weather-research/1.0'})
+              with urllib.request.urlopen(req, timeout=120) as r:
+                  return json.loads(r.read())
+
+          def normal_bucket_probability(mu, sigma, bucket):
+              # This is only an hourly normal proxy. It is NOT a daily-maximum bucket probability.
+              if sigma is None or not math.isfinite(sigma) or sigma <= 0:
+                  return None
+              root2 = math.sqrt(2.0)
+              def cdf(x):
+                  return 0.5 * (1.0 + math.erf((x - mu) / (sigma * root2)))
+              return cdf(bucket + 0.5) - cdf(bucket - 0.5)
+
+          def fetch(station, run, target_date, bucket):
+              s = STATIONS[station]
+              params = {
+                  'latitude': s['lat'],
+                  'longitude': s['lon'],
+                  'hourly': 'temperature_2m,temperature_2m_spread',
+                  'models': MODEL,
+                  'run': run,
+                  'forecast_days': 4,
+                  'timezone': 'Europe/Rome',
+              }
+              url = ENDPOINT + '?' + urllib.parse.urlencode(params)
+              payload = get_json(url)
+              hourly = payload['hourly']
+              rows = []
+              for t, mean, spread in zip(hourly['time'], hourly['temperature_2m'], hourly['temperature_2m_spread']):
+                  if t[:10] != target_date or mean is None:
+                      continue
+                  p = normal_bucket_probability(float(mean), None if spread is None else float(spread), bucket)
+                  rows.append({
+                      'time': t,
+                      'mean_c': float(mean),
+                      'spread_c': None if spread is None else float(spread),
+                      'hourly_normal_bucket_proxy': p,
+                  })
+              if not rows:
+                  raise RuntimeError(f'No target-day rows: {station} {run} {target_date}')
+              peak = max(rows, key=lambda r: r['mean_c'])
+              proxy_peak = max((r for r in rows if r['hourly_normal_bucket_proxy'] is not None), key=lambda r: r['hourly_normal_bucket_proxy'], default=None)
+              return {
+                  'station': station,
+                  'run': run,
+                  'target_date': target_date,
+                  'target_bucket_c': bucket,
+                  'peak_mean_c': peak['mean_c'],
+                  'spread_at_peak_c': peak['spread_c'],
+                  'peak_mean_time': peak['time'],
+                  'max_hourly_normal_bucket_proxy': None if proxy_peak is None else proxy_peak['hourly_normal_bucket_proxy'],
+                  'max_hourly_normal_bucket_proxy_time': None if proxy_peak is None else proxy_peak['time'],
+                  'url': url,
+              }
+
+          result = {
+              'generated_at': dt.datetime.now(dt.timezone.utc).isoformat(),
+              'endpoint': ENDPOINT,
+              'model': MODEL,
+              'warning': 'hourly_normal_bucket_proxy uses hourly ensemble mean/spread and is not the probability distribution of the daily maximum',
+              'cases': {},
+          }
+
+          for case_name, case in CASES.items():
+              rows = []
+              for run in case['runs']:
+                  for station in STATIONS:
+                      try:
+                          rows.append(fetch(station, run, case['target_date'], case['bucket_c']))
+                      except Exception as e:
+                          rows.append({
+                              'station': station,
+                              'run': run,
+                              'target_date': case['target_date'],
+                              'target_bucket_c': case['bucket_c'],
+                              'error': repr(e),
+                          })
+              result['cases'][case_name] = {
+                  'target_date': case['target_date'],
+                  'target_bucket_c': case['bucket_c'],
+                  'wallet_actions': case['wallet_actions'],
+                  'rows': rows,
+              }
+
+          json_path = OUT / 'milan-ensemble-mean-probe.json'
+          json_path.write_text(json.dumps(result, indent=2), encoding='utf-8')
+
+          lines = [
+              '# Milan ECMWF ensemble mean/spread probe', '',
+              f'Generated: **{result["generated_at"]}**', '',
+              f'Model: `{MODEL}` via Open-Meteo Ensemble Mean API.', '',
+              'Purpose: test whether the post-18Z wallet actions are more compatible with a distribution-shape update than with the deterministic daily maximum alone.', '',
+              '**Important:** the normal bucket number below is an hourly proxy built from the archived ensemble mean and spread. It is not the probability of the civil-day maximum landing in the Polymarket bucket.', '',
+          ]
+
+          for case_name, case in result['cases'].items():
+              lines += [f'## {case_name} — target {case["target_date"]}', '', '### Wallet actions', '']
+              for a in case['wallet_actions']:
+                  lines.append(f'- `{a["ts"]}` — **{a["action"]} {a["bucket_c"]}°C** — {a["size"]:.6f} @ {a["price"]:.4f}')
+              lines += ['', '| Run | Station | Peak ensemble mean | Spread at peak | Max hourly normal proxy for target bucket | Proxy time |', '|---|---|---:|---:|---:|---|']
+              for r in case['rows']:
+                  if 'error' in r:
+                      lines.append(f'| {r["run"]} | {r["station"]} | ERROR | ERROR | ERROR | `{r["error"]}` |')
+                  else:
+                      p = r['max_hourly_normal_bucket_proxy']
+                      ptxt = 'NA' if p is None else f'{100*p:.1f}%'
+                      s = r['spread_at_peak_c']
+                      stxt = 'NA' if s is None else f'{s:.2f}°C'
+                      lines.append(f'| {r["run"]} | {r["station"]} | {r["peak_mean_c"]:.2f}°C | {stxt} | {ptxt} | {r["max_hourly_normal_bucket_proxy_time"] or "NA"} |')
+              lines.append('')
+
+          lines += [
+              '## Interpretation rule', '',
+              'The useful signal is run-to-run change, not the absolute proxy:', '',
+              '- if the 18Z target-bucket proxy rises in the same direction as the wallet action, ensemble mean/spread contains information absent from the deterministic-max-only view;',
+              '- if it does not, do not rescue the hypothesis with storytelling: the next candidate is another forecast source, resolver bias/post-processing, or market-relative-value execution rather than direct ECMWF bucket probability.', '',
+          ]
+
+          md_path = OUT / 'milan-ensemble-mean-probe.md'
+          md_path.write_text('\n'.join(lines), encoding='utf-8')
+          PY
+
+      - name: Commit probe output
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/milan-ensemble-mean-probe.json research/data/milan-ensemble-mean-probe.md
+          git diff --cached --quiet && exit 0
+          git commit -m "data: capture Milan ECMWF ensemble mean revisions"
+          git push
