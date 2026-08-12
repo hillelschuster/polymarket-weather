@@ -1,0 +1,137 @@
+name: One-shot T+0 post-observation execution
+
+on:
+  push:
+    paths:
+      - '.github/workflows/t0-observation-execution-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Measure actual post-signal trade prints
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt
+          import json
+          import pathlib
+          import time
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+
+          UA='polymarket-weather-t0-execution/1.0'
+          DATA='https://data-api.polymarket.com'
+          CLOB='https://clob.polymarket.com'
+          src=json.loads(pathlib.Path('research/data/t0-observation-markout-sample.json').read_text())
+
+          def get(url,retries=4):
+              req=urllib.request.Request(url,headers={'Accept':'application/json','User-Agent':UA})
+              for a in range(retries+1):
+                  try:
+                      with urllib.request.urlopen(req,timeout=30) as r: return json.load(r)
+                  except urllib.error.HTTPError as e:
+                      if e.code not in (429,500,502,503,504) or a==retries:
+                          raise RuntimeError(f'HTTP {e.code}: '+e.read().decode('utf-8','replace')[:300])
+                  except urllib.error.URLError:
+                      if a==retries: raise
+                  time.sleep(min(2**a,8))
+              raise RuntimeError('unreachable')
+
+          def trades(condition,start,end):
+              q=urllib.parse.urlencode({'market':condition,'start':start,'end':end,'limit':10000,'offset':0,'takerOnly':'false'})
+              x=get(f'{DATA}/trades?{q}')
+              return x if isinstance(x,list) else []
+
+          def hist(token,start,end):
+              q=urllib.parse.urlencode({'market':token,'startTs':start,'endTs':end,'fidelity':1})
+              return get(f'{CLOB}/prices-history?{q}').get('history',[])
+
+          def nearest(h,target,maxabs=180):
+              if not h:return None
+              p=min(h,key=lambda x:abs(int(x['t'])-target))
+              if abs(int(p['t'])-target)>maxabs:return None
+              return float(p['p'])
+
+          bins=[(0,30),(30,60),(60,120),(120,300),(300,600)]
+          results=[]
+          for c in src['cases']:
+              if c.get('error'): continue
+              signal=int(c.get('known_breach_ts') or c['anchor_ts'])
+              profit_side='no' if c.get('known_breach_ts') else 'yes'
+              token=c[f'{profit_side}_token']
+              condition=c['condition_id']
+              cm=get(f'{CLOB}/clob-markets/{urllib.parse.quote(condition,safe="")}')
+              fd=cm.get('fd') or {}
+              fee_rate=float(fd.get('r') or 0.0)
+              start=signal-60; end=signal+900
+              rows=trades(condition,start,end)
+              side_rows=[x for x in rows if str(x.get('asset') or '')==token]
+              h=hist(token,start,end)
+              terminal=nearest(h,signal+600)
+              binned=[]
+              total_net_positive=0.0
+              total_raw_positive=0.0
+              total_volume=0.0
+              for lo,hi in bins:
+                  xs=[x for x in side_rows if lo <= int(x.get('timestamp') or 0)-signal < hi]
+                  qty=sum(float(x.get('size') or 0) for x in xs)
+                  notional=sum(float(x.get('size') or 0)*float(x.get('price') or 0) for x in xs)
+                  vwap=notional/qty if qty else None
+                  raw_mark=0.0; net_mark=0.0
+                  if terminal is not None:
+                      for x in xs:
+                          q=float(x.get('size') or 0); p=float(x.get('price') or 0)
+                          raw=max(terminal-p,0.0)
+                          unit_fee=fee_rate*p*(1-p)
+                          net=max(terminal-p-unit_fee,0.0)
+                          raw_mark += q*raw
+                          net_mark += q*net
+                  total_raw_positive += raw_mark
+                  total_net_positive += net_mark
+                  total_volume += qty
+                  binned.append({'lo_s':lo,'hi_s':hi,'count':len(xs),'qty':qty,'vwap':vwap,'raw_positive_markout_dollars':raw_mark,'fee_adjusted_positive_markout_dollars':net_mark})
+              first=sorted([x for x in side_rows if int(x.get('timestamp') or 0)>=signal],key=lambda x:int(x.get('timestamp') or 0))
+              first=first[0] if first else None
+              results.append({
+                  'name':c['name'],'signal_ts':signal,'signal_iso':dt.datetime.fromtimestamp(signal,dt.timezone.utc).isoformat(),
+                  'profit_side':profit_side,'token':token,'condition_id':condition,'fee_rate':fee_rate,
+                  'terminal_10m_price':terminal,'post_signal_profit_token_trade_count':sum(x['count'] for x in binned),
+                  'post_signal_profit_token_qty_10m':total_volume,'gross_positive_markout_dollars_10m_prints':total_raw_positive,
+                  'fee_adjusted_positive_markout_dollars_10m_prints':total_net_positive,
+                  'first_trade_after_signal': None if first is None else {k:first.get(k) for k in ('timestamp','price','size','side','transactionHash')},
+                  'bins':binned,
+              })
+
+          out={'generated_at':dt.datetime.now(dt.timezone.utc).isoformat(),'method':'Actual Data API trade prints on the economically favorable token after the observation signal; terminal reference is CLOB historical price at +10m. Fee-adjusted markout subtracts unit taker fee r*p*(1-p) using each market CLOB fd.r. It is opportunity-volume evidence, not a claim one bot could capture every print.','cases':results}
+          p=pathlib.Path('research/data/t0-observation-execution.json'); p.write_text(json.dumps(out,indent=2),encoding='utf-8')
+
+          lines=['# T+0 observation execution economics','',f'Generated: **{out["generated_at"]}**','',out['method'],'',
+                 '| Case | Trade side after signal | +10m ref | Fee r | 0-10m printed qty | Gross positive markout $ | Fee-adjusted positive markout $ |','|---|---|---:|---:|---:|---:|---:|']
+          for r in results:
+              lines.append(f'| {r["name"]} | {r["profit_side"].upper()} | {r["terminal_10m_price"] if r["terminal_10m_price"] is not None else "NA"} | {r["fee_rate"]:.4f} | {r["post_signal_profit_token_qty_10m"]:.2f} | {r["gross_positive_markout_dollars_10m_prints"]:.2f} | {r["fee_adjusted_positive_markout_dollars_10m_prints"]:.2f} |')
+          lines += ['','## Repricing by elapsed time','']
+          for r in results:
+              lines += [f'### {r["name"]}','',f'- signal: `{r["signal_iso"]}`; favorable side: **{r["profit_side"].upper()}**; +10m reference: **{r["terminal_10m_price"]}**',f'- first favorable-token trade after signal: `{json.dumps(r["first_trade_after_signal"],sort_keys=True)}`','', '| Seconds | Trades | Qty | VWAP | Fee-adjusted positive markout $ |','|---:|---:|---:|---:|---:|']
+              for b in r['bins']:
+                  vw='NA' if b['vwap'] is None else f'{b["vwap"]:.4f}'
+                  lines.append(f'| {b["lo_s"]}-{b["hi_s"]} | {b["count"]} | {b["qty"]:.2f} | {vw} | {b["fee_adjusted_positive_markout_dollars"]:.2f} |')
+              lines.append('')
+          pathlib.Path('research/data/t0-observation-execution.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+
+      - name: Commit execution evidence
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/t0-observation-execution.json research/data/t0-observation-execution.md
+          git diff --cached --quiet && exit 0
+          git commit -m "data: measure T+0 observation execution markout"
+          git push
