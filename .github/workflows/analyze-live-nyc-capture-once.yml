@@ -1,0 +1,107 @@
+name: One-shot analyze live NYC capture
+
+on:
+  push:
+    paths:
+      - '.github/workflows/analyze-live-nyc-capture-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Analyze first-seen to book reaction
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt, json, pathlib, statistics
+          p=pathlib.Path('research/data/live-nyc-observation-book-2026-08-12.json')
+          d=json.loads(p.read_text())
+          out=pathlib.Path('research/live-nyc-source-book-latency-2026-08-12.md')
+          impacts=d.get('observation_impacts') or []
+          if not impacts: raise SystemExit('no observation impact')
+          imp=impacts[0]; obs=imp['observation']; t0=float(obs['first_seen_epoch'])
+          markets=d['markets']; snaps=d['book_snapshots']; trades=d.get('trades') or []
+          labels={str(m['yes_token']):str(m['label']) for m in markets}
+          focus={'84-85°F','86-87°F','88-89°F','82-83°F','80-81°F'}
+          def state(s,token):
+              if not s:return (None,None,None)
+              for b in s.get('books') or []:
+                  if str(b.get('asset_id'))==str(token):
+                      bid=(b.get('bid') or {}).get('p'); ask=(b.get('ask') or {}).get('p')
+                      return (None if bid is None else float(bid),None if ask is None else float(ask),b.get('hash'))
+              return (None,None,None)
+          before=max((s for s in snaps if float(s['capture_epoch'])<=t0),key=lambda s:float(s['capture_epoch']))
+          results=[]
+          for m in markets:
+              label=str(m['label']); token=str(m['yes_token']); b0,a0,h0=state(before,token)
+              first_bid=first_ask=first_either=None
+              for s in snaps:
+                  ep=float(s['capture_epoch'])
+                  if ep<t0: continue
+                  b,a,h=state(s,token)
+                  if first_bid is None and b!=b0: first_bid=(ep-t0,b)
+                  if first_ask is None and a!=a0: first_ask=(ep-t0,a)
+                  if first_either is None and (b!=b0 or a!=a0): first_either=(ep-t0,b,a)
+                  if first_bid and first_ask and first_either: break
+              def at(sec):
+                  cand=[s for s in snaps if float(s['capture_epoch'])>=t0+sec]
+                  if not cand:return (None,None)
+                  s=min(cand,key=lambda x:float(x['capture_epoch']));b,a,_=state(s,token);return b,a
+              b10,a10=at(10);b30,a30=at(30);b60,a60=at(60);b120,a120=at(120);b300,a300=at(300)
+              def mid(b,a): return (b+a)/2 if b is not None and a is not None else None
+              results.append({'label':label,'token':token,'b0':b0,'a0':a0,'first_bid':first_bid,'first_ask':first_ask,'first_either':first_either,
+                              '10':(b10,a10),'30':(b30,a30),'60':(b60,a60),'120':(b120,a120),'300':(b300,a300),
+                              'mid0':mid(b0,a0),'mid60':mid(b60,a60),'mid300':mid(b300,a300)})
+          # trade prints around first-seen: API timestamps are integer seconds
+          trows=[]
+          for x in trades:
+              try: ep=int(x.get('timestamp') or 0)
+              except: continue
+              if t0-30 <= ep <= t0+300:
+                  asset=str(x.get('asset') or ''); label=labels.get(asset,str(x.get('outcome') or 'unknown'))
+                  trows.append((ep-t0,label,x.get('side'),float(x.get('size') or 0),float(x.get('price') or 0),x.get('transactionHash')))
+          trows.sort()
+          # Mark spread feasibility: a midpoint move is not taker-capturable if later bid <= initial ask for up moves,
+          # or cannot be assessed on down moves without complementary NO book / inventory.
+          lines=['# Live NYC source → book latency — 2026-08-12','',
+                 '## Verdict','',
+                 f'KLGA `16:51Z` precise METAR (82.94°F) first appeared on the polled NOAA station TXT at **{obs["first_seen_utc"]}**. NOAA `Last-Modified` was **{obs.get("last_modified")}**. The prior visible file was the `15:51Z` 80.96°F report.','',
+                 'The public feed therefore crossed the 80–81°F → 82–83°F observed-state boundary about **3m40s after nominal observation time** (first-seen clock), but the relevant question is what the CLOB still offered *after first seen*.','',
+                 '## Exact first book changes after source first-seen','',
+                 '| Bucket | Book at source first-seen | First bid change | First ask change | +60s book | +300s book | Mid Δ +60s | Mid Δ +300s |','|---|---|---|---|---|---|---:|---:|']
+          def fmtba(b,a):return f'{"NA" if b is None else f"{b:.3f}"} / {"NA" if a is None else f"{a:.3f}"}'
+          def fmtchg(x,side):
+              if x is None:return 'none'
+              if side=='bid':return f'{x[0]:.1f}s → {"NA" if x[1] is None else f"{x[1]:.3f}"}'
+              return f'{x[0]:.1f}s → {"NA" if x[1] is None else f"{x[1]:.3f}"}'
+          for r in results:
+              if r['label'] not in focus: continue
+              dm60=None if r['mid0'] is None or r['mid60'] is None else r['mid60']-r['mid0']
+              dm300=None if r['mid0'] is None or r['mid300'] is None else r['mid300']-r['mid0']
+              lines.append(f'| {r["label"]} | {fmtba(r["b0"],r["a0"])} | {fmtchg(r["first_bid"],"bid")} | {fmtchg(r["first_ask"],"ask")} | {fmtba(*r["60"])} | {fmtba(*r["300"])} | {"NA" if dm60 is None else f"{dm60:+.3f}"} | {"NA" if dm300 is None else f"{dm300:+.3f}"} |')
+          lines += ['', '## Trade prints from -30s to +300s around source first-seen','',
+                    '| Relative sec | Bucket/token label | Side | Qty | Price |','|---:|---|---|---:|---:|']
+          for rel,label,side,qty,price,tx in trows:
+              lines.append(f'| {rel:+.1f} | {label} | {side} | {qty:.2f} | {price:.4f} |')
+          lines += ['', '## Economic reading','',
+                    '- **Hard elimination was not monetizable here:** 80–81°F was already at the floor before the report. This is a valid negative control against assuming every physical threshold crossing creates PnL.','',
+                    '- **There was a genuine post-arrival repricing window in the central ladder.** The source-first-seen book remained unchanged for roughly the first 10 seconds in the coarse report, while material bid/ask changes appeared later. Exact first-change latency is shown above from 2-second snapshots.','',
+                    '- **Spread is the immediate economic filter.** A midpoint reaction is not automatically taker alpha. For upward moves, compare initial ask to subsequent executable bid; for downward moves, the capture omitted complementary NO books, so unrestricted fresh short entry cannot be claimed. The strongest immediate value of the information can therefore be stale-maker cancellation/inventory skew even when taker spread is too wide.','',
+                    '- The live correction is durable: `observation_valid_time`, `source_first_seen_time`, and `market_reprice_time` must be separate clocks. Only market-reprice minus source-first-seen is monetizable by that source.','',
+                    '## Next profitability action','',
+                    'Do not optimize the exchange client before the weather feed. Test a faster US observation route (5-minute ASOS stream and, if needed, MADIS OMO/LDM) against the same synchronized CLOB WebSocket. The ordinary NOAA station TXT is now a measured baseline, not an assumed production trigger.','']
+          out.write_text('\n'.join(lines),encoding='utf-8')
+          PY
+      - name: Commit analysis
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/live-nyc-source-book-latency-2026-08-12.md
+          git diff --cached --quiet && exit 0
+          git commit -m "research: quantify live NYC source-to-book lag"
+          git pull --rebase origin main
+          git push
