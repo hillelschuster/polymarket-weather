@@ -28,7 +28,8 @@ from typing import Any, Iterable
 
 CLOB_BASE = "https://clob.polymarket.com"
 GAMMA_BASE = "https://gamma-api.polymarket.com"
-USER_AGENT = "polymarket-weather-enrich-v2-wallet-orders/1.0"
+USER_AGENT = "polymarket-weather-enrich-v2-wallet-orders/1.1"
+METADATA_SCHEMA_VERSION = 2
 
 
 def request_json(url: str, *, timeout: float, retries: int = 5) -> Any:
@@ -179,48 +180,78 @@ def resolve_token(token_id: str, *, timeout: float) -> dict[str, Any]:
     secondary = str(parent.get("secondary_token_id") or "")
     if not condition_id or not primary or not secondary:
         raise RuntimeError(f"incomplete markets-by-token response for {token_id}: {parent!r}")
-    if token_id == primary:
-        canonical_outcome = "Yes"
-    elif token_id == secondary:
-        canonical_outcome = "No"
-    else:
+    if token_id not in {primary, secondary}:
         raise RuntimeError(
             f"token {token_id} is neither primary nor secondary for condition {condition_id}"
         )
 
-    query = urllib.parse.urlencode({"condition_ids": condition_id})
-    gamma_market = select_gamma_market(
-        request_json(f"{GAMMA_BASE}/markets?{query}", timeout=timeout), condition_id
-    )
+    # primary/secondary identify token membership, not Yes/No semantics.
     clob_market = request_json(
         f"{CLOB_BASE}/clob-markets/{urllib.parse.quote(condition_id, safe='')}",
         timeout=timeout,
     )
     if not isinstance(clob_market, dict):
         raise RuntimeError(f"unexpected CLOB market response for {condition_id}")
+    clob_map = clob_outcomes(clob_market)
+    clob_outcome = clob_map.get(token_id)
 
-    gamma_outcome = gamma_token_outcome(gamma_market, token_id)
-    clob_outcome = clob_outcomes(clob_market).get(token_id)
-    side_checks = {
-        "markets_by_token": canonical_outcome,
-        "gamma": gamma_outcome,
-        "clob_market": clob_outcome,
-    }
+    query = urllib.parse.urlencode({"condition_ids": condition_id})
+    gamma_market: dict[str, Any] = {}
+    gamma_lookup_error: str | None = None
+    try:
+        gamma_market = select_gamma_market(
+            request_json(f"{GAMMA_BASE}/markets?{query}", timeout=timeout), condition_id
+        )
+    except (RuntimeError, urllib.error.URLError) as exc:
+        gamma_lookup_error = str(exc)
+
+    gamma_outcome = gamma_token_outcome(gamma_market, token_id) if gamma_market else None
+    if not clob_outcome and not gamma_outcome:
+        raise RuntimeError(f"no explicit outcome label available for token {token_id}")
+    canonical_outcome = clob_outcome or gamma_outcome
+
+    side_checks = {"gamma": gamma_outcome, "clob_market": clob_outcome}
     known_outcomes = [value.lower() for value in side_checks.values() if value]
     side_consistent = bool(known_outcomes) and len(set(known_outcomes)) == 1
+
+    def token_for(label: str) -> str | None:
+        wanted = label.lower()
+        for tid, outcome in clob_map.items():
+            if str(outcome).lower() == wanted:
+                return tid
+        if gamma_market:
+            tokens = [str(x) for x in parse_jsonish(gamma_market.get("clobTokenIds"))]
+            outcomes = [str(x) for x in parse_jsonish(gamma_market.get("outcomes"))]
+            if len(tokens) == len(outcomes):
+                for tid, outcome in zip(tokens, outcomes):
+                    if outcome.lower() == wanted:
+                        return tid
+        return None
+
+    yes_token = token_for("Yes")
+    no_token = token_for("No")
+    if not yes_token or not no_token:
+        raise RuntimeError(f"could not derive explicit Yes/No token IDs for {condition_id}")
 
     events = [x for x in (gamma_market.get("events") or []) if isinstance(x, dict)]
     event = events[0] if len(events) == 1 else None
     event_summary = compact_event(event) if event else None
-    weather_match = weather_evidence(gamma_market, event)
+    weather_match = weather_evidence(gamma_market, event) if gamma_market else []
 
     return {
+        "metadata_schema_version": METADATA_SCHEMA_VERSION,
         "condition_id": condition_id,
         "token_outcome": canonical_outcome,
         "token_side_checks": side_checks,
         "token_side_consistent": side_consistent,
-        "primary_yes_token_id": primary,
-        "secondary_no_token_id": secondary,
+        "primary_token_id": primary,
+        "secondary_token_id": secondary,
+        "yes_token_id": yes_token,
+        "no_token_id": no_token,
+        # Compatibility aliases: actual side IDs, not primary/secondary ordering.
+        "primary_yes_token_id": yes_token,
+        "secondary_no_token_id": no_token,
+        "gamma_lookup_error": gamma_lookup_error,
         "market_id": gamma_market.get("id"),
         "market_slug": gamma_market.get("slug"),
         "question": gamma_market.get("question"),
@@ -245,7 +276,7 @@ def resolve_token(token_id: str, *, timeout: float) -> dict[str, Any]:
         "clob_taker_base_fee_bips": clob_market.get("tbf"),
         "clob_fee_details": clob_market.get("fd"),
         "clob_rewards": clob_market.get("r"),
-        "clob_taker_order_delay_enabled": clob_market.get("itode"),
+           "clob_taker_order_delay_enabled": clob_market.get("itode"),
         "clob_min_order_age_seconds": clob_market.get("oas"),
     }
 
@@ -322,6 +353,8 @@ def main() -> int:
                 raise ValueError("input row missing token_id")
 
             metadata = cache.get(token_id)
+            if metadata is not None and metadata.get("metadata_schema_version") != METADATA_SCHEMA_VERSION:
+                metadata = None
             enrichment_error = None
             if metadata is None:
                 try:
