@@ -1,0 +1,94 @@
+name: One-shot live NYC state snapshot
+
+on:
+  push:
+    paths:
+      - '.github/workflows/live-nyc-snapshot-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  snapshot:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture current state
+        shell: bash
+        run: |
+          python - <<'PY'
+          import datetime as dt, json, pathlib, re, urllib.parse, urllib.request
+          UA='polymarket-weather-live-snapshot/1.0'; out=pathlib.Path('research/data'); out.mkdir(parents=True,exist_ok=True)
+          def getj(url):
+              req=urllib.request.Request(url,headers={'Accept':'application/json','User-Agent':UA,'Cache-Control':'no-cache'})
+              with urllib.request.urlopen(req,timeout=20) as r:return json.load(r),dict(r.headers)
+          def gettext(url):
+              req=urllib.request.Request(url,headers={'Accept':'text/plain,*/*','User-Agent':UA,'Cache-Control':'no-cache','Pragma':'no-cache'})
+              with urllib.request.urlopen(req,timeout=20) as r:return r.read().decode('utf-8','replace'),dict(r.headers)
+          def postj(url,obj):
+              req=urllib.request.Request(url,data=json.dumps(obj).encode(),headers={'Content-Type':'application/json','Accept':'application/json','User-Agent':UA},method='POST')
+              with urllib.request.urlopen(req,timeout=20) as r:return json.load(r)
+          def jlist(v):
+              if isinstance(v,list):return v
+              if isinstance(v,str):
+                  try:
+                      x=json.loads(v);return x if isinstance(x,list) else []
+                  except:return []
+              return []
+          def tc(raw):
+              ms=re.findall(r'(?:^|\s)T([01])(\d{3})([01])(\d{3})(?:\s|$)',raw or '')
+              if ms:
+                  s,t,_,_=ms[-1];v=int(t)/10;return -v if s=='1' else v
+              m=re.search(r'\s(M?\d{2})/(M?\d{2}|//)\s',raw or '')
+              if m:
+                  a=m.group(1);return -float(a[1:]) if a.startswith('M') else float(a)
+          event=None;slug=None
+          for s in ['highest-temperature-in-nyc-on-august-12-2026','highest-temperature-in-new-york-city-on-august-12-2026']:
+              try:
+                  e,_=getj('https://gamma-api.polymarket.com/events/slug/'+s)
+                  if e.get('markets'):event=e;slug=s;break
+              except:pass
+          if not event:
+              es,_=getj('https://gamma-api.polymarket.com/events?active=true&closed=false&limit=500')
+              for e in es:
+                  z=(str(e.get('title') or '')+' '+str(e.get('slug') or '')).lower()
+                  if 'highest temperature' in z and ('nyc' in z or 'new york' in z) and 'august' in z and '12' in z:
+                      event=e;slug=e.get('slug');break
+          if not event:raise SystemExit('NYC event not found')
+          markets=[];reqs=[]
+          for m in event.get('markets') or []:
+              ts=[str(x) for x in jlist(m.get('clobTokenIds'))];os=[str(x) for x in jlist(m.get('outcomes'))]
+              mp=dict(zip(os,ts)) if len(ts)==len(os) else {};yes=mp.get('Yes') or mp.get('YES')
+              if yes:
+                  markets.append({'label':m.get('groupItemTitle') or m.get('question'),'yes_token':yes,'condition_id':m.get('conditionId')});reqs.append({'token_id':yes})
+          books=postj('https://clob.polymarket.com/books',reqs)
+          bytoken={str(b.get('asset_id')):b for b in books}
+          for m in markets:
+              b=bytoken.get(m['yes_token'],{});bids=sorted([(float(x['price']),float(x['size'])) for x in b.get('bids') or []],reverse=True);asks=sorted([(float(x['price']),float(x['size'])) for x in b.get('asks') or []])
+              m['bid']=bids[0] if bids else None;m['ask']=asks[0] if asks else None;m['last_trade_price']=b.get('last_trade_price')
+          txt,h=gettext('https://tgftp.nws.noaa.gov/data/observations/metar/stations/KLGA.TXT?cb='+str(dt.datetime.now().timestamp()))
+          raw=[x.strip() for x in txt.splitlines() if x.strip()][-1];t=tc(raw)
+          awc=[]
+          try:awc,_=getj('https://aviationweather.gov/api/data/metar?ids=KLGA&format=json&hours=12')
+          except:pass
+          obs=[]
+          for x in awc if isinstance(awc,list) else []:
+              r=str(x.get('rawOb') or '');v=tc(r)
+              if v is not None:obs.append({'obsTime':x.get('obsTime'),'temp_c':v,'temp_f':v*9/5+32,'raw':r})
+          result={'captured_at':dt.datetime.now(dt.timezone.utc).isoformat(),'event_slug':slug,'event_title':event.get('title'),'resolutionSource':event.get('resolutionSource'),'station_text':txt.strip(),'station_last_modified':h.get('Last-Modified'),'station_temp_f':None if t is None else t*9/5+32,'awc_running_max_f':max((x['temp_f'] for x in obs),default=None),'markets':markets,'awc_observations':obs}
+          (out/'live-nyc-state-snapshot-2026-08-12.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
+          lines=['# Live NYC state snapshot — 2026-08-12','',f'Captured `{result["captured_at"]}`.','',f'Event: **{result["event_title"]}** (`{slug}`).','',f'KLGA current file: `{raw}`; Last-Modified `{result["station_last_modified"]}`; parsed **{result["station_temp_f"]:.1f}°F**.','',f'AWC recent running max: **{result["awc_running_max_f"]:.1f}°F**.' if result['awc_running_max_f'] is not None else 'AWC recent max unavailable.','', '| Bucket | Best bid | Best ask | Last trade |','|---|---:|---:|---:|']
+          for m in markets:
+              f=lambda x:'NA' if x is None else (f'{x[0]:.4f} x {x[1]:.1f}' if isinstance(x,(list,tuple)) else str(x))
+              lines.append(f'| {m["label"]} | {f(m["bid"])} | {f(m["ask"])} | {m.get("last_trade_price") or "NA"} |')
+          (out/'live-nyc-state-snapshot-2026-08-12.md').write_text('\n'.join(lines),encoding='utf-8')
+          PY
+      - name: Commit snapshot
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/live-nyc-state-snapshot-2026-08-12.*
+          git diff --cached --quiet && exit 0
+          git commit -m "data: snapshot live NYC resolver state and ladder"
+          git pull --rebase origin main
+          git push
