@@ -1,0 +1,346 @@
+{
+  "generated_at": "2026-08-12T13:59:55.499443+00:00",
+  "method": "Actual Data API trade prints on the economically favorable token after the observation signal; terminal reference is CLOB historical price at +10m. Fee-adjusted markout subtracts unit taker fee r*p*(1-p) using each market CLOB fd.r. It is opportunity-volume evidence, not a claim one bot could capture every print.",
+  "cases": [
+    {
+      "name": "London Jul12 27C pre-breach",
+      "signal_ts": 1783862400,
+      "signal_iso": "2026-07-12T13:20:00+00:00",
+      "profit_side": "no",
+      "token": "2655055245387824275985181109206555608704123016388750340070226258019209549699",
+      "condition_id": "0x1cbcd7f27f60388d43a9d3f1d5e7ed7d3cd31d1076c990a73ae48e644ef1f491",
+      "fee_rate": 0.05,
+      "terminal_10m_price": 0.9995,
+      "post_signal_profit_token_trade_count": 50,
+      "post_signal_profit_token_qty_10m": 6693.216877,
+      "gross_positive_markout_dollars_10m_prints": 60.72430657261084,
+      "fee_adjusted_positive_markout_dollars_10m_prints": 57.73009450408773,
+      "first_trade_after_signal": {
+        "timestamp": 1783862417,
+        "price": 0.907234134,
+        "size": 211.940877,
+        "side": "BUY",
+        "transactionHash": "0xa4eb0554c87ac1548bea1dcef91656e4b53cbcbc265f88273cd7b68b76354cee"
+      },
+      "bins": [
+        {
+          "lo_s": 0,
+          "hi_s": 30,
+          "count": 1,
+          "qty": 211.940877,
+          "vwap": 0.907234134,
+          "raw_positive_markout_dollars": 19.5549085572045,
+          "fee_adjusted_positive_markout_dollars": 18.663057530737163
+        },
+        {
+          "lo_s": 30,
+          "hi_s": 60,
+          "count": 3,
+          "qty": 244.77,
+          "vwap": 0.9111345344977939,
+          "raw_positive_markout_dollars": 21.629214990975004,
+          "fee_adjusted_positive_markout_dollars": 20.63922156214153
+        },
+        {
+          "lo_s": 60,
+          "hi_s": 120,
+          "count": 7,
+          "qty": 828.36,
+          "vwap": 0.9794329759712793,
+          "raw_positive_markout_dollars": 16.62272002443104,
+          "fee_adjusted_positive_markout_dollars": 15.791050754408735
+        },
+        {
+          "lo_s": 120,
+          "hi_s": 300,
+          "count": 19,
+          "qty": 346.55,
+          "vwap": 0.9983842446977349,
+          "raw_positive_markout_dollars": 0.3866650000000195,
+          "fee_adjusted_positive_markout_dollars": 0.3587933770000195
+        },
+        {
+          "lo_s": 300,
+          "hi_s": 600,
+          "count": 20,
+          "qty": 5061.596,
+          "vwap": 0.9990000000000001,
+          "raw_positive_markout_dollars": 2.5307980000002828,
+          "fee_adjusted_positive_markout_dollars": 2.2779712798002825
+        }
+      ]
+    },
+    {
+      "name": "Wellington Jul21 11C pre-breach",
+      "signal_ts": 1784601000,
+      "signal_iso": "2026-07-21T02:30:00+00:00",
+      "profit_side": "no",
+      "token": "101940427571296396096846204867677734529692848694090204797814015788501285652940",
+      "condition_id": "0x6b7d24a529bf4e36f4c1b5842010cf191022013856a8566e59494013ea68431f",
+      "fee_rate": 0.05,
+      "terminal_10m_price": 0.999,
+      "post_signal_profit_token_trade_count": 115,
+      "post_signal_profit_token_qty_10m": 11036.513561,
+      "gross_positive_markout_dollars_10m_prints": 12.432904431976107,
+      "fee_adjusted_positive_markout_dollars_10m_prints": 11.653362742469975,
+      "first_trade_after_signal": {
+        "timestamp": 1784601085,
+        "price": 0.99,
+        "size": 11.6969,
+        "side": "BUY",
+        "transactionHash": "0x7be342bf56d6dbf91a720e4ba753ed8c55db353cfbe1fc2845b1af46479198c6"
+      },
+      "bins": [
+        {
+          "lo_s": 0,
+          "hi_s": 30,
+          "count": 0,
+          "qty": 0,
+          "vwap": null,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        },
+        {
+          "lo_s": 30,
+          "hi_s": 60,
+          "count": 0,
+          "qty": 0,
+          "vwap": null,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        },
+        {
+          "lo_s": 60,
+          "hi_s": 120,
+          "count": 2,
+          "qty": 58.9069,
+          "vwap": 0.9900000000000001,
+          "raw_positive_markout_dollars": 0.5301621000000005,
+          "fee_adjusted_positive_markout_dollars": 0.5010031845000005
+        },
+        {
+          "lo_s": 120,
+          "hi_s": 300,
+          "count": 59,
+          "qty": 3722.436661,
+          "vwap": 0.9961117621829483,
+          "raw_positive_markout_dollars": 10.751282335880113,
+          "fee_adjusted_positive_markout_dollars": 10.116920616894127
+        },
+        {
+          "lo_s": 300,
+          "hi_s": 600,
+          "count": 54,
+          "qty": 7255.17,
+          "vwap": 0.9988412911074316,
+          "raw_positive_markout_dollars": 1.1514599960959946,
+          "fee_adjusted_positive_markout_dollars": 1.0354389410758473
+        }
+      ]
+    },
+    {
+      "name": "NYC Jul20 82-83F first-lock",
+      "signal_ts": 1784584260,
+      "signal_iso": "2026-07-20T21:51:00+00:00",
+      "profit_side": "yes",
+      "token": "17750026989324637430239624516804711284957008010968484738128557533693057790497",
+      "condition_id": "0x564564bf6bcd76cd5df03bdd40da7e9aab66412c08a7856825503cb886ac972f",
+      "fee_rate": 0.05,
+      "terminal_10m_price": 0.9935,
+      "post_signal_profit_token_trade_count": 92,
+      "post_signal_profit_token_qty_10m": 2392.934029,
+      "gross_positive_markout_dollars_10m_prints": 283.9696288185795,
+      "fee_adjusted_positive_markout_dollars_10m_prints": 273.7124491640685,
+      "first_trade_after_signal": {
+        "timestamp": 1784584267,
+        "price": 0.5967907425,
+        "size": 155.55,
+        "side": "BUY",
+        "transactionHash": "0xe5690d71925969a3f59dfa0aa0aafc5302cf3f5703872fc16f507492f2cb0d34"
+      },
+      "bins": [
+        {
+          "lo_s": 0,
+          "hi_s": 30,
+          "count": 17,
+          "qty": 478.670322,
+          "vwap": 0.6044216252804745,
+          "raw_positive_markout_dollars": 186.240270910232,
+          "fee_adjusted_positive_markout_dollars": 180.52279697730995
+        },
+        {
+          "lo_s": 30,
+          "hi_s": 60,
+          "count": 17,
+          "qty": 298.549059,
+          "vwap": 0.7569777401301732,
+          "raw_positive_markout_dollars": 70.6134981166903,
+          "fee_adjusted_positive_markout_dollars": 67.87305035095503
+        },
+        {
+          "lo_s": 60,
+          "hi_s": 120,
+          "count": 17,
+          "qty": 607.302348,
+          "vwap": 0.9634923838586128,
+          "raw_positive_markout_dollars": 18.223695740547182,
+          "fee_adjusted_positive_markout_dollars": 17.17346341794557
+        },
+        {
+          "lo_s": 120,
+          "hi_s": 300,
+          "count": 13,
+          "qty": 298.49830000000003,
+          "vwap": 0.9793424183655316,
+          "raw_positive_markout_dollars": 4.226014050000021,
+          "fee_adjusted_positive_markout_dollars": 3.92503466800002
+        },
+        {
+          "lo_s": 300,
+          "hi_s": 600,
+          "count": 28,
+          "qty": 709.914,
+          "vwap": 0.9870706000992938,
+          "raw_positive_markout_dollars": 4.666150001110038,
+          "fee_adjusted_positive_markout_dollars": 4.218103749857967
+        }
+      ]
+    },
+    {
+      "name": "Chicago Jun29 92-93F first-lock",
+      "signal_ts": 1782766260,
+      "signal_iso": "2026-06-29T20:51:00+00:00",
+      "profit_side": "yes",
+      "token": "104731151991775829530898867001308797559508505585986273054939511693211358463775",
+      "condition_id": "0x827eb218c55d9bef7b7064ad41465f1544b4c01f8f99e293d5ad1f3dfef13ada",
+      "fee_rate": 0.05,
+      "terminal_10m_price": 0.725,
+      "post_signal_profit_token_trade_count": 14,
+      "post_signal_profit_token_qty_10m": 158.952222,
+      "gross_positive_markout_dollars_10m_prints": 0.27500000000000024,
+      "fee_adjusted_positive_markout_dollars_10m_prints": 0.11955000000000024,
+      "first_trade_after_signal": {
+        "timestamp": 1782766364,
+        "price": 0.71,
+        "size": 5,
+        "side": "SELL",
+        "transactionHash": "0x03e495588915deec9abf5ebc02d4cebdebd805f491ae00eedeff9f18348e1c14"
+      },
+      "bins": [
+        {
+          "lo_s": 0,
+          "hi_s": 30,
+          "count": 0,
+          "qty": 0,
+          "vwap": null,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        },
+        {
+          "lo_s": 30,
+          "hi_s": 60,
+          "count": 0,
+          "qty": 0,
+          "vwap": null,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        },
+        {
+          "lo_s": 60,
+          "hi_s": 120,
+          "count": 5,
+          "qty": 42.411293,
+          "vwap": 0.7521487024630501,
+          "raw_positive_markout_dollars": 0.15000000000000013,
+          "fee_adjusted_positive_markout_dollars": 0.04705000000000013
+        },
+        {
+          "lo_s": 120,
+          "hi_s": 300,
+          "count": 4,
+          "qty": 59.026594,
+          "vwap": 0.8021551946553258,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        },
+        {
+          "lo_s": 300,
+          "hi_s": 600,
+          "count": 5,
+          "qty": 57.514335,
+          "vwap": 0.8191453139413195,
+          "raw_positive_markout_dollars": 0.1250000000000001,
+          "fee_adjusted_positive_markout_dollars": 0.0725000000000001
+        }
+      ]
+    },
+    {
+      "name": "Chicago Jun20 76-77F late-extrema",
+      "signal_ts": 1781999460,
+      "signal_iso": "2026-06-20T23:51:00+00:00",
+      "profit_side": "yes",
+      "token": "60063171740228927599588563655122511401376816368472476092382143157293330443901",
+      "condition_id": "0x37165a2f57e84236aedc3317ff89c82348d27e10f73a846332a3cb1f5b654395",
+      "fee_rate": 0.05,
+      "terminal_10m_price": 0.996,
+      "post_signal_profit_token_trade_count": 2,
+      "post_signal_profit_token_qty_10m": 466.34,
+      "gross_positive_markout_dollars_10m_prints": 1.3990200000000013,
+      "fee_adjusted_positive_markout_dollars_10m_prints": 1.2369435330000011,
+      "first_trade_after_signal": {
+        "timestamp": 1781999593,
+        "price": 0.993,
+        "size": 233.17,
+        "side": "SELL",
+        "transactionHash": "0xae4bde87b148d548264ba116d1ee7f1db6db15441e054b8e9161454e8c7b73a5"
+      },
+      "bins": [
+        {
+          "lo_s": 0,
+          "hi_s": 30,
+          "count": 0,
+          "qty": 0,
+          "vwap": null,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        },
+        {
+          "lo_s": 30,
+          "hi_s": 60,
+          "count": 0,
+          "qty": 0,
+          "vwap": null,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        },
+        {
+          "lo_s": 60,
+          "hi_s": 120,
+          "count": 0,
+          "qty": 0,
+          "vwap": null,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        },
+        {
+          "lo_s": 120,
+          "hi_s": 300,
+          "count": 2,
+          "qty": 466.34,
+          "vwap": 0.993,
+          "raw_positive_markout_dollars": 1.3990200000000013,
+          "fee_adjusted_positive_markout_dollars": 1.2369435330000011
+        },
+        {
+          "lo_s": 300,
+          "hi_s": 600,
+          "count": 0,
+          "qty": 0,
+          "vwap": null,
+          "raw_positive_markout_dollars": 0.0,
+          "fee_adjusted_positive_markout_dollars": 0.0
+        }
+      ]
+    }
+  ]
+}
