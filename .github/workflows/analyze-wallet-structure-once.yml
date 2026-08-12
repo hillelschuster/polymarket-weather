@@ -1,0 +1,269 @@
+name: One-shot target wallet structure analysis
+
+on:
+  push:
+    paths:
+      - '.github/workflows/analyze-wallet-structure-once.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch taker-only view and analyze complete history
+        shell: bash
+        run: |
+          python - <<'PY'
+          import collections
+          import csv
+          import datetime as dt
+          import json
+          import math
+          import pathlib
+          import re
+          import statistics
+          import urllib.parse
+          import urllib.request
+          from zoneinfo import ZoneInfo
+
+          WALLET = '0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4f'
+          OUT = pathlib.Path('research/data')
+          OUT.mkdir(parents=True, exist_ok=True)
+
+          def get_json(base, params):
+              url = base + '?' + urllib.parse.urlencode(params)
+              req = urllib.request.Request(url, headers={'User-Agent': 'polymarket-weather-research/1.0'})
+              with urllib.request.urlopen(req, timeout=60) as r:
+                  return json.load(r)
+
+          all_trades = get_json('https://data-api.polymarket.com/trades', {
+              'user': WALLET, 'limit': 10000, 'offset': 0, 'takerOnly': 'false'
+          })
+          taker_trades = get_json('https://data-api.polymarket.com/trades', {
+              'user': WALLET, 'limit': 10000, 'offset': 0, 'takerOnly': 'true'
+          })
+
+          # A transaction can contain several matching rows. If the user's transaction appears
+          # in the official taker-only endpoint, classify its user-facing trade row(s) as taker.
+          taker_txs = {str(r.get('transactionHash','')).lower() for r in taker_trades}
+          for r in all_trades:
+              r['liquidity_role'] = 'TAKER' if str(r.get('transactionHash','')).lower() in taker_txs else 'MAKER'
+              r['notional'] = float(r.get('size') or 0) * float(r.get('price') or 0)
+
+          # Save enriched history.
+          fields = [
+              'timestamp','timestamp_utc','liquidity_role','side','size','price','notional','asset','conditionId',
+              'title','slug','eventSlug','outcome','outcomeIndex','transactionHash','name','pseudonym'
+          ]
+          with (OUT / 'target-wallet-enriched-trades.csv').open('w', newline='', encoding='utf-8') as f:
+              w = csv.DictWriter(f, fieldnames=fields, extrasaction='ignore')
+              w.writeheader()
+              for r0 in sorted(all_trades, key=lambda x:int(x.get('timestamp') or 0)):
+                  r = dict(r0)
+                  ts = int(r.get('timestamp') or 0)
+                  r['timestamp_utc'] = dt.datetime.fromtimestamp(ts, dt.timezone.utc).isoformat() if ts else ''
+                  w.writerow(r)
+
+          # City -> IANA timezones for the wallet's recurring temperature universe.
+          tzmap = {
+              'Milan':'Europe/Rome','Madrid':'Europe/Madrid','Munich':'Europe/Berlin','Paris':'Europe/Paris',
+              'Amsterdam':'Europe/Amsterdam','London':'Europe/London','Istanbul':'Europe/Istanbul','Ankara':'Europe/Istanbul',
+              'Tel Aviv':'Asia/Jerusalem','Wuhan':'Asia/Shanghai','Shanghai':'Asia/Shanghai','Beijing':'Asia/Shanghai',
+              'Guangzhou':'Asia/Shanghai','Shenzhen':'Asia/Shanghai','Chengdu':'Asia/Shanghai','Qingdao':'Asia/Shanghai',
+              'Seoul':'Asia/Seoul','Tokyo':'Asia/Tokyo','Taipei':'Asia/Taipei','Singapore':'Asia/Singapore',
+              'Hong Kong':'Asia/Hong_Kong','Karachi':'Asia/Karachi','Wellington':'Pacific/Auckland',
+              'New York City':'America/New_York','NYC':'America/New_York','Miami':'America/New_York',
+              'Chicago':'America/Chicago','Dallas':'America/Chicago','Houston':'America/Chicago',
+              'Denver':'America/Denver','Seattle':'America/Los_Angeles','San Francisco':'America/Los_Angeles',
+              'Los Angeles':'America/Los_Angeles','Toronto':'America/Toronto','Buenos Aires':'America/Argentina/Buenos_Aires',
+              'Mexico City':'America/Mexico_City',
+          }
+
+          def city_of(title):
+              m = re.search(r'temperature in (.+?) be ', title or '', re.I)
+              return m.group(1).strip() if m else None
+
+          month_num = {m:i for i,m in enumerate(['','january','february','march','april','may','june','july','august','september','october','november','december']) if m}
+          def event_date(slug):
+              s = slug or ''
+              m = re.search(r'-on-([a-z]+)-(\d{1,2})-(\d{4})(?:-|$)', s)
+              if not m: return None
+              try: return dt.date(int(m.group(3)), month_num[m.group(1).lower()], int(m.group(2)))
+              except Exception: return None
+
+          horizon = collections.Counter()
+          local_hour_t0 = collections.Counter()
+          local_hour_t1 = collections.Counter()
+          city_stats = collections.defaultdict(lambda:{'fills':0,'notional':0.0,'buys':0,'sells':0,'taker':0,'maker':0})
+          buy_notionals=[]
+          sell_notionals=[]
+          prices=[]
+          for r in all_trades:
+              c=city_of(r.get('title'))
+              if c:
+                  s=city_stats[c]
+                  s['fills']+=1; s['notional']+=r['notional']; s['taker' if r['liquidity_role']=='TAKER' else 'maker']+=1
+                  s['buys' if r.get('side')=='BUY' else 'sells']+=1
+              if r.get('side')=='BUY': buy_notionals.append(r['notional'])
+              else: sell_notionals.append(r['notional'])
+              prices.append(float(r.get('price') or 0))
+              ed=event_date(r.get('eventSlug'))
+              if c and ed and c in tzmap:
+                  utc=dt.datetime.fromtimestamp(int(r['timestamp']),dt.timezone.utc)
+                  loc=utc.astimezone(ZoneInfo(tzmap[c]))
+                  h=(ed-loc.date()).days
+                  horizon[h]+=1
+                  if h==0: local_hour_t0[loc.hour]+=1
+                  if h==1: local_hour_t1[loc.hour]+=1
+
+          # Exact-round-notional structure: distance from common $5 increments.
+          def dist_to_step(x, step):
+              return abs(x-round(x/step)*step)
+          round1=sum(1 for x in buy_notionals if dist_to_step(x,1)<=0.02)
+          round5=sum(1 for x in buy_notionals if dist_to_step(x,5)<=0.02)
+          rounded_counter=collections.Counter(round(x) for x in buy_notionals if abs(x-round(x))<=0.02)
+
+          # Event-level diversification / adjacent bucket expression.
+          events=collections.defaultdict(list)
+          for r in sorted(all_trades,key=lambda x:int(x.get('timestamp') or 0)):
+              events[r.get('eventSlug') or ''].append(r)
+          unique_conditions_per_event=[]
+          multi_bucket_events=[]
+          for ev, rows in events.items():
+              conds={r.get('conditionId') for r in rows}
+              unique_conditions_per_event.append(len(conds))
+              if len(conds)>=2:
+                  multi_bucket_events.append((ev,len(conds),sum(r['notional'] for r in rows),len(rows)))
+
+          def bucket_c(title):
+              # exact whole-C bucket only
+              m=re.search(r'be (\d+)°C on', title or '')
+              return int(m.group(1)) if m else None
+
+          # Consecutive within-event SELL -> BUY rotations.
+          rotations=[]
+          for ev, rows in events.items():
+              rows=sorted(rows,key=lambda x:int(x.get('timestamp') or 0))
+              for a,b in zip(rows,rows[1:]):
+                  lag=int(b['timestamp'])-int(a['timestamp'])
+                  if a.get('side')=='SELL' and b.get('side')=='BUY' and lag<=300:
+                      ka,kb=bucket_c(a.get('title')),bucket_c(b.get('title'))
+                      rotations.append({
+                          'event':ev,'lag_seconds':lag,'sell_title':a.get('title'),'sell_bucket':ka,
+                          'sell_price':a.get('price'),'sell_size':a.get('size'),'sell_role':a['liquidity_role'],
+                          'buy_title':b.get('title'),'buy_bucket':kb,'buy_price':b.get('price'),'buy_size':b.get('size'),
+                          'buy_role':b['liquidity_role'],'bucket_delta': (kb-ka if ka is not None and kb is not None else None),
+                          'timestamp':int(a['timestamp'])
+                      })
+          (OUT/'target-wallet-fast-rotations.json').write_text(json.dumps(rotations,indent=2),encoding='utf-8')
+
+          # UTC activity histogram.
+          utc_hours=collections.Counter(dt.datetime.fromtimestamp(int(r['timestamp']),dt.timezone.utc).hour for r in all_trades)
+
+          # Core exact Milan sequence and raw economics.
+          milan=[]
+          for r in sorted(all_trades,key=lambda x:int(x.get('timestamp') or 0)):
+              text=' '.join([str(r.get('title','')),str(r.get('eventSlug',''))]).lower()
+              if 'milan' in text and ('june-25-2026' in text or 'june 25' in text or 'june-30-2026' in text or 'june 30' in text):
+                  milan.append(r)
+
+          lines=[]
+          lines += ['# Target wallet — complete official-trade structural analysis','',
+                    f'Generated: **{dt.datetime.now(dt.timezone.utc).isoformat()}**','',
+                    f'Wallet: `{WALLET}`','',
+                    'Sources: official Polymarket Data API `/trades` with both `takerOnly=false` and `takerOnly=true`.','']
+          lines += [f'- total fills: **{len(all_trades):,}**',
+                    f'- taker-only endpoint rows: **{len(taker_trades):,}**',
+                    f'- rows classified TAKER by transaction hash: **{sum(r["liquidity_role"]=="TAKER" for r in all_trades):,}**',
+                    f'- rows classified MAKER: **{sum(r["liquidity_role"]=="MAKER" for r in all_trades):,}**',
+                    f'- raw traded notional: **${sum(r["notional"] for r in all_trades):,.2f}**',
+                    f'- BUY fills: **{sum(r.get("side")=="BUY" for r in all_trades):,}**; SELL fills: **{sum(r.get("side")=="SELL" for r in all_trades):,}**','']
+
+          lines += ['## Horizon distribution (local event date minus local trade date)','']
+          for h,n in sorted(horizon.items()):
+              lines.append(f'- T{h:+d}: **{n:,} fills**')
+          lines += ['', 'T+0 local-hour fill counts: `' + ', '.join(f'{h:02d}:{local_hour_t0[h]}' for h in range(24) if local_hour_t0[h]) + '`',
+                    '', 'T+1 local-hour fill counts: `' + ', '.join(f'{h:02d}:{local_hour_t1[h]}' for h in range(24) if local_hour_t1[h]) + '`','']
+
+          lines += ['## Execution role','',
+                    'Role is inferred only from the official API differential: if the transaction appears in the same user query with `takerOnly=true`, its user trade row is classified as TAKER; otherwise MAKER.',
+                    'This should be cross-checked against `OrdersMatched.takerOrderMaker` on a sample before using it for fee accounting.','']
+          buy_t=sum(1 for r in all_trades if r.get('side')=='BUY' and r['liquidity_role']=='TAKER')
+          buy_m=sum(1 for r in all_trades if r.get('side')=='BUY' and r['liquidity_role']=='MAKER')
+          sell_t=sum(1 for r in all_trades if r.get('side')=='SELL' and r['liquidity_role']=='TAKER')
+          sell_m=sum(1 for r in all_trades if r.get('side')=='SELL' and r['liquidity_role']=='MAKER')
+          lines += [f'- BUY: **{buy_t:,} taker / {buy_m:,} maker**',f'- SELL: **{sell_t:,} taker / {sell_m:,} maker**','']
+
+          lines += ['## Sizing structure','',
+                    f'- BUY fills within 2¢ of an exact $1 raw notional: **{round1:,}/{len(buy_notionals):,}**',
+                    f'- BUY fills within 2¢ of an exact $5 raw notional: **{round5:,}/{len(buy_notionals):,}**',
+                    '- most common exact-dollar BUY notionals:']
+          for val,n in rounded_counter.most_common(20): lines.append(f'  - `${val}`: **{n} fills**')
+          lines += ['']
+
+          lines += ['## City concentration','']
+          for c,s in sorted(city_stats.items(),key=lambda kv:kv[1]['notional'],reverse=True)[:25]:
+              lines.append(f'- **{c}** — {s["fills"]} fills, ${s["notional"]:,.0f} raw notional, {s["buys"]} buys/{s["sells"]} sells, {s["taker"]} taker/{s["maker"]} maker')
+          lines += ['']
+
+          lines += ['## Multi-bucket event expression','',
+                    f'- unique event slugs traded: **{len(events):,}**',
+                    f'- events where wallet traded >=2 binary buckets: **{len(multi_bucket_events):,}**',
+                    f'- median distinct buckets/event: **{statistics.median(unique_conditions_per_event) if unique_conditions_per_event else 0}**','',
+                    'Top multi-bucket events by raw notional:']
+          for ev,k,notional,nrows in sorted(multi_bucket_events,key=lambda x:x[2],reverse=True)[:20]:
+              lines.append(f'- `{ev}` — **{k} buckets**, {nrows} fills, **${notional:,.2f}**')
+          lines += ['']
+
+          lines += ['## Fast within-event SELL → BUY rotations (<=5 minutes)','',
+                    f'- total detected: **{len(rotations)}**']
+          deltas=collections.Counter(r['bucket_delta'] for r in rotations if r['bucket_delta'] is not None)
+          if deltas: lines.append('- exact-C bucket deltas: `' + ', '.join(f'{k:+d}°C:{v}' for k,v in sorted(deltas.items())) + '`')
+          lines += ['']
+          for r in sorted(rotations,key=lambda x:x['timestamp'])[:40]:
+              when=dt.datetime.fromtimestamp(r['timestamp'],dt.timezone.utc).isoformat()
+              lines.append(f'- `{when}` `{r["event"]}` — SELL {r["sell_bucket"]}°C @ {r["sell_price"]} → {r["lag_seconds"]}s → BUY {r["buy_bucket"]}°C @ {r["buy_price"]}; delta `{r["bucket_delta"]}`; roles {r["sell_role"]}/{r["buy_role"]}')
+          lines += ['']
+
+          lines += ['## UTC fill-hour histogram','', '`' + ', '.join(f'{h:02d}:{utc_hours[h]}' for h in range(24)) + '`','']
+
+          lines += ['## Milan June 25 / June 30 — exact official rows','']
+          for r in milan:
+              when=dt.datetime.fromtimestamp(int(r['timestamp']),dt.timezone.utc).isoformat()
+              lines.append(f'- `{when}` — **{r["side"]} {r["size"]} @ {r["price"]}** (${r["notional"]:.6f} raw) — {r["title"]} — **{r["liquidity_role"]}** — tx `{r["transactionHash"]}`')
+          lines += ['']
+
+          # Specific raw 33C round trip if rows are present.
+          b33=[r for r in milan if '33°C' in str(r.get('title')) and r.get('side')=='BUY']
+          s33=[r for r in milan if '33°C' in str(r.get('title')) and r.get('side')=='SELL']
+          if b33 and s33:
+              b=b33[0]; s=s33[0]
+              matched=min(float(b['size']),float(s['size']))
+              raw=matched*(float(s['price'])-float(b['price']))
+              held=int(s['timestamp'])-int(b['timestamp'])
+              lines += ['### Milan June 25 33°C realized raw round trip','',
+                        f'- matched shares: **{matched:.6f}**',
+                        f'- entry: **{100*float(b["price"]):.4f}¢**',
+                        f'- exit: **{100*float(s["price"]):.4f}¢**',
+                        f'- raw price PnL before fees: **${raw:.4f}**',
+                        f'- holding time: **{held/3600:.2f} hours**','']
+
+          lines += ['## Evidence-quality note','',
+                    'The file is complete with respect to the current official `/trades` response because it returned fewer than 10,000 rows. It still does not include CTF merge/split/redemption actions, so event-level cash PnL requires a later `/activity`/on-chain reconciliation.','']
+
+          (OUT/'target-wallet-structure-analysis.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+          PY
+
+      - name: Commit analysis
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/data/target-wallet-enriched-trades.csv research/data/target-wallet-fast-rotations.json research/data/target-wallet-structure-analysis.md
+          git diff --cached --quiet && exit 0
+          git commit -m "research: decompose target wallet execution structure"
+          git push
