@@ -33,6 +33,31 @@ Realized net PnL is the scoreboard.
 13. **Keep implementation small.** Direct APIs, explicit formulas, compact data tables and understandable code are preferred. Complexity earns its place through expected net income.
 14. **Rank by dollars, not beauty.** Compare expected PnL/day, capacity, turnover, capital lock, correlation and decay. A smaller percentage edge with much larger capacity can dominate.
 
+## Current implementation priority — 2026-08-14
+
+Read first:
+
+- `research/exploitative-alpha-discovery-2026-08-14.md`
+- `research/next-research.md`
+
+The next highest-value component is a **single synchronized first-seen information + Polymarket L2 recorder**. It should capture exact resolver metadata, raw station observations, model-vintage first availability, complete relevant order-book state and order/fill lifecycle timestamps under one clock.
+
+This measurement comes before another broad model build because it determines:
+
+- whether ASOS/METAR information actually leads the book;
+- whether AIFS/GFS/HRRR revisions actually lead the book;
+- how much stale executable depth exists after each information shock;
+- maker adverse selection and information-response half-life;
+- the real capacity curve of each candidate signal.
+
+Production routing should use one resolver-aligned probability surface:
+
+- **ordinary state:** maker-first around calibrated fair value;
+- **fresh information shock:** cancel stale quotes, then take only depth with positive marginal EV after fee, spread, impact and model uncertainty;
+- **structural opportunity:** continuously scan full-ladder / NegRisk equivalents, but count profit only after all leg costs and fill risk.
+
+Never hard-code city -> resolver station assumptions. Parse and archive the exact contract rules/source/station/unit/bucket/cutoff metadata before a market becomes tradeable.
+
 ## Core research question
 
 > What information about a weather settlement becomes knowable before Polymarket prices it correctly, and what is the highest-PnL way to monetize that gap?
