@@ -1,249 +1,291 @@
 # Weather alpha research — current synthesis
 
-Snapshot: **2026-08-11**
+Snapshot: **2026-08-14**
 
-## Verdict
+## Current authoritative research document
 
-Weather is a real, monetized Polymarket niche. The all-time WEATHER leaderboard currently contains multiple six-figure winners and several traders with more than $10M of weather volume. That establishes economic opportunity at category level. The research problem is to identify which repeatable mechanisms generate the profits and which of them remain accessible.
+Read first:
 
-The strongest formulation is broader than “forecast better than the crowd”:
+- [`exploitative-alpha-discovery-2026-08-14.md`](exploitative-alpha-discovery-2026-08-14.md)
 
-> **Estimate the exact settlement distribution faster and more accurately than the marginal trader, then monetize the discrepancy through the cheapest executable path.**
+It consolidates the current executive edge matrix, the six exploitation vectors, corrected fee/resolver mechanics, mathematical pricing rules, data pipelines, execution routing, failure modes and the profit-ranked implementation roadmap.
 
-Six engines can produce PnL:
+## Current verdict
 
-1. **Resolver-specific forecast calibration** — probability of the exact station/source bucket, including rounding and civil-day rules.
-2. **State-conditioning / certainty collapse** — update daily maxima, minima and cumulative totals as observations arrive.
-3. **Information-release latency** — new model runs and official observations can move fair value before the order book fully moves.
-4. **Cross-outcome structure** — mutually exclusive ladders and negative-risk conversions create relative-value constraints.
-5. **Wallet information** — profitable weather specialists reveal timing, city, horizon and price fingerprints.
-6. **Execution alpha** — maker pricing, spread capture, rebates and informed quote placement can convert the same forecast into more net PnL than crossing the book.
+Weather is a real, monetized Polymarket niche, but the strongest formulation is not merely “forecast better than the crowd.”
 
-## Public evidence that specialists make money
+> **Estimate the exact settlement probability surface from point-in-time information, then monetize it through the cheapest executable route before the marginal market participant updates.**
 
-Current Polymarket WEATHER leaderboard snapshots show approximately:
+The production design should therefore be one resolver-aligned probability engine with two regimes:
 
-- `gopfan2`: +$349k all-time WEATHER PnL;
-- `aenews2`: +$285k;
-- `ColdMath`: +$136k;
-- `gopfan`: +$118k;
-- `Poligarch`, `Hans323`, `automatedAItradingbot`, `WeatherTraderBot`, `HighTempTation` and others with substantial weather profit.
+1. **Maker-first in ordinary information states** — quote around fair value, exploit the full mutually-exclusive ladder and NegRisk relationships, and demand enough margin to survive fill-conditioned adverse selection.
+2. **Taker after fresh information shocks** — cancel stale quotes first, recompute the distribution, and cross only depth whose probability edge remains positive after Weather taker fees, spread, impact and model uncertainty.
 
-The WEATHER volume leaderboard includes several accounts above $10M of category turnover.
+The most important missing evidence is a **synchronized first-seen information + full Polymarket L2 dataset**. It is the common experiment for ASOS observation latency, AIFS/GFS/HRRR release latency, stale depth, maker toxicity, response half-life and real capacity.
 
-This is category evidence rather than proof of one strategy. WEATHER contains daily temperature, climate/global-temperature, precipitation, wind and other markets. Contract-level decomposition is therefore the useful unit of research.
+## Current alpha ranking
 
-Sources:
-- https://polymarket.com/leaderboard/weather/all/profit
-- https://polymarket.com/leaderboard/weather/all/volume
+### 1. Forecast-aware maker / full-ladder NegRisk trading
 
-## The supplied forecasting wallet is especially informative
+Why it ranks first in aggregate-dollar potential:
 
-Profile:
-`0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4f`
+- can monetize repeated customer flow instead of waiting only for large directional signals;
+- Weather makers currently pay zero platform trading fee on fee-enabled markets;
+- maker rebates can improve economics when eligible;
+- the same coherent weather probability surface identifies modal, tail and relative-value mispricing;
+- direct repo evidence proves profitable specialist Weather maker activity.
 
-On the 2026-08-11 snapshot the account shows:
+Primary evidence:
+- [`forecast-aware-maker-merge.md`](forecast-aware-maker-merge.md)
+- [`market-microstructure.md`](market-microstructure.md)
+- [`execution-economics-third-pass.md`](execution-economics-third-pass.md)
 
-- 792 predictions;
-- about $4.5k of open position value;
-- +$1,018.71 past-day PnL;
-- large exact-bucket YES positions spread across Istanbul, Tel Aviv, Madrid, Milan, Wuhan, Karachi, Munich, Mexico City, Paris, Singapore, Miami, Denver, Wellington, Amsterdam, Ankara and Shanghai.
+Primary missing statistic:
 
-Several same-day positions were bought around 47–67¢ and had repriced near $1 by the snapshot: Istanbul 27°C, Tel Aviv 35°C, Milan 36°C, Karachi 32°C and Munich 31°C. The wallet also holds next-day modal-bucket positions such as Madrid 38°C and Tel Aviv 35°C.
+`spread captured + rebate + fill-conditioned markout`, stratified by information state.
 
-**Inference:** the visible portfolio is more consistent with a strategy that buys exact modal buckets as weather uncertainty collapses than with a generic “fade longshots” strategy. The account combines T+0 and T+1 forecasts across many international cities. Trade timestamps and historical closed positions are required to identify whether the dominant edge is forecast-vintage timing, live-observation conditioning, or both.
+### 2. US ASOS extrema / resolver-state certainty collapse
 
-Profile source:
-https://polymarket.com/@0xbddc2a7690bf600e347d5eb4a9c28f9f24e55d4f-1774968947489
+Why it is the strongest directional thesis:
 
-## The most promising daily-temperature edge: certainty collapse
+- the resolver-relevant observation can differ from generic displayed METAR temperature;
+- whole-C transmission can lose whole-F bucket information;
+- T-groups, SPECI and six-hour extrema can reveal the peak state with higher resolver fidelity;
+- after the likely physical peak, the problem reduces from forecasting the whole day to estimating only the probability of exceeding the already-observed maximum.
 
-For a daily high, define:
+Primary evidence:
+- [`us-asos-observation-alpha.md`](us-asos-observation-alpha.md)
+- [`us-asos-case-studies.md`](us-asos-case-studies.md)
+- [`us-asos-low-alpha.md`](us-asos-low-alpha.md)
+- [`city-source-map.md`](city-source-map.md)
 
-- `M_t` = maximum already observed at the exact resolution station by time `t`;
-- `R_t` = maximum temperature over the remaining local civil day;
-- `H = max(M_t, R_t)` = final resolver high.
+Primary missing statistic:
 
-Once the station has already printed a value inside bucket `b`, downside probability below `b` vanishes. As the likely daily peak passes, the remaining probability of exceeding the next rounding boundary can collapse quickly.
+`source_first_seen -> CLOB_first_reprice` latency distribution plus executable stale depth.
 
-The tradeable quantity becomes:
+### 3. AIFS / NWP first-seen probability revisions
 
-`q_b(t) = P(round_resolver(max(M_t, R_t)) == b | information available at t)`
+The edge is not the nominal 00/06/12/18 cycle. It is the **actual first public availability** of target information relative to market repricing.
 
-This is fundamentally different from forecasting tomorrow's high from scratch.
+ECMWF's public dissemination asymmetry makes AIFS a serious candidate, but the repo has already verified an important limitation: free AIFS output is not a direct daily-maximum oracle. It must be transformed into station-calibrated bucket probabilities and evaluated as a probability **revision**.
 
-A strong implementation can condition every forecast member on current station error:
+Primary evidence:
+- [`aifs-hypothesis-finalization-2026-08-13.md`](aifs-hypothesis-finalization-2026-08-13.md)
+- [`aifs-public-timing-profit-thesis-2026-08-13.md`](aifs-public-timing-profit-thesis-2026-08-13.md)
+- [`milan-18z-release-case.md`](milan-18z-release-case.md)
+- [`release-timing.md`](release-timing.md)
 
-`x*_{m,h} = x_{m,h} + bias(model, station, lead) + alpha(h-t) * (obs_t - x_{m,t}) + residual_dressing`
+Primary missing statistic:
 
-Then:
+`Delta q_model -> subsequent market markout`, using real first-seen timestamps rather than model initialization clocks.
 
-`H_m(t) = max(M_t, max_{h>t} x*_{m,h})`
+### 4. Climate-vintage replication
 
-The empirical distribution of `H_m(t)` is mapped through the contract's actual rounding/bucket function. Historical station-specific residual calibration converts raw members into reliable bucket probabilities.
+GISTEMP, annual-rank and seasonal-extreme markets have lower turnover but potentially much higher capacity.
 
-This mechanism has a causal reason to persist: the physical process becomes more constrained during the day, while traders and generic bots may still reference stale point forecasts or lagging web summaries.
+The point-in-time requirement is decisive: public upstream vintages must be archived when actually available. Today's `latest` file is not historical evidence of what could have been traded earlier.
 
-## US short-range markets have richer data than most public bots use
+Primary evidence / tools:
+- [`gistemp-basis-alpha.md`](gistemp-basis-alpha.md)
+- [`gistemp-input-vintages.md`](gistemp-input-vintages.md)
+- [`gistemp-first-release-labels.md`](gistemp-first-release-labels.md)
+- [`annual-rank-alpha.md`](annual-rank-alpha.md)
+- `../scripts/gistemp_input_watch.py`
+- `../scripts/gistemp_market_watch.py`
 
-Two NOAA products are unusually aligned with US temperature contracts:
+Primary missing statistic:
 
-### LAMP
+first public vintage where a resolver bracket becomes highly concentrated **and** meaningful stale executable depth still exists.
 
-NOAA Localized Aviation MOS Program guidance is station-specific, updates hourly for most elements, incorporates recent station observations plus model/MOS information, and provides temperature guidance to roughly 38 hours.
+### 5. Spatial/upwind propagation
 
-That makes LAMP a natural feature for T+0/T+1 airport settlement markets.
+Use physical propagation only where it improves the **remaining exceedance probability** after conditioning on current local resolver state.
 
-### NBM
+Useful phenomena:
 
-The National Blend of Models publishes probabilistic MaxT fields including mean, standard deviation, percentiles and threshold probabilities. The blend is already designed as a calibrated probabilistic guidance product rather than a raw deterministic forecast.
+- fronts;
+- convection;
+- marine layer / sea-breeze boundaries;
+- precipitation bands;
+- cloud/radiation transitions.
 
-A profitable US stack should compare, rather than blindly average:
+Do not build a giant generic nowcasting stack before the point-in-time station/radar dataset proves incremental resolver PnL.
 
-- live exact-station observations;
-- LAMP station guidance;
-- NBM probabilistic MaxT;
-- HRRR/HREF short-range guidance;
-- GFS MOS;
-- ECMWF ENS.
+### 6. Specialist-wallet reverse engineering
 
-The target is resolver-bucket log loss / trading PnL, not generic weather MAE.
+Public specialist flow is most useful as a way to infer:
 
-## Global city markets create geographic attention asymmetry
+- hidden information sources;
+- release clocks;
+- city/horizon specialization;
+- maker versus taker routing;
+- sizing and price bands;
+- capacity.
 
-The supplied wallet is active in cities such as Wuhan, Karachi, Ankara, Wellington, Tel Aviv and Shanghai as well as major Western cities. Public projects often emphasize NYC/London/Miami and route global forecasts through Open-Meteo.
+It is not most useful as generic copy-trading after the fill is already public.
 
-That suggests a useful specialization strategy:
+Primary evidence:
+- [`wallets.md`](wallets.md)
+- [`wallet-history-acquisition.md`](wallet-history-acquisition.md)
+- [`wallet-history-followup.md`](wallet-history-followup.md)
+- [`wallet-forecast-purity.md`](wallet-forecast-purity.md)
+- [`specialist-archetypes.md`](specialist-archetypes.md)
+- [`milan-18z-release-case.md`](milan-18z-release-case.md)
 
-- map every Polymarket city to its resolver station;
-- map every resolver to the best local/national observation and NWP source;
-- measure where direct/local data beats popular global aggregators;
-- rank cities by incremental forecast skill × market volume × spread × response latency.
+### 7. Pure structural / complete-set arbitrage
 
-The underexploited edge may therefore be **city-specific data plumbing plus calibration**, not one universal weather model.
+Always scan because it is mathematically cheap. But displayed ladder sums are not executable profit unless all fees, depth, partial fills, leg movement and NegRisk conversion economics are included.
 
-## Resolution mechanics are themselves alpha
+For mutually exclusive exhaustive YES outcomes with asks `a_i`, a simple fee-adjusted basket condition is:
 
-Public projects have repeatedly lost money or fabricated backtest edge by targeting the wrong data source or station.
+`sum_i a_i + 0.05 * sum_i[a_i * (1-a_i)] + impact < 1`.
 
-One open-source project (`jattree/weather-edge`) reported a $210 → $51.61 live run. Its later audit found that the run used, at different times, gridded reanalysis instead of the resolver feed, incorrect stations, incorrect Fahrenheit bucket integration and multi-bucket execution. Its later review concluded the weather alpha had never actually been measured under correct plumbing.
+Equivalent NegRisk token representations should also be searched.
 
-This matters economically because a 1°C station/source error is the width of many international buckets.
+## Resolver discipline
 
-Current Polymarket rules vary by market:
+Never hard-code city -> station assumptions. Every active event must be parsed for:
 
-- Paris daily high: Wunderground Daily Observations at Paris-Le Bourget `LFPB`;
-- Wuhan: Wunderground at Wuhan Tianhe `ZHHH`;
-- Shanghai: Wunderground at Pudong `ZSPD`;
-- Ankara: Wunderground at Esenboğa `LTAC`;
-- Tel Aviv: current rules use NOAA WRH station data at Ben Gurion `LLBG`;
-- Hong Kong low-temperature markets can resolve directly from Hong Kong Observatory Daily Extract data.
+```text
+source / station
+timezone / day definition
+native unit
+bucket boundaries
+precision / rounding
+cutoff / revision convention
+outcome token IDs
+NegRisk relationship
+fee schedule / tick / min size
+```
 
-Rules, units and even source families vary through time. Parse each event rather than hard-code a permanent city convention.
+The same city can use different source/station conventions across markets or time. The prediction target is the contract's exact resolver object.
 
-## US Fahrenheit resolver reconstruction contains a niche technical edge
+Primary reference:
+- [`city-source-map.md`](city-source-map.md)
+- [`resolution-alpha.md`](resolution-alpha.md)
+- [`data-quality.md`](data-quality.md)
 
-Iowa Environmental Mesonet documentation highlights a subtle issue: official US ASOS temperature observations are internally based on whole-degree Fahrenheit conventions, while routine METAR temperature transmission is commonly whole Celsius and can be distorted by Fahrenheit↔Celsius round trips. IEM prioritizes higher-precision T-groups and incorporates special/max-temperature reports where available.
+## Current core formulas
 
-Therefore `max(routine METAR temp_c) -> convert to °F -> round` is not always the same object as the eventual official daily high.
+### Taker expected value
 
-For 2°F US Polymarket buckets, this difference can move the winning contract. Exact ASOS/DSM/CLI/T-group logic deserves explicit modeling.
+For YES fair probability `q` and executable ask `a`:
 
-## Market price is a feature, not an opponent to ignore
+`fee(a) = 0.05 * a * (1-a)`
 
-The market itself aggregates information. The strongest forecaster can learn the residual value of weather information relative to the market:
+`EV_taker/share = q - a - fee(a) - impact - model_uncertainty_margin`.
 
-`P(Y=i | weather_state, market_distribution, wallet_flow, microstructure)`
+### Remaining-extreme probability
 
-A practical hierarchy is:
+For daily high:
 
-1. calibrated weather-only distribution `q_weather`;
-2. coherent market distribution `q_market` projected onto the probability simplex;
-3. learned combination whose weight varies by city, horizon and market state;
-4. trade the residual between the combined probability and executable price.
+`H = max(M_t, X_t)`
 
-This allows the crowd to contribute information while preserving an independent weather edge.
+where `M_t` is the resolver-compatible maximum already observed and `X_t` is the future maximum over the remaining resolver day.
 
-## Full-ladder probability is the correct object
+Trade the bucket vector:
 
-A temperature event with `K` mutually exclusive buckets has:
+`q_i(t) = P(H in bucket_i | point-in-time information)`.
 
-`sum_i q_i = 1`
+After the likely peak, the key state becomes:
 
-Polymarket negative-risk mechanics link a NO share in one outcome to YES shares in the others. That turns the event into a structured relative-value surface.
+`P(X_t > M_t | information)`.
 
-Useful calculations include:
+### Maker quotes
 
-- coherent weather probabilities across all buckets;
-- coherent executable market probabilities;
-- deviations after projecting market prices onto the simplex;
-- NO_i versus the basket of other YES outcomes;
-- fee/depth-adjusted all-outcome basket prices;
-- relative-value trades where weather information identifies which local distortion is wrong.
+For fair YES `q`:
 
-## Execution changes the edge materially
+`YES_bid = q - mY`
 
-Polymarket currently lists Weather with:
+`NO_bid = 1 - q - mN`.
 
-- taker fee rate `0.05` on fee-enabled contracts;
-- maker fee `0`;
-- 25% of collected Weather taker fees allocated to the maker-rebate pool.
+If equal complementary quantities fill, raw pair capture is:
 
-Fee per share:
+`mY + mN`.
 
-`fee(p) = 0.05 * p * (1-p)`
+But maker profitability must be evaluated after fill-conditioned adverse selection and capital time.
 
-For a YES bought at executable ask `a` and held to resolution:
+### Effective-cost Kelly
 
-`EV_taker/share = q - a - fee(a)`
+With effective one-share cost `c` and calibrated/shrunk win probability `p`:
 
-The displayed Polymarket price is normally the bid/ask midpoint and can switch to last trade when spread exceeds $0.10. It is therefore unsuitable as the final execution price.
+`f* = (p - c) / (1 - c)`.
 
-A weather strategy with modest informational edge may monetize better by posting informed liquidity around fair value, especially in wide global-city ladders. The relevant comparison is expected dollars from crossing now versus expected dollars from a maker order after fill probability, adverse-selection markout and rebate.
+Capacity is additionally limited to book depth where marginal net EV remains positive.
 
-Sources:
-- https://docs.polymarket.com/trading/fees
-- https://docs.polymarket.com/market-makers/maker-rebates
-- https://docs.polymarket.com/concepts/prices-orderbook
-- https://docs.polymarket.com/advanced/neg-risk
+## Minimum data architecture
 
-## Weather market families extend beyond daily highs
+The desired production core remains deliberately small:
 
-The same mathematical framework applies to several current Polymarket families:
+```text
+market_discovery.py
+resolver.py
+live_latency_capture.py
+weather_observations.py
+model_vintages.py
+probability.py
+clob.py
+strategy.py
+ledger.py
+```
 
-### Daily lows
+The new highest-value component is `live_latency_capture.py`, which should append synchronized point-in-time records for:
 
-`L = min(m_t, remaining_min)`.
+- complete relevant Polymarket L2;
+- trades / book state;
+- exact resolver metadata;
+- raw station observations and first-seen times;
+- model-vintage first-seen times and hashes;
+- derived probability revisions;
+- order/fill lifecycle timestamps.
 
-Information becomes one-sided as the night/morning minimum is observed.
+No broader infrastructure is justified before this dataset proves where executable alpha survives.
 
-### Monthly precipitation
+## Profit-ranked next work
 
-`P_month = observed_accumulation_t + remaining_precipitation`.
+See [`next-research.md`](next-research.md).
 
-Observed rainfall is permanent state; uncertainty decreases as the month advances. Current NYC August precipitation markets resolve from NOAA Central Park monthly summarized precipitation.
+Current order:
 
-### Monthly wind maximum
+1. synchronized first-seen weather/model + full-L2 capture;
+2. exact resolver metadata parser;
+3. US ASOS extrema replay/live state;
+4. maker fill/markout simulator;
+5. AIFS first-seen prospective experiment;
+6. GFS/HRRR extension;
+7. finish the GISTEMP forward experiment;
+8. monthly climate -> annual-rank propagation;
+9. specialist decomposition only when it can change a signal/execution rule;
+10. spatial propagation augmentation after point-in-time data exists.
 
-`W_month = max(observed_max_t, remaining_wind_max)`.
+## Evidence hierarchy
 
-Mt. Washington August markets resolve from Mount Washington Observatory F6 data. Extreme-wind probability is strongly conditional on tropical-cyclone and synoptic forecasts.
+Use, in order:
 
-### Global temperature anomaly
+1. live net PnL;
+2. production-fidelity shadow results;
+3. realistic real-time paper execution;
+4. strict point-in-time replay;
+5. conventional backtest;
+6. theory.
 
-Current monthly anomaly ladders resolve from NASA GISTEMP. NASA publishes a 2026 release schedule; August data are scheduled for September 10 at 11:00 AM EDT. ERA5T daily data arrive about five days behind real time and monthly means about five days after month-end. A calibrated historical mapping from partial-month/ERA5T/global datasets into eventual GISTEMP bins is a high-capacity research path.
+Do not promote estimates, hypotheses or retrospective proxies into stronger evidence grades.
 
-## Ranked alpha priorities
+## Broader references
 
-Current research ranking by expected combination of edge, persistence and capacity:
+- [`edge-thesis.md`](edge-thesis.md)
+- [`weather-math.md`](weather-math.md)
+- [`market-families.md`](market-families.md)
+- [`data-sources.md`](data-sources.md)
+- [`point-in-time-forecast-reconstruction.md`](point-in-time-forecast-reconstruction.md)
+- [`model-priority-matrix.md`](model-priority-matrix.md)
+- [`calibration-design.md`](calibration-design.md)
+- [`public-bot-code-audit.md`](public-bot-code-audit.md)
+- [`zero-edge-paper-audit.md`](zero-edge-paper-audit.md)
+- [`deep-research-2026-08-11.md`](deep-research-2026-08-11.md)
 
-1. **T+0 exact-bucket certainty collapse at resolver stations.**
-2. **T+1 station-calibrated full-ladder forecasting, especially under-followed international cities.**
-3. **Forecast/observation release-latency event studies.**
-4. **Profitable-wallet timing and consensus as an incremental feature.**
-5. **Informed maker execution around weather fair value.**
-6. **Cross-bucket/negative-risk relative value.**
-7. **GISTEMP monthly anomaly nowcasting for larger-capacity climate contracts.**
-8. **Cumulative precipitation and monthly-extreme markets.**
+## Bottom line
 
-Ranking should evolve with measured expected dollar PnL/day and capacity.
+The project no longer needs another broad weather-model survey before measurement infrastructure.
+
+> **Build one synchronized first-seen information + L2 dataset, then allocate capital to whichever of ASOS sniping, model-vintage taking, maker quoting, climate replication or structural baskets produces the highest genuine net dollars per unit of capital time.**
