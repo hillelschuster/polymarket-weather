@@ -22,6 +22,7 @@ DATA = os.path.join(ROOT, "data")
 os.makedirs(DATA, exist_ok=True)
 DET = os.path.join(DATA, "detections.jsonl")
 CLO = os.path.join(DATA, "closures.jsonl")
+SURVEY = os.path.join(DATA, "survey.jsonl")
 SEEN = os.path.join(DATA, "seen.json")
 RUNLOG = os.path.join(DATA, "run.log")
 
@@ -136,13 +137,14 @@ def fetch_events():
 
 def fetch_obs(events):
     need = sorted({MAP[e["city"]][0] for e in events if MAP[e["city"]][0] != "hko"})
-    temps, raws = {}, {}
+    temps, raws, times = {}, {}, {}
     for i in range(0, len(need), 12):
         try:
             ms = get("https://aviationweather.gov/api/data/metar?ids=%s&format=json" % ",".join(need[i:i+12]))
             for m in ms:
                 temps[m["icaoId"]] = m.get("temp")
                 raws[m["icaoId"]] = m.get("rawOb") or ""
+                times[m["icaoId"]] = m.get("obsTime")
         except Exception as ex:
             say("metar chunk err: %s" % ex)
     try:
@@ -150,14 +152,18 @@ def fetch_obs(events):
         temps["hko"] = next((s["value"] for s in r.get("temperature", {}).get("data", [])
                              if s.get("place") == "Hong Kong Observatory"), None)
         raws["hko"] = ""
+        try:
+            times["hko"] = datetime.fromisoformat(r.get("updateTime")).timestamp()
+        except Exception:
+            times["hko"] = None
         if "VHHH" not in temps:
             try:
                 ms = get("https://aviationweather.gov/api/data/metar?ids=VHHH&format=json")
-                if ms: temps["VHHH"] = ms[0].get("temp"); raws["VHHH"] = ms[0].get("rawOb") or ""
+                if ms: temps["VHHH"] = ms[0].get("temp"); raws["VHHH"] = ms[0].get("rawOb") or ""; times["VHHH"] = ms[0].get("obsTime")
             except Exception: pass
     except Exception as ex:
         say("hko err: %s" % ex)
-    return temps, raws
+    return temps, raws, times
 
 def bucket_parse(gt):
     """-> (lo, hi, val) in market units; None if unparseable."""
@@ -336,7 +342,7 @@ def cycle(events_cache):
     if events_cache is None or (now - events_cache[0]).total_seconds() > EVENT_CACHE_SEC:
         events_cache = (now, fetch_events())
     events = events_cache[1]
-    temps, raws = fetch_obs(events)
+    temps, raws, times = fetch_obs(events)
     seen = load_seen()
     pending = {}
     try:
@@ -381,15 +387,41 @@ def cycle(events_cache):
         runmax, runmin = running.get(src, (None, None))
         book = top_of_book(e)
         active += 1
+
+        # ---- SURVEY: record EVERY in-window state (denominator) regardless of detectors ----
+        is_low = e["title"].startswith("Lowest")
+        is_f = city in US_F
+        anchor = runmin if is_low else runmax
+        anchor_m = (anchor * 9 / 5 + 32) if (anchor is not None and is_f) else anchor
+        minutes_to_lock = round(((dawn if is_low else lastlight) - local_hour) * 60)
+        obs_t = times.get("VHHH" if src == "hko" else src)
+        obs_age_min = round((now.timestamp() - obs_t) / 60, 1) if obs_t else None
+        rel = []
+        for r in book:
+            contains = anchor_m is not None and r["lo"] <= anchor_m < r["hi"]
+            adjacent = anchor_m is not None and (0 < anchor_m - r["hi"] <= 1.6 or 0 < r["lo"] - anchor_m <= 1.6)
+            cheap = r["yes_ask"] is not None and r["yes_ask"] <= 0.02
+            if contains or adjacent or cheap:
+                bd = round(min(anchor_m - r["lo"], r["hi"] - anchor_m), 2) if contains else None
+                rel.append({"b": r["bucket"], "bid": r["yes_bid"], "ask": r["yes_ask"],
+                            "ask_sz": r["yes_ask_sz"], "contains": contains, "bd": bd})
+        log(SURVEY, {"ts": now.isoformat(), "title": e["title"], "city": city,
+                     "side": "low" if is_low else "high", "min_to_lock": minutes_to_lock,
+                     "runmax": runmax, "runmin": runmin, "obs": obs, "obs_age_min": obs_age_min,
+                     "precip": precip, "buckets": rel})
+
         for d in detectors(e, MAP[city], local_hour, obs, precip, book, runmax, runmin):
             if d.get("shares", 0) < 5:   # CLOB minimum order size
                 continue
             key = f"{e['title']}|{d['bucket']}|{d['side']}"
             if key in seen: continue
             seen.add(key)
+            bd = next((x["bd"] for x in rel if x["b"] == d["bucket"] and x["bd"] is not None), None)
             rec = {"ts": now.isoformat(), "key": key, "city": city, "title": e["title"],
                    "slug": e.get("slug"), "end": e["endDate"], "resolver_obs_c": obs,
-                   "runmax_c": runmax, "runmin_c": runmin, **d}
+                   "runmax_c": runmax, "runmin_c": runmin,
+                   "minutes_to_lock": minutes_to_lock, "obs_age_min": obs_age_min,
+                   "boundary_distance": bd, **d}
             log(DET, rec)
             pending[key] = rec
             px = d.get("yes_ask") if d["side"] == "YES" else round(1 - d["yes_bid"], 3)
