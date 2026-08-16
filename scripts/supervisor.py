@@ -1,0 +1,414 @@
+"""Detached non-stop supervisor for Polymarket weather temperature markets.
+
+Every cycle (~2 min):
+  1. discovers active temperature events (cached 10 min);
+  2. pulls resolver observations (aviationweather METAR batch + HKO official);
+  3. for markets inside decision windows, pulls top-of-book for every bucket;
+  4. fires conservative deterministic detectors (paper only — no orders sent);
+  5. logs alerts to data/detections.jsonl, heartbeats to data/run.log;
+  6. settles past events via IEM daily station data -> data/closures.jsonl
+     with paper PnL per detection.
+
+Run detached (Git Bash):   nohup python scripts/supervisor.py >/dev/null 2>&1 &
+Windows detached:          run_supervisor.bat
+Single cycle (test):       python scripts/supervisor.py --once
+Stop:                      close the "weather-supervisor" window / kill python.
+"""
+import json, os, re, sys, time, urllib.request
+from datetime import datetime, timezone, timedelta
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA = os.path.join(ROOT, "data")
+os.makedirs(DATA, exist_ok=True)
+DET = os.path.join(DATA, "detections.jsonl")
+CLO = os.path.join(DATA, "closures.jsonl")
+SEEN = os.path.join(DATA, "seen.json")
+RUNLOG = os.path.join(DATA, "run.log")
+
+# city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
+MAP = {
+    "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
+    "Seoul": ("RKSI", 9, "Asia/Seoul", 5.7, 18.7), "Busan": ("RKPK", 9, "Asia/Seoul", 5.8, 18.8),
+    "Tokyo": ("RJTT", 9, "Asia/Tokyo", 5.5, 18.4), "Shanghai": ("ZSPD", 8, "Asia/Shanghai", 5.5, 18.3),
+    "Beijing": ("ZBAA", 8, "Asia/Shanghai", 5.5, 18.9), "Taipei": ("RCSS", 8, "Asia/Taipei", 5.5, 18.2),
+    "Chongqing": ("ZUCK", 8, "Asia/Shanghai", 6.0, 19.3), "Wuhan": ("ZHHH", 8, "Asia/Shanghai", 5.8, 19.0),
+    "Chengdu": ("ZUUU", 8, "Asia/Shanghai", 6.3, 19.5), "Shenzhen": ("ZGSZ", 8, "Asia/Shanghai", 6.1, 18.9),
+    "Guangzhou": ("ZGGG", 8, "Asia/Shanghai", 6.1, 18.9), "Singapore": ("WSSS", 8, "Asia/Singapore", 7.0, 19.1),
+    "Kuala Lumpur": ("WMKK", 8, "Asia/Kuala_Lumpur", 7.1, 19.2), "Manila": ("RPLL", 8, "Asia/Manila", 5.7, 18.2),
+    "Karachi": ("OPKC", 5, "Asia/Karachi", 6.0, 18.9), "Jeddah": ("OEJN", 3, "Asia/Riyadh", 5.9, 18.7),
+    "Tel Aviv": ("LLBG", 3, "Asia/Jerusalem", 6.0, 19.2), "Istanbul": ("LTFM", 3, "Europe/Istanbul", 6.1, 19.9),
+    "Ankara": ("LTAC", 3, "Europe/Istanbul", 6.1, 19.7), "Moscow": ("UUWW", 3, "Europe/Moscow", 5.3, 19.9),
+    "Cape Town": ("FACT", 2, "Africa/Johannesburg", 7.2, 18.3), "Wellington": ("NZWN", 12, "Pacific/Auckland", 7.1, 17.4),
+    "London": ("EGLC", 1, "Europe/London", 5.9, 20.2), "Paris": ("LFPB", 2, "Europe/Paris", 6.5, 20.8),
+    "Amsterdam": ("EHAM", 2, "Europe/Amsterdam", 6.4, 20.7), "Warsaw": ("EPWA", 2, "Europe/Warsaw", 5.5, 19.8),
+    "Helsinki": ("EFHK", 3, "Europe/Helsinki", 5.4, 20.9), "Madrid": ("LEMD", 2, "Europe/Madrid", 7.2, 20.9),
+    "Milan": ("LIMC", 2, "Europe/Rome", 6.3, 20.2), "Munich": ("EDDM", 2, "Europe/Berlin", 6.2, 20.2),
+    "NYC": ("KLGA", -4, "America/New_York", 6.1, 19.5), "Miami": ("KMIA", -4, "America/New_York", 6.8, 19.5),
+    "Atlanta": ("KATL", -4, "America/New_York", 6.9, 20.1), "Boston": ("KBOS", -4, "America/New_York", 5.9, 19.3),
+    "Chicago": ("KMDW", -5, "America/Chicago", 6.0, 19.4), "Dallas": ("KDAL", -5, "America/Chicago", 6.8, 20.1),
+    "Austin": ("KAUS", -5, "America/Chicago", 6.9, 20.2), "Houston": ("KHOU", -5, "America/Chicago", 6.8, 19.9),
+    "Denver": ("KDEN", -6, "America/Denver", 6.2, 19.4), "Phoenix": ("KPHX", -7, "America/Phoenix", 5.9, 19.3),
+    "Los Angeles": ("KLAX", -7, "America/Los_Angeles", 6.2, 19.3), "San Francisco": ("KSFO", -7, "America/Los_Angeles", 6.4, 19.4),
+    "Seattle": ("KSEA", -7, "America/Los_Angeles", 6.2, 20.2), "Toronto": ("CYYZ", -4, "America/Toronto", 6.3, 19.9),
+    "Mexico City": ("MMMX", -6, "America/Mexico_City", 7.1, 19.9),
+    "Sao Paulo": ("SBSP", -3, "America/Sao_Paulo", 6.3, 17.8),
+    "Buenos Aires": ("SABE", -3, "America/Argentina/Buenos_Aires", 7.3, 18.3),
+}
+US_F = {"NYC", "Miami", "Chicago", "Dallas", "Austin", "Houston", "Denver", "Phoenix",
+        "Los Angeles", "San Francisco", "Seattle", "Atlanta", "Boston"}
+
+CYCLE_SEC = 120
+EVENT_CACHE_SEC = 600
+# $100 sizing card
+SIZE_LOCKED = 12.0   # >=90% confidence states
+SIZE_LOTTO = 2.0     # cheap asks <= 0.02
+
+def say(msg):
+    line = f"[{datetime.now(timezone.utc).isoformat(timespec='seconds')}] {msg}"
+    try:
+        with open(RUNLOG, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+    print(line, flush=True)
+
+def get(url, retries=2):
+    for a in range(retries + 1):
+        try:
+            req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
+            return json.load(urllib.request.urlopen(req, timeout=30))
+        except Exception:
+            if a == retries: raise
+            time.sleep(2)
+
+def log(path, obj):
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+
+def load_seen():
+    try:
+        with open(SEEN, encoding="utf-8") as f: return set(json.load(f))
+    except Exception: return set()
+
+def save_seen(s):
+    with open(SEEN, "w", encoding="utf-8") as f: json.dump(sorted(s), f)
+
+MONTHS = {m.lower(): i for i, m in enumerate(
+    ["January","February","March","April","May","June","July","August",
+     "September","October","November","December"], 1)}
+
+def target_local_date(title):
+    """'... on August 16?' -> date(2026, 8, 16). None if unparseable."""
+    m = re.search(r"on (\w+) (\d+)", title)
+    if not m: return None
+    mi = MONTHS.get(m.group(1).lower())
+    if not mi: return None
+    return datetime.now(timezone.utc).year, mi, int(m.group(2))
+
+def fee(p): return 0.05 * p * (1 - p)
+
+def city_of(title):
+    for k in MAP:
+        if k in title: return k
+    return None
+
+def fetch_events():
+    events, offset = [], 0
+    while True:
+        b = get(f"https://gamma-api.polymarket.com/events?tag_slug=weather&closed=false&limit=100&offset={offset}")
+        if not b: break
+        events += b; offset += 100
+        if len(b) < 100: break
+    out = []
+    for e in events:
+        t = e.get("title") or ""
+        if not t.startswith(("Highest temperature", "Lowest temperature")): continue
+        c = city_of(t)
+        if not c: continue
+        out.append({"id": e.get("id"), "title": t, "city": c, "endDate": e.get("endDate"),
+                    "slug": e.get("slug"), "markets": e.get("markets") or []})
+    return out
+
+def fetch_obs(events):
+    need = sorted({MAP[e["city"]][0] for e in events if MAP[e["city"]][0] != "hko"})
+    temps, raws = {}, {}
+    for i in range(0, len(need), 12):
+        try:
+            ms = get("https://aviationweather.gov/api/data/metar?ids=%s&format=json" % ",".join(need[i:i+12]))
+            for m in ms:
+                temps[m["icaoId"]] = m.get("temp")
+                raws[m["icaoId"]] = m.get("rawOb") or ""
+        except Exception as ex:
+            say("metar chunk err: %s" % ex)
+    try:
+        r = get("https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en")
+        temps["hko"] = next((s["value"] for s in r.get("temperature", {}).get("data", [])
+                             if s.get("place") == "Hong Kong Observatory"), None)
+        raws["hko"] = ""
+        if "VHHH" not in temps:
+            try:
+                ms = get("https://aviationweather.gov/api/data/metar?ids=VHHH&format=json")
+                if ms: temps["VHHH"] = ms[0].get("temp"); raws["VHHH"] = ms[0].get("rawOb") or ""
+            except Exception: pass
+    except Exception as ex:
+        say("hko err: %s" % ex)
+    return temps, raws
+
+def bucket_parse(gt):
+    """-> (lo, hi, val) in market units; None if unparseable."""
+    gt = gt.strip()
+    m = re.match(r"^(\d+)-(\d+)°F", gt)
+    if m:
+        a, b = int(m.group(1)), int(m.group(2)); return (a - 0.5, b + 0.5, a)
+    m = re.match(r"^(\d+)", gt)
+    if not m: return None
+    v = int(m.group(1))
+    if "or below" in gt: return (float("-inf"), v + 0.5, v)
+    if "or higher" in gt: return (v - 0.5, float("inf"), v)
+    return (v - 0.5, v + 0.5, v)
+
+def top_of_book(event):
+    rows = []
+    for m in event["markets"]:
+        bp = bucket_parse(m.get("groupItemTitle") or "")
+        if not bp: continue
+        toks = json.loads(m["clobTokenIds"]) if isinstance(m.get("clobTokenIds"), str) else m.get("clobTokenIds")
+        outcomes = json.loads(m.get("outcomes")) if isinstance(m.get("outcomes"), str) else m.get("outcomes")
+        yes_idx = outcomes.index("Yes") if outcomes and "Yes" in outcomes else 0
+        try:
+            bk = get(f"https://clob.polymarket.com/book?token_id={toks[yes_idx]}")
+        except Exception:
+            continue
+        bids = sorted(bk.get("bids") or [], key=lambda x: float(x["price"]))
+        asks = sorted(bk.get("asks") or [], key=lambda x: float(x["price"]))
+        rows.append({"bucket": m.get("groupItemTitle").strip(), "lo": bp[0], "hi": bp[1], "val": bp[2],
+                     "tokens": toks, "yes_idx": yes_idx,
+                     "yes_bid": float(bids[-1]["price"]) if bids else None,
+                     "yes_bid_sz": float(bids[-1]["size"]) if bids else 0,
+                     "yes_ask": float(asks[0]["price"]) if asks else None,
+                     "yes_ask_sz": float(asks[0]["size"]) if asks else 0})
+    rows.sort(key=lambda r: r["val"])
+    return rows
+
+def fetch_running(in_window_events):
+    """Running (day_max, day_min) per station, restricted to each event's local calendar day.
+    Returns {(station): (runmax, runmin)} using up to 14h of recent METARs."""
+    out = {}
+    stations = sorted({(MAP[e["city"]][0], MAP[e["city"]][1]) for e in in_window_events})
+    if not stations: return out
+    for i in range(0, len(stations), 10):
+        chunk = stations[i:i+10]
+        ids = ",".join("VHHH" if s == "hko" else s for s, _ in chunk)
+        try:
+            ms = get("https://aviationweather.gov/api/data/metar?ids=%s&hours=14&format=json" % ids)
+        except Exception as ex:
+            say("recent metar err %s" % ex); continue
+        by = {}
+        for m in ms:
+            t, tmp = m.get("obsTime"), m.get("temp")
+            if isinstance(t, (int, float)) and tmp is not None:
+                by.setdefault(m["icaoId"], []).append((t, tmp))
+        for (src, off), _res in [(c, None) for c in chunk]:
+            st = "VHHH" if src == "hko" else src
+            obs_list = by.get(st) or []
+            nowloc = datetime.now(timezone.utc) + timedelta(hours=off)
+            day_start_utc = (nowloc.replace(hour=0, minute=0, second=0, microsecond=0)
+                             - timedelta(hours=off)).timestamp()
+            vals = [tmp for tt, tmp in obs_list if tt >= day_start_utc]
+            if vals:
+                out[src] = (max(vals), min(vals))
+    return out
+
+def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmin=None):
+    """Conservative deterministic rules. Return list of detection dicts."""
+    src, off, tz, dawn, lastlight = city_cfg
+    is_low = event["title"].startswith("Lowest")
+    is_f = event["city"] in US_F
+    obs_m = obs * 9 / 5 + 32 if is_f else obs
+    margin = 3.6 if is_f else 2.0   # 2C equivalent; F markets need wider margin due to METAR C quantization
+    out = []
+
+    def mk(rule, side, q, r):
+        px = r["yes_ask"] if side == "YES" else 1 - r["yes_bid"]
+        avail = (r["yes_ask_sz"] if side == "YES" else r["yes_bid_sz"]) * 0.9
+        want = (SIZE_LOTTO if rule == "R1_low_lotto" else SIZE_LOCKED) / px
+        shares = max(0, int(min(want, avail)))
+        edge = (q - px - fee(px)) if side == "YES" else (q - px - fee(px))
+        return dict(rule=rule, side=side, q=q, edge=round(edge, 3), px=round(px, 4),
+                    size_usd=round(shares * px, 2), shares=shares, **r)
+
+    for r in book:
+        in_bucket = r["lo"] <= obs_m < r["hi"]
+        # state anchors: RUNNING extremes for the local day (current obs alone lies when
+        # rain/shower drops temp after the peak, making achieved buckets look dead)
+        runmax_m = (runmax * 9 / 5 + 32) if (runmax is not None and is_f) else runmax
+        runmin_m = (runmin * 9 / 5 + 32) if (runmin is not None and is_f) else runmin
+        min_anchor = runmin_m if runmin_m is not None else obs_m
+        if is_low and (dawn - 2.5) <= local_hour <= dawn and not precip:
+            # R1 lotto: running min inside bucket, ask dirt cheap -> floor q 0.15
+            min_in_bucket = (r["lo"] <= min_anchor < r["hi"]) and in_bucket
+            if min_in_bucket and r["yes_ask"] is not None and r["yes_ask"] <= 0.02:
+                q = 0.15
+                if q - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
+                    out.append(mk("R1_low_lotto", "YES", q, r))
+            # R2 dead-below: bucket top <= running-min - margin -> ceiling q_yes 0.05
+            if r["hi"] <= min_anchor - margin and r["yes_bid"] is not None:
+                q_no = 0.95
+                no_ask = 1 - r["yes_bid"]
+                if q_no - no_ask - fee(no_ask) > 0.05:
+                    out.append(mk("R2_low_dead_below", "NO", q_no, r))
+        if (not is_low) and local_hour >= lastlight - 2.5 and local_hour <= lastlight and not precip:
+            # R4 high-side lotto: running max inside bucket, ask dirt cheap -> floor q 0.15
+            max_anchor = runmax_m if runmax_m is not None else obs_m
+            max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m or obs_m < r["hi"])
+            if max_in_bucket and r["yes_ask"] is not None and r["yes_ask"] <= 0.02:
+                q4 = 0.15
+                if q4 - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
+                    out.append(mk("R4_high_lotto", "YES", q4, r))
+            # R3 dead-above after peak: bucket bottom >= running-max + margin -> ceiling q_yes 0.05
+            if r["lo"] >= max_anchor + margin and r["yes_bid"] is not None:
+                q_no = 0.95
+                no_ask = 1 - r["yes_bid"]
+                if q_no - no_ask - fee(no_ask) > 0.05:
+                    out.append(mk("R3_high_dead_above", "NO", q_no, r))
+    return out
+
+def settle_past(seen_pending):
+    """Fetch IEM daily data for closed+detected events, resolve winner, log paper PnL."""
+    now = datetime.now(timezone.utc)
+    done = []
+    for key, det in list(seen_pending.items()):
+        try:
+            end = datetime.fromisoformat(det["end"].replace("Z", "+00:00"))
+        except Exception:
+            continue
+        src, off, tz, dawn, lastlight = MAP[det["city"]]
+        # settle only after the event's LOCAL day has fully ended (endDate alone is too
+        # early for US/EU high markets whose day continues past the admin endDate)
+        tld = target_local_date(det["title"])
+        if tld is not None:
+            local_day_end_utc = datetime(tld[0], tld[1], tld[2], tzinfo=timezone.utc) \
+                + timedelta(days=1) - timedelta(hours=off)
+            settle_when = local_day_end_utc + timedelta(hours=2)
+        else:
+            settle_when = end + timedelta(hours=3)
+        if now < settle_when: continue
+        station = "VHHH" if src == "hko" else src
+        day = (end + timedelta(hours=off)).strftime("%Y-%m-%d")
+        url = (f"https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station={station}&data=tmpc"
+               f"&year1={day[:4]}&month1={int(day[5:7])}&day1={int(day[8:10])}"
+               f"&year2={int(day[:4])}&month2={int(day[5:7])}&day2={int(day[8:10])}"
+               f"&tz={tz}&format=onlycomma&latlon=no&missing=M&trace=T&direct=no&report_type=3&report_type=4")
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "supervisor"})
+            vals = []
+            for line in urllib.request.urlopen(req, timeout=40).read().decode().strip().split("\n")[1:]:
+                p = line.split(",")
+                if len(p) > 2 and p[2] not in ("M", ""): vals.append(float(p[2]))
+            if not vals: continue
+            extremum = min(vals) if det["title"].startswith("Lowest") else max(vals)
+            ex = extremum * 9 / 5 + 32 if det["city"] in US_F else extremum
+            bucket_hit = det["lo"] <= ex < det["hi"]
+            pos_won = bucket_hit if det["side"] == "YES" else (not bucket_hit)
+            px = det.get("px") or (det["yes_ask"] if det["side"] == "YES" else 1 - det["yes_bid"])
+            shares = det.get("shares") or det["size"] / px
+            pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
+            log(CLO, {"ts": now.isoformat(), "key": key, "city": det["city"], "station": station,
+                      "title": det["title"], "bucket": det["bucket"], "side": det["side"],
+                      "bucket_hit": bucket_hit, "pos_won": pos_won,
+                      "paper_size_usd": round(shares * px, 2), "shares": round(shares, 1),
+                      "entry_px": round(px, 4),
+                      "resolver_extremum": round(ex, 1), "won": pos_won, "paper_pnl": round(pnl, 2),
+                      "note": "IEM proxy" if station == "VHHH" else ""})
+            say(f"[SETTLED] {det['city']} {det['bucket']} {det['side']} bucket_hit={bucket_hit} pos_won={pos_won} pnl={pnl:+.2f}")
+            done.append(key)
+        except Exception as ex:
+            say("settle err %s %s" % (key, ex))
+    for k in done: seen_pending.pop(k)
+
+def cycle(events_cache):
+    now = datetime.now(timezone.utc)
+    if events_cache is None or (now - events_cache[0]).total_seconds() > EVENT_CACHE_SEC:
+        events_cache = (now, fetch_events())
+    events = events_cache[1]
+    temps, raws = fetch_obs(events)
+    seen = load_seen()
+    pending = {}
+    try:
+        with open(os.path.join(DATA, "pending.json"), encoding="utf-8") as f:
+            pending = json.load(f)
+    except Exception: pass
+
+    active = 0
+    # pass 1: find in-window events
+    in_window_events = []
+    for e in events:
+        city = e["city"]
+        src, off, tz, dawn, lastlight = MAP[city]
+        try:
+            end = datetime.fromisoformat((e["endDate"] or "").replace("Z", "+00:00"))
+        except Exception: continue
+        hrs = (end - now).total_seconds() / 3600
+        if not (0 < hrs < 40): continue
+        local = now + timedelta(hours=off)
+        local_hour = local.hour + local.minute / 60
+        # CRITICAL: only act inside the event's own local calendar day
+        tld = target_local_date(e["title"])
+        if tld is None or (local.year, local.month, local.day) != tld:
+            continue
+        is_low = e["title"].startswith("Lowest")
+        in_window = ((dawn - 2.5) <= local_hour <= dawn) if is_low else (lastlight - 2.5) <= local_hour <= lastlight
+        if not in_window: continue
+        obs = temps.get(src) if src != "hko" else temps.get("hko")
+        if obs is None: continue
+        in_window_events.append((e, obs))
+
+    running = fetch_running([e for e, _ in in_window_events])
+
+    # pass 2: books + detectors with running-extremum state
+    for e, obs in in_window_events:
+        city = e["city"]
+        src, off, tz, dawn, lastlight = MAP[city]
+        local = now + timedelta(hours=off)
+        local_hour = local.hour + local.minute / 60
+        raw = raws.get("VHHH" if src == "hko" else src, "")
+        precip = bool(re.search(r"\b(RA|SN|SHRA|-RA|RA\s|TSRA|RASN|SNRA|SHSN)\b", raw))
+        runmax, runmin = running.get(src, (None, None))
+        book = top_of_book(e)
+        active += 1
+        for d in detectors(e, MAP[city], local_hour, obs, precip, book, runmax, runmin):
+            if d.get("shares", 0) < 5:   # CLOB minimum order size
+                continue
+            key = f"{e['title']}|{d['bucket']}|{d['side']}"
+            if key in seen: continue
+            seen.add(key)
+            rec = {"ts": now.isoformat(), "key": key, "city": city, "title": e["title"],
+                   "slug": e.get("slug"), "end": e["endDate"], "resolver_obs_c": obs,
+                   "runmax_c": runmax, "runmin_c": runmin, **d}
+            log(DET, rec)
+            pending[key] = rec
+            px = d.get("yes_ask") if d["side"] == "YES" else round(1 - d["yes_bid"], 3)
+            say(f"[ALERT] {d['rule']} {city} {d['bucket']} {d['side']} px={px} edge={d['edge']} obs={obs}C runmax={runmax} runmin={runmin}")
+        save_seen(seen)  # per-event persistence prevents duplicate re-fires after mid-cycle errors
+    save_seen(seen)
+    with open(os.path.join(DATA, "pending.json"), "w", encoding="utf-8") as f:
+        json.dump(pending, f)
+    settle_past(pending)
+    with open(os.path.join(DATA, "pending.json"), "w", encoding="utf-8") as f:
+        json.dump(pending, f)
+    say(f"cycle done: {len(events)} events, {active} in window, {len(pending)} pending")
+    return events_cache
+
+if __name__ == "__main__":
+    once = "--once" in sys.argv
+    cache = None
+    say("supervisor starting (pid=%s, once=%s)" % (os.getpid(), once))
+    while True:
+        try:
+            cache = cycle(cache)
+        except KeyboardInterrupt:
+            say("stopped"); break
+        except Exception as ex:
+            say("cycle error: " + str(ex))
+        if once: break
+        time.sleep(CYCLE_SEC)
