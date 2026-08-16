@@ -62,6 +62,11 @@ EVENT_CACHE_SEC = 600
 # $100 sizing card
 SIZE_LOCKED = 12.0   # >=90% confidence states
 SIZE_LOTTO = 2.0     # cheap asks <= 0.02
+# Audit 2026-08-16 tier math: break-even q = p+0.05*p*(1-p) = 0.21% at 0.002 vs 1.05-2.1%
+# at 0.01-0.02; state-sample 95% lower bound 0.84% clears ONLY the <=0.002 tier (4x).
+# Both Paris lotto losses were 0.01-0.019 entries; the HK win was 0.001.
+# 1-2c states remain recorded by the survey logger for later re-admission with evidence.
+ASK_MAX_LOTTO = 0.002
 
 def say(msg):
     line = f"[{datetime.now(timezone.utc).isoformat(timespec='seconds')}] {msg}"
@@ -247,7 +252,7 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
         if is_low and (dawn - 2.5) <= local_hour <= dawn and not precip:
             # R1 lotto: running min inside bucket, ask dirt cheap -> floor q 0.15
             min_in_bucket = (r["lo"] <= min_anchor < r["hi"]) and in_bucket
-            if min_in_bucket and r["yes_ask"] is not None and r["yes_ask"] <= 0.02:
+            if min_in_bucket and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
                 q = 0.15
                 if q - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
                     out.append(mk("R1_low_lotto", "YES", q, r))
@@ -261,7 +266,7 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
             # R4 high-side lotto: running max inside bucket, ask dirt cheap -> floor q 0.15
             max_anchor = runmax_m if runmax_m is not None else obs_m
             max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m or obs_m < r["hi"])
-            if max_in_bucket and r["yes_ask"] is not None and r["yes_ask"] <= 0.02:
+            if max_in_bucket and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
                 q4 = 0.15
                 if q4 - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
                     out.append(mk("R4_high_lotto", "YES", q4, r))
