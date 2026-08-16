@@ -1,4 +1,4 @@
-data/gistemp-inputs/
-data/gistemp-market/
+data/
+.env
 __pycache__/
 *.pyc
