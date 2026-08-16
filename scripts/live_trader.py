@@ -29,7 +29,10 @@ RUNLOG = os.path.join(DATA, "run.log")
 ENVF = os.path.join(ROOT, ".env")
 PAUSE = os.path.join(DATA, "PAUSE")
 
-LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")   # R1 lottos: manual only
+LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
+LOTTO_RULES = ("R1_low_lotto", "R4_high_lotto")
+LIVE_RULES = LIVE_RULES + LOTTO_RULES
+ASK_TIER_LOTTO = 0.002   # sweep displayed YES levels only up to the audited tier cap
 MAX_OPEN = 3
 MAX_TRADES_DAY = 6
 MAX_COST_DAY = 12.0
@@ -100,7 +103,8 @@ def fresh_book(det):
     yes_bid_sz = float(bids[-1]["size"]) if bids else 0
     yes_ask = float(asks[0]["price"]) if asks else None
     yes_ask_sz = float(asks[0]["size"]) if asks else 0
-    return (yes_bid, yes_bid_sz, toks, yi), (yes_ask, yes_ask_sz, toks, yi), det
+    asks_all = [(float(a["price"]), float(a["size"])) for a in asks]
+    return (yes_bid, yes_bid_sz, toks, yi), (yes_ask, yes_ask_sz, toks, yi), det, asks_all
 
 def tick_round(p):
     return max(TICK, round(p / TICK) * TICK)
@@ -155,42 +159,73 @@ def process(cfg):
         if any(v.get("city") == det["city"] for v in state["open"].values()):
             state["processed"][key]["action"] = "skip_city_dup"; continue
 
-        yes, ask, det2 = fresh_book(det)
+        yes, ask, det2, asks_all = fresh_book(det)
         if not yes: state["processed"][key]["action"] = "skip_no_book"; continue
         side = det["side"]
-        if side == "YES":
-            px_now, sz_now = ask[0], ask[1]
+        is_lotto = rule in LOTTO_RULES
+        sweep = None
+        if is_lotto:
+            # sweep every displayed YES level up to the audited tier cap (0.002),
+            # bounded by the per-ticket dollar cap; one FAK at the tier limit walks the levels
+            rem = float(cfg.get("LOTTO_SWEEP_CAP") or 5.0)
+            sweep = []
+            for px, sz in asks_all:
+                if px > ASK_TIER_LOTTO: break
+                take = min(sz * 0.9, rem / px)
+                if take < 1: break
+                sweep.append((px, int(take))); rem -= int(take) * px
+                if rem <= px: break
+            shares = sum(s for _, s in sweep)
+            if shares < 5:
+                state["processed"][key]["action"] = "skip_thin"
+                jlog(ORDERS, {**base, "result": "REJECTED_THIN", "tier_depth_shares": sum(s for p, s in asks_all if p <= ASK_TIER_LOTTO)}); continue
+            px_now = sum(p * s for p, s in sweep) / shares
+            limit_px = ASK_TIER_LOTTO
+            edge_now = det["q"] - px_now - fee(px_now)
+            if edge_now < 0.10:
+                state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "avg_px": round(px_now, 4), "edge_now": round(edge_now, 3)}); continue
+            if daily.get("lotto_cost", 0.0) + px_now * shares > float(cfg.get("LOTTO_DAY_CAP") or 10.0):
+                state["processed"][key]["action"] = "skip_daily_lotto_cap"; continue
         else:
-            if yes[0] is None: state["processed"][key]["action"] = "skip_no_bid"; continue
-            px_now, sz_now = 1 - yes[0], yes[1]
-        if px_now is None or px_now > (det.get("px") or 0) + PX_TOL:
-            state["processed"][key]["action"] = "skip_price_moved"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE", "px_now": round(px_now,3) if px_now else None}); continue
-        q = det["q"]
-        edge_now = q - px_now - fee(px_now)
-        if edge_now < EDGE_MIN:
-            state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "px_now": round(px_now,3), "edge_now": round(edge_now,3)}); continue
-        shares = int(min(CARD / px_now, 0.9 * sz_now))
-        if shares < 5:
-            state["processed"][key]["action"] = "skip_thin"; jlog(ORDERS, {**base, "result": "REJECTED_THIN", "depth": sz_now}); continue
+            if side == "YES":
+                px_now, sz_now = ask[0], ask[1]
+            else:
+                if yes[0] is None: state["processed"][key]["action"] = "skip_no_bid"; continue
+                px_now, sz_now = 1 - yes[0], yes[1]
+            if px_now is None or px_now > (det.get("px") or 0) + PX_TOL:
+                state["processed"][key]["action"] = "skip_price_moved"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE", "px_now": round(px_now,3) if px_now else None}); continue
+            q = det["q"]
+            edge_now = q - px_now - fee(px_now)
+            if edge_now < EDGE_MIN:
+                state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "px_now": round(px_now,3), "edge_now": round(edge_now,3)}); continue
+            shares = int(min(CARD / px_now, 0.9 * sz_now))
+            if shares < 5:
+                state["processed"][key]["action"] = "skip_thin"; jlog(ORDERS, {**base, "result": "REJECTED_THIN", "depth": sz_now}); continue
+            limit_px = px_now
+        cost = px_now * shares
 
         yi = det2.get("yes_idx", 0)
         token = det2["tokens"][yi] if side == "YES" else det2["tokens"][1 - yi]
 
         dry = cfg.get("DRY_RUN", "true").lower() != "false" or cfg.get("LIVE_ENABLED", "false").lower() != "true"
         if dry:
-            jlog(ORDERS, {**base, "result": "DRY_RUN_WOULD_ORDER", "px": round(px_now,3), "shares": shares,
-                          "cost": round(shares*px_now,2), "edge_now": round(edge_now,3), "token": token})
-            say(f"DRY_RUN would BUY {side} {det['city']} {det['bucket']} px={px_now:.3f} x{shares} (~${shares*px_now:.0f}) edge={edge_now:.3f}")
-            state["open"][key] = {**base, "px": round(px_now,3), "shares": shares, "dry": True}
-            daily["trades"] += 1; daily["cost"] += round(shares * px_now, 2)
+            jlog(ORDERS, {**base, "result": "DRY_RUN_WOULD_SWEEP" if is_lotto else "DRY_RUN_WOULD_ORDER",
+                          "px": round(px_now, 4), "shares": shares, "cost": round(cost, 2),
+                          "levels": sweep, "edge_now": round(edge_now, 3), "token": token})
+            say(f"DRY_RUN would {'SWEEP' if is_lotto else 'BUY'} {side} {det['city']} {det['bucket']} avg_px={px_now:.4f} x{shares} (~${cost:.0f}) edge={edge_now:.3f}")
+            state["open"][key] = {**base, "px": round(px_now, 4), "shares": shares, "dry": True}
+            daily["trades"] += 1; daily["cost"] += round(cost, 2)
+            if is_lotto: daily["lotto_cost"] = round(daily.get("lotto_cost", 0.0) + cost, 2)
         else:
             try:
-                ok, detail = place_order(cfg, token, tick_round(px_now), shares)
-                jlog(ORDERS, {**base, "result": "LIVE_ORDER", "px": round(px_now,3), "shares": shares,
-                              "token": token, "resp": str(detail)[:400]})
-                say(f"LIVE BUY {side} {det['city']} {det['bucket']} px={px_now:.3f} x{shares}")
-                state["open"][key] = {**base, "px": round(px_now,3), "shares": shares, "dry": False}
-                daily["trades"] += 1; daily["cost"] += round(shares * px_now, 2)
+                ok, detail = place_order(cfg, token, tick_round(limit_px), shares)
+                jlog(ORDERS, {**base, "result": "LIVE_SWEEP" if is_lotto else "LIVE_ORDER",
+                              "px": round(px_now, 4), "shares": shares, "limit_px": limit_px,
+                              "levels": sweep, "token": token, "resp": str(detail)[:400]})
+                say(f"LIVE {'SWEEP' if is_lotto else 'BUY'} {side} {det['city']} {det['bucket']} avg_px={px_now:.4f} x{shares}")
+                state["open"][key] = {**base, "px": round(px_now, 4), "shares": shares, "dry": False}
+                daily["trades"] += 1; daily["cost"] += round(cost, 2)
+                if is_lotto: daily["lotto_cost"] = round(daily.get("lotto_cost", 0.0) + cost, 2)
             except Exception as ex:
                 say(f"ORDER ERROR {key}: {ex}")
                 jlog(ORDERS, {**base, "result": "ERROR", "err": str(ex)[:300]})
