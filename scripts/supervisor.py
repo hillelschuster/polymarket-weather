@@ -78,7 +78,11 @@ def say(msg):
             f.write(line + "\n")
     except Exception:
         pass
-    print(line, flush=True)
+    try:
+        if sys.stdout:
+            print(line, flush=True)
+    except Exception:
+        pass
 
 def get(url, retries=2):
     for a in range(retries + 1):

@@ -64,7 +64,10 @@ def say(msg):
     try:
         with open(RUNLOG, "a", encoding="utf-8") as f: f.write(line + "\n")
     except Exception: pass
-    print(line, flush=True)
+    try:
+        if sys.stdout:
+            print(line, flush=True)
+    except Exception: pass
 
 def jload(path, default):
     try:
