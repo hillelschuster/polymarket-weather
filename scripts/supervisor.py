@@ -284,6 +284,27 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                     out.append(mk("R3_high_dead_above", "NO", q_no, r))
     return out
 
+def official_outcome(det):
+    """If the market itself has resolved (closed + outcomePrices), return bucket_hit (bool)
+    from the official result; else None. Preferred over any station proxy."""
+    try:
+        evg = get(f"https://gamma-api.polymarket.com/events?slug={det['slug']}")
+        if isinstance(evg, list): evg = evg[0] if evg else None
+        if not evg or not evg.get("closed"): return None
+        for m in evg.get("markets") or []:
+            if (m.get("groupItemTitle") or "").strip() == det["bucket"]:
+                op = m.get("outcomePrices")
+                if op is None: return None
+                prices = json.loads(op) if isinstance(op, str) else op
+                outcomes = m.get("outcomes") or ["Yes", "No"]
+                if isinstance(outcomes, str): outcomes = json.loads(outcomes)
+                yi = outcomes.index("Yes") if "Yes" in outcomes else 0
+                if len(prices) > yi and prices[yi] is not None:
+                    return float(prices[yi]) > 0.5
+    except Exception:
+        return None
+    return None
+
 def settle_past(seen_pending):
     """Fetch IEM daily data for closed+detected events, resolve winner, log paper PnL."""
     now = datetime.now(timezone.utc)
@@ -305,6 +326,23 @@ def settle_past(seen_pending):
             settle_when = end + timedelta(hours=3)
         if now < settle_when: continue
         station = "VHHH" if src == "hko" else src
+        official = official_outcome(det)
+        if official is not None:
+            bucket_hit = official
+            ex = -999  # official market resolution; station value not needed
+            px = det.get("px") or (det["yes_ask"] if det["side"] == "YES" else 1 - det["yes_bid"])
+            shares = det.get("shares") or det["size"] / px
+            pos_won = bucket_hit if det["side"] == "YES" else (not bucket_hit)
+            pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
+            log(CLO, {"ts": now.isoformat(), "key": key, "city": det["city"], "station": "OFFICIAL",
+                      "title": det["title"], "bucket": det["bucket"], "side": det["side"],
+                      "bucket_hit": bucket_hit, "pos_won": pos_won,
+                      "paper_size_usd": round(shares * px, 2), "shares": round(shares, 1),
+                      "entry_px": round(px, 4), "resolver_extremum": ex,
+                      "won": pos_won, "paper_pnl": round(pnl, 2), "note": "official_outcome"})
+            say(f"[SETTLED-OFFICIAL] {det['city']} {det['bucket']} {det['side']} bucket_hit={bucket_hit} pos_won={pos_won} pnl={pnl:+.2f}")
+            done.append(key)
+            continue
         day = (end + timedelta(hours=off)).strftime("%Y-%m-%d")
         url = (f"https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station={station}&data=tmpc"
                f"&year1={day[:4]}&month1={int(day[5:7])}&day1={int(day[8:10])}"

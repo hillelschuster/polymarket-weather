@@ -18,7 +18,7 @@ Test:     python scripts/live_trader.py --once     (single pass, respects DRY_RU
 Stop:     create data/PAUSE  |  kill process
 """
 import json, os, sys, time, urllib.request
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
@@ -136,6 +136,21 @@ def process(cfg):
     except FileNotFoundError:
         return
 
+    # prune open positions whose events ended (settle window passed) — stale entries
+    # must never block MAX_OPEN slots on fresh opportunities
+    nowts = datetime.now(timezone.utc)
+    for k in list(state["open"].keys()):
+        v = state["open"][k]
+        end = v.get("end")
+        try:
+            if end:
+                if nowts > datetime.fromisoformat(str(end).replace("Z", "+00:00")) + timedelta(hours=3):
+                    del state["open"][k]
+            elif v.get("ts") and nowts > datetime.fromisoformat(v["ts"]) + timedelta(hours=36):
+                del state["open"][k]
+        except Exception:
+            pass
+
     for det in dets:
         key = det["key"]
         if key in state["processed"]: continue
@@ -145,7 +160,7 @@ def process(cfg):
         base = {
             "ts": datetime.now(timezone.utc).isoformat(), "key": key, "rule": rule,
             "city": det["city"], "bucket": det["bucket"], "side": det["side"],
-            "alert_px": det.get("px"),
+            "alert_px": det.get("px"), "end": det.get("endDate"),
         }
         # ---- gates ----
         if rule not in LIVE_RULES:
