@@ -10,9 +10,9 @@ Two processes do all the work:
 ## Safety architecture (already built in)
 
 - trader starts in DRY_RUN with no key: it logs `DRY_RUN_WOULD_ORDER` lines, never orders.
-- live gates: only R2/R3 dead-bucket NOs; price re-verified at execution (max +0.03 slip);
-  recomputed edge > 0.04; size = min($12, 90% of displayed depth), >= 5 shares;
-  max 3 open, max 1 per city, max 6 trades/day, max $12/day; orders are FAK
+- live gates: only R2/R3 dead-bucket NOs (or lotto sweeps if ALLOW_LOTTOS=true); price re-verified at execution (max +0.03 slip);
+  recomputed edge > 0.04; size = min(CARD, 90% of displayed depth), >= 5 shares;
+  max 3 open ($75 max capital lock on $250 base), max 1 per city, max 8 trades/day, max $50/day cost cap; orders are FAK
   (fill-and-kill — never rests as a stale maker quote).
 - kill switch: create a file named `PAUSE` in `data\` -> trader stops new orders instantly
   (`echo. > data\PAUSE`). Delete it to resume.
@@ -21,7 +21,7 @@ Two processes do all the work:
 
 ## Your steps to go live (30 minutes)
 
-1. **Deposit**: Polymarket -> Deposit -> USDC (Polygon network). Start with $100.
+1. **Deposit**: Polymarket -> Deposit -> USDC (Polygon network). Recommended initial bankroll: **$250**.
 2. **Create credentials**: Polymarket UI -> Settings -> Export Private Key. Put it in `.env`
    (copy `.env.example` to `.env`, fill PRIVATE_KEY, set FUNDER to your deposit address if
    the account was created via email login).
@@ -36,7 +36,11 @@ Two processes do all the work:
 
 Add capital only after: >= 20 settled live positions AND win rate >= 80% AND live fill
 prices within 0.02 of alert prices. Scale the `CARD` in live_trader.py and `SIZE_*` in
-supervisor.py together (e.g. $100->card 12; $300->card 30; $500->card 45).
+supervisor.py together:
+- **$100 Bankroll:** `CARD=12`, `MAX_COST_DAY=20`, `SIZE_LOCKED=12`, `SIZE_LOTTO=2`
+- **$250 Bankroll (CURRENT):** `CARD=25`, `MAX_COST_DAY=50`, `SIZE_LOCKED=25`, `SIZE_LOTTO=3`
+- **$500 Bankroll:** `CARD=50`, `MAX_COST_DAY=100`, `SIZE_LOCKED=50`, `SIZE_LOTTO=5`
+- **$1,000 Bankroll:** `CARD=100`, `MAX_COST_DAY=200`, `SIZE_LOCKED=100`, `SIZE_LOTTO=10`
 
 ## Known maintenance items
 

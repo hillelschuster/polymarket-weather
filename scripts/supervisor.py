@@ -62,9 +62,9 @@ US_F = {"NYC", "Miami", "Chicago", "Dallas", "Austin", "Houston", "Denver", "Pho
 
 CYCLE_SEC = 120
 EVENT_CACHE_SEC = 600
-# $100 sizing card
-SIZE_LOCKED = 12.0   # >=90% confidence states
-SIZE_LOTTO = 2.0     # cheap asks <= 0.02
+# $250 sizing card (10% per locked position, ~$3 lotto)
+SIZE_LOCKED = 25.0   # >=90% confidence states
+SIZE_LOTTO = 3.0     # cheap asks <= 0.002
 # Audit 2026-08-16 tier math: break-even q = p+0.05*p*(1-p) = 0.21% at 0.002 vs 1.05-2.1%
 # at 0.01-0.02; state-sample 95% lower bound 0.84% clears ONLY the <=0.002 tier (4x).
 # Both Paris lotto losses were 0.01-0.019 entries; the HK win was 0.001.
@@ -219,8 +219,16 @@ def fetch_running(in_window_events):
         by = {}
         for m in ms:
             t, tmp = m.get("obsTime"), m.get("temp")
-            if isinstance(t, (int, float)) and tmp is not None:
-                by.setdefault(m["icaoId"], []).append((t, tmp))
+            raw = m.get("rawOb") or ""
+            if isinstance(t, (int, float)):
+                if tmp is not None:
+                    by.setdefault(m["icaoId"], []).append((t, tmp))
+                m6 = re.search(r"\b1([01])(\d{3})\b", raw)
+                if m6:
+                    by.setdefault(m["icaoId"], []).append((t, (-1 if m6.group(1) == "1" else 1) * int(m6.group(2)) / 10))
+                n6 = re.search(r"\b2([01])(\d{3})\b", raw)
+                if n6:
+                    by.setdefault(m["icaoId"], []).append((t, (-1 if n6.group(1) == "1" else 1) * int(n6.group(2)) / 10))
         for (src, off), _res in [(c, None) for c in chunk]:
             st = "VHHH" if src == "hko" else src
             obs_list = by.get(st) or []

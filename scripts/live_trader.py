@@ -27,24 +27,28 @@ STATE = os.path.join(DATA, "live_state.json")
 ORDERS = os.path.join(DATA, "live_orders.jsonl")
 RUNLOG = os.path.join(DATA, "run.log")
 ENVF = os.path.join(ROOT, ".env")
-PAUSE = os.path.join(DATA, "PAUSE")
+# $250 bankroll default calibration (10% card, 30% max concurrent risk, 20% daily budget)
+DEFAULT_CARD = 25.0
+DEFAULT_MAX_OPEN = 3
+DEFAULT_MAX_TRADES_DAY = 8
+DEFAULT_MAX_COST_DAY = 50.0
+DEFAULT_LOTTO_SWEEP_CAP = 5.0
+DEFAULT_LOTTO_DAY_CAP = 10.0
 
-LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
+BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
 LOTTO_RULES = ("R1_low_lotto", "R4_high_lotto")
-# Live lotto execution delayed pending confirmed win on clean official-settled record.
-# To re-enable live lotto: LIVE_RULES = LIVE_RULES + LOTTO_RULES
 ASK_TIER_LOTTO = 0.002   # sweep displayed YES levels only up to the audited tier cap
-MAX_OPEN = 3
-MAX_TRADES_DAY = 6
-MAX_COST_DAY = 12.0
-CARD = 12.0              # $ per position
 PX_TOL = 0.03            # max slippage vs alert price
 EDGE_MIN = 0.04          # recomputed edge floor at execution time
 POLL_SEC = 30
 TICK = 0.001
 
 def env():
-    cfg = {"LIVE_ENABLED": "false", "PRIVATE_KEY": "", "FUNDER": "", "DRY_RUN": "true", "CHAIN_ID": "137"}
+    cfg = {"LIVE_ENABLED": "false", "PRIVATE_KEY": "", "FUNDER": "", "DRY_RUN": "true", "CHAIN_ID": "137",
+           "CARD": str(DEFAULT_CARD), "MAX_OPEN": str(DEFAULT_MAX_OPEN),
+           "MAX_TRADES_DAY": str(DEFAULT_MAX_TRADES_DAY), "MAX_COST_DAY": str(DEFAULT_MAX_COST_DAY),
+           "ALLOW_LOTTOS": "false", "LOTTO_SWEEP_CAP": str(DEFAULT_LOTTO_SWEEP_CAP),
+           "LOTTO_DAY_CAP": str(DEFAULT_LOTTO_DAY_CAP)}
     try:
         for line in open(ENVF, encoding="utf-8"):
             line = line.strip()
@@ -130,6 +134,12 @@ def process(cfg):
     state = jload(STATE, {"processed": {}, "open": {}, "daily": {}})
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     daily = state["daily"].setdefault(today, {"trades": 0, "cost": 0.0})
+    card = float(cfg.get("CARD") or DEFAULT_CARD)
+    max_open = int(cfg.get("MAX_OPEN") or DEFAULT_MAX_OPEN)
+    max_trades_day = int(cfg.get("MAX_TRADES_DAY") or DEFAULT_MAX_TRADES_DAY)
+    max_cost_day = float(cfg.get("MAX_COST_DAY") or DEFAULT_MAX_COST_DAY)
+    allow_lottos = cfg.get("ALLOW_LOTTOS", "false").lower() == "true"
+    live_rules = BASE_LIVE_RULES + (LOTTO_RULES if allow_lottos else ())
     dets = []
     try:
         with open(DET, encoding="utf-8") as f:
@@ -164,13 +174,13 @@ def process(cfg):
             "alert_px": det.get("px"), "end": det.get("endDate"),
         }
         # ---- gates ----
-        if rule not in LIVE_RULES:
+        if rule not in live_rules:
             state["processed"][key]["action"] = "skip_rule_not_whitelisted"; continue
         if os.path.exists(PAUSE):
             say("PAUSE file present — no new orders"); state["processed"][key]["action"] = "skip_paused"; continue
-        if len(state["open"]) >= MAX_OPEN:
+        if len(state["open"]) >= max_open:
             state["processed"][key]["action"] = "skip_max_open"; continue
-        if daily["trades"] >= MAX_TRADES_DAY or daily["cost"] >= MAX_COST_DAY:
+        if daily["trades"] >= max_trades_day or daily["cost"] >= max_cost_day:
             state["processed"][key]["action"] = "skip_daily_cap"; continue
         if any(v.get("city") == det["city"] for v in state["open"].values()):
             state["processed"][key]["action"] = "skip_city_dup"; continue
@@ -183,7 +193,7 @@ def process(cfg):
         if is_lotto:
             # sweep every displayed YES level up to the audited tier cap (0.002),
             # bounded by the per-ticket dollar cap; one FAK at the tier limit walks the levels
-            rem = float(cfg.get("LOTTO_SWEEP_CAP") or 5.0)
+            rem = float(cfg.get("LOTTO_SWEEP_CAP") or DEFAULT_LOTTO_SWEEP_CAP)
             sweep = []
             for px, sz in asks_all:
                 if px > ASK_TIER_LOTTO: break
@@ -200,7 +210,7 @@ def process(cfg):
             edge_now = det["q"] - px_now - fee(px_now)
             if edge_now < 0.10:
                 state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "avg_px": round(px_now, 4), "edge_now": round(edge_now, 3)}); continue
-            if daily.get("lotto_cost", 0.0) + px_now * shares > float(cfg.get("LOTTO_DAY_CAP") or 10.0):
+            if daily.get("lotto_cost", 0.0) + px_now * shares > float(cfg.get("LOTTO_DAY_CAP") or DEFAULT_LOTTO_DAY_CAP):
                 state["processed"][key]["action"] = "skip_daily_lotto_cap"; continue
         else:
             if side == "YES":
@@ -214,7 +224,7 @@ def process(cfg):
             edge_now = q - px_now - fee(px_now)
             if edge_now < EDGE_MIN:
                 state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "px_now": round(px_now,3), "edge_now": round(edge_now,3)}); continue
-            shares = int(min(CARD / px_now, 0.9 * sz_now))
+            shares = int(min(card / px_now, 0.9 * sz_now))
             if shares < 5:
                 state["processed"][key]["action"] = "skip_thin"; jlog(ORDERS, {**base, "result": "REJECTED_THIN", "depth": sz_now}); continue
             limit_px = px_now
