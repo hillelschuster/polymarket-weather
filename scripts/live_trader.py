@@ -31,7 +31,8 @@ PAUSE = os.path.join(DATA, "PAUSE")
 
 LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
 LOTTO_RULES = ("R1_low_lotto", "R4_high_lotto")
-LIVE_RULES = LIVE_RULES + LOTTO_RULES
+# Live lotto execution delayed pending confirmed win on clean official-settled record.
+# To re-enable live lotto: LIVE_RULES = LIVE_RULES + LOTTO_RULES
 ASK_TIER_LOTTO = 0.002   # sweep displayed YES levels only up to the audited tier cap
 MAX_OPEN = 3
 MAX_TRADES_DAY = 6

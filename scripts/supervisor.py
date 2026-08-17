@@ -27,8 +27,10 @@ SEEN = os.path.join(DATA, "seen.json")
 RUNLOG = os.path.join(DATA, "run.log")
 
 # city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
+# NOTE: Hong Kong suspended from auto-eligible cities until HKO-native historical API is wired.
+# Station anchor (VHHH airport) diverges from official resolver (HKO downtown).
 MAP = {
-    "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
+    # "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
     "Seoul": ("RKSI", 9, "Asia/Seoul", 5.7, 18.7), "Busan": ("RKPK", 9, "Asia/Seoul", 5.8, 18.8),
     "Tokyo": ("RJTT", 9, "Asia/Tokyo", 5.5, 18.4), "Shanghai": ("ZSPD", 8, "Asia/Shanghai", 5.5, 18.3),
     "Beijing": ("ZBAA", 8, "Asia/Shanghai", 5.5, 18.9), "Taipei": ("RCSS", 8, "Asia/Taipei", 5.5, 18.2),
@@ -237,12 +239,13 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
     is_f = event["city"] in US_F
     obs_m = obs * 9 / 5 + 32 if is_f else obs
     margin = 3.6 if is_f else 2.0   # 2C equivalent; F markets need wider margin due to METAR C quantization
+    bd_min = 1.4 if is_f else 0.8   # 0.8C equivalent boundary margin against resolver-vs-METAR noise
     out = []
 
     def mk(rule, side, q, r):
         px = r["yes_ask"] if side == "YES" else 1 - r["yes_bid"]
         avail = (r["yes_ask_sz"] if side == "YES" else r["yes_bid_sz"]) * 0.9
-        want = (SIZE_LOTTO if rule == "R1_low_lotto" else SIZE_LOCKED) / px
+        want = (SIZE_LOTTO if rule in ("R1_low_lotto", "R4_high_lotto") else SIZE_LOCKED) / px
         shares = max(0, int(min(want, avail)))
         edge = (q - px - fee(px)) if side == "YES" else (q - px - fee(px))
         return dict(rule=rule, side=side, q=q, edge=round(edge, 3), px=round(px, 4),
@@ -256,9 +259,10 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
         runmin_m = (runmin * 9 / 5 + 32) if (runmin is not None and is_f) else runmin
         min_anchor = runmin_m if runmin_m is not None else obs_m
         if is_low and (dawn - 2.5) <= local_hour <= dawn and not precip:
-            # R1 lotto: running min inside bucket, ask dirt cheap -> floor q 0.15
+            # R1 lotto: running min inside bucket, boundary distance >= bd_min, ask dirt cheap -> floor q 0.15
             min_in_bucket = (r["lo"] <= min_anchor < r["hi"]) and in_bucket
-            if min_in_bucket and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
+            bd_low = min(min_anchor - r["lo"], r["hi"] - min_anchor) if min_in_bucket else 0
+            if min_in_bucket and bd_low >= bd_min and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
                 q = 0.15
                 if q - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
                     out.append(mk("R1_low_lotto", "YES", q, r))
@@ -269,10 +273,11 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                 if q_no - no_ask - fee(no_ask) > 0.05:
                     out.append(mk("R2_low_dead_below", "NO", q_no, r))
         if (not is_low) and local_hour >= lastlight - 2.5 and local_hour <= lastlight and not precip:
-            # R4 high-side lotto: running max inside bucket, ask dirt cheap -> floor q 0.15
+            # R4 high-side lotto: running max inside bucket, boundary distance >= bd_min, ask dirt cheap -> floor q 0.15
             max_anchor = runmax_m if runmax_m is not None else obs_m
             max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m or obs_m < r["hi"])
-            if max_in_bucket and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
+            bd_high = min(max_anchor - r["lo"], r["hi"] - max_anchor) if max_in_bucket else 0
+            if max_in_bucket and bd_high >= bd_min and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
                 q4 = 0.15
                 if q4 - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
                     out.append(mk("R4_high_lotto", "YES", q4, r))
@@ -314,7 +319,13 @@ def settle_past(seen_pending):
             end = datetime.fromisoformat(det["end"].replace("Z", "+00:00"))
         except Exception:
             continue
-        src, off, tz, dawn, lastlight = MAP[det["city"]]
+        if det["city"] not in MAP:
+            if det["city"] == "Hong Kong":
+                src, off, tz, dawn, lastlight = ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8)
+            else:
+                continue
+        else:
+            src, off, tz, dawn, lastlight = MAP[det["city"]]
         # settle only after the event's LOCAL day has fully ended (endDate alone is too
         # early for US/EU high markets whose day continues past the admin endDate)
         tld = target_local_date(det["title"])
