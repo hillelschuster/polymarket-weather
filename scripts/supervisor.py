@@ -387,7 +387,6 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                     if q_no - no_ask - fee(no_ask) > 0.05:
                         out.append(mk("R3_high_dead_above", "NO", q_no, r))
     return out
-    return out
 
 def official_outcome(det):
     """If the market itself has resolved (closed + outcomePrices), return bucket_hit (bool)
