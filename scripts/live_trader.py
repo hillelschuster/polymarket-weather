@@ -27,6 +27,7 @@ STATE = os.path.join(DATA, "live_state.json")
 ORDERS = os.path.join(DATA, "live_orders.jsonl")
 RUNLOG = os.path.join(DATA, "run.log")
 ENVF = os.path.join(ROOT, ".env")
+PAUSE = os.path.join(DATA, "PAUSE")
 # $250 bankroll default calibration (10% card, 30% max concurrent risk, 20% daily budget)
 DEFAULT_CARD = 25.0
 DEFAULT_MAX_OPEN = 3
