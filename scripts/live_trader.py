@@ -28,13 +28,13 @@ ORDERS = os.path.join(DATA, "live_orders.jsonl")
 RUNLOG = os.path.join(DATA, "run.log")
 ENVF = os.path.join(ROOT, ".env")
 PAUSE = os.path.join(DATA, "PAUSE")
-# $250 bankroll default calibration (10% card, 30% max concurrent risk, 20% daily budget)
 DEFAULT_CARD = 25.0
 DEFAULT_MAX_OPEN = 3
 DEFAULT_MAX_TRADES_DAY = 8
 DEFAULT_MAX_COST_DAY = 50.0
 DEFAULT_LOTTO_SWEEP_CAP = 5.0
 DEFAULT_LOTTO_DAY_CAP = 10.0
+DEFAULT_ALERT_MAX_AGE_SEC = 600  # 10 minutes max alert latency
 
 BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
 LOTTO_RULES = ("R1_low_lotto", "R4_high_lotto")
@@ -49,7 +49,8 @@ def env():
            "CARD": str(DEFAULT_CARD), "MAX_OPEN": str(DEFAULT_MAX_OPEN),
            "MAX_TRADES_DAY": str(DEFAULT_MAX_TRADES_DAY), "MAX_COST_DAY": str(DEFAULT_MAX_COST_DAY),
            "ALLOW_LOTTOS": "false", "LOTTO_SWEEP_CAP": str(DEFAULT_LOTTO_SWEEP_CAP),
-           "LOTTO_DAY_CAP": str(DEFAULT_LOTTO_DAY_CAP)}
+           "LOTTO_DAY_CAP": str(DEFAULT_LOTTO_DAY_CAP),
+           "ALERT_MAX_AGE_SEC": str(DEFAULT_ALERT_MAX_AGE_SEC)}
     try:
         for line in open(ENVF, encoding="utf-8"):
             line = line.strip()
@@ -142,6 +143,7 @@ def process(cfg):
     max_open = int(cfg.get("MAX_OPEN") or DEFAULT_MAX_OPEN)
     max_trades_day = int(cfg.get("MAX_TRADES_DAY") or DEFAULT_MAX_TRADES_DAY)
     max_cost_day = float(cfg.get("MAX_COST_DAY") or DEFAULT_MAX_COST_DAY)
+    alert_max_age_sec = int(cfg.get("ALERT_MAX_AGE_SEC") or DEFAULT_ALERT_MAX_AGE_SEC)
     allow_lottos = cfg.get("ALLOW_LOTTOS", "false").lower() == "true"
     live_rules = BASE_LIVE_RULES + (LOTTO_RULES if allow_lottos else ())
     dets = []
@@ -151,32 +153,80 @@ def process(cfg):
     except FileNotFoundError:
         return
 
-    # prune open positions whose events ended (settle window passed) — stale entries
-    # must never block MAX_OPEN slots on fresh opportunities
+    # ---- Self-Healing Pruning of Expired Open Positions ----
     nowts = datetime.now(timezone.utc)
     for k in list(state["open"].keys()):
         v = state["open"][k]
         end = v.get("end")
-        try:
-            if end:
-                if nowts > datetime.fromisoformat(str(end).replace("Z", "+00:00")) + timedelta(hours=3):
-                    del state["open"][k]
-            elif v.get("ts") and nowts > datetime.fromisoformat(v["ts"]) + timedelta(hours=36):
-                del state["open"][k]
-        except Exception:
-            pass
+        if not end:
+            for d in dets:
+                if d.get("key") == k:
+                    end = d.get("end") or d.get("endDate")
+                    if end:
+                        v["end"] = end
+                        break
+        ts = v.get("ts")
+        expired = False
+        reason = ""
+        if end:
+            try:
+                end_dt = datetime.fromisoformat(str(end).replace("Z", "+00:00"))
+                if nowts > end_dt + timedelta(hours=2):
+                    expired = True
+                    reason = f"event endDate {end} + 2h passed"
+            except Exception:
+                pass
+        if not expired and ts:
+            try:
+                ts_dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                if nowts > ts_dt + timedelta(hours=12):
+                    expired = True
+                    reason = f"position age > 12h ({ts})"
+            except Exception:
+                pass
+        if expired:
+            say(f"[PRUNE-EXPIRED] Closed open position slot: {k} ({reason})")
+            del state["open"][k]
 
     for det in dets:
         key = det["key"]
         if key in state["processed"]: continue
-        state["processed"][key] = {"ts": datetime.now(timezone.utc).isoformat(), "action": "seen"}
 
         rule = det.get("rule")
+        end_val = det.get("end") or det.get("endDate")
         base = {
             "ts": datetime.now(timezone.utc).isoformat(), "key": key, "rule": rule,
             "city": det["city"], "bucket": det["bucket"], "side": det["side"],
-            "alert_px": det.get("px"), "end": det.get("endDate"),
+            "alert_px": det.get("px"), "end": end_val,
         }
+
+        # ---- Gate 0: Alert Freshness & Event Expiration (Fail-Loud / No Legacy Execution) ----
+        det_ts_str = det.get("ts")
+        if det_ts_str:
+            try:
+                det_dt = datetime.fromisoformat(str(det_ts_str).replace("Z", "+00:00"))
+                age_sec = (nowts - det_dt).total_seconds()
+                if age_sec > alert_max_age_sec:
+                    state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_stale_alert", "det_age_min": round(age_sec / 60, 1)}
+                    jlog(ORDERS, {**base, "result": "REJECTED_STALE_ALERT", "det_age_min": round(age_sec / 60, 1)})
+                    say(f"[SKIP-STALE] {key} detected {age_sec/60:.1f}m ago (max {alert_max_age_sec/60:.0f}m) — skipped")
+                    continue
+            except Exception:
+                pass
+
+        if end_val:
+            try:
+                end_dt = datetime.fromisoformat(str(end_val).replace("Z", "+00:00"))
+                if nowts >= end_dt:
+                    state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_event_ended", "end": end_val}
+                    jlog(ORDERS, {**base, "result": "REJECTED_EVENT_ENDED", "end": end_val})
+                    say(f"[SKIP-ENDED] {key} event endDate {end_val} has passed")
+                    continue
+            except Exception:
+                pass
+
+        state["processed"][key] = {"ts": datetime.now(timezone.utc).isoformat(), "action": "seen"}
+
         # ---- gates ----
         if rule not in live_rules:
             state["processed"][key]["action"] = "skip_rule_not_whitelisted"; continue
