@@ -480,7 +480,7 @@ def settle_past(seen_pending):
             shares = det.get("shares") if det.get("shares") is not None else (det.get("size_usd", 0) / px)
             pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
             log(CLO, {"ts": now.isoformat(), "key": key, "city": det["city"], "station": station,
-                      "title": det["title"], "bucket": det["bucket"], "side": det["side"],
+                      "title": det["title"], "slug": det.get("slug"), "bucket": det["bucket"], "side": det["side"],
                       "bucket_hit": bucket_hit, "pos_won": pos_won,
                       "paper_size_usd": round(shares * px, 2), "shares": round(shares, 1),
                       "entry_px": round(px, 4),
