@@ -274,11 +274,22 @@ def process(cfg):
                 px_now, sz_now = 1 - yes[0], yes[1]
             if px_now is None or px_now > (det.get("px") or 0) + PX_TOL:
                 state["processed"][key]["action"] = "skip_price_moved"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE", "px_now": round(px_now,3) if px_now else None}); continue
+            if px_now > 0.92:
+                state["processed"][key]["action"] = "skip_price_ceiling"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE_CEILING", "px_now": round(px_now,3)}); continue
             q = det["q"]
             edge_now = q - px_now - fee(px_now)
             if edge_now < EDGE_MIN:
                 state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "px_now": round(px_now,3), "edge_now": round(edge_now,3)}); continue
-            shares = int(min(card / px_now, 0.9 * sz_now))
+            
+            # Dynamic Fractional Kelly Price-Tier Sizing
+            if px_now <= 0.70:
+                card_tier = card            # Full Card ($25.0, ~1/8.5 Kelly)
+            elif px_now <= 0.85:
+                card_tier = min(card, 18.0) # Medium Card ($18.0, ~1/11 Kelly)
+            else:
+                card_tier = min(card, 10.0) # Defensive Card ($10.0, ~1/14 Kelly)
+
+            shares = int(min(card_tier / px_now, 0.9 * sz_now))
             if shares < 5:
                 state["processed"][key]["action"] = "skip_thin"; jlog(ORDERS, {**base, "result": "REJECTED_THIN", "depth": sz_now}); continue
             limit_px = px_now

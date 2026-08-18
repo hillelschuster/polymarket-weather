@@ -46,11 +46,15 @@ MAP = {
     "Amsterdam": ("EHAM", 2, "Europe/Amsterdam", 6.4, 20.7), "Warsaw": ("EPWA", 2, "Europe/Warsaw", 5.5, 19.8),
     "Helsinki": ("EFHK", 3, "Europe/Helsinki", 5.4, 20.9), "Madrid": ("LEMD", 2, "Europe/Madrid", 7.2, 20.9),
     "Milan": ("LIMC", 2, "Europe/Rome", 6.3, 20.2), "Munich": ("EDDM", 2, "Europe/Berlin", 6.2, 20.2),
+    "Rome": ("LIRF", 2, "Europe/Rome", 6.2, 20.1), "Frankfurt": ("EDDF", 2, "Europe/Berlin", 6.1, 20.3),
+    "Vienna": ("LOWW", 2, "Europe/Vienna", 5.8, 20.0),
     "NYC": ("KLGA", -4, "America/New_York", 6.1, 19.5), "Miami": ("KMIA", -4, "America/New_York", 6.8, 19.5),
     "Atlanta": ("KATL", -4, "America/New_York", 6.9, 20.1), "Boston": ("KBOS", -4, "America/New_York", 5.9, 19.3),
+    "Philadelphia": ("KPHL", -4, "America/New_York", 6.1, 19.4), "Washington DC": ("KDCA", -4, "America/New_York", 6.2, 19.5),
     "Chicago": ("KMDW", -5, "America/Chicago", 6.0, 19.4), "Dallas": ("KDAL", -5, "America/Chicago", 6.8, 20.1),
     "Austin": ("KAUS", -5, "America/Chicago", 6.9, 20.2), "Houston": ("KHOU", -5, "America/Chicago", 6.8, 19.9),
     "Denver": ("KDEN", -6, "America/Denver", 6.2, 19.4), "Phoenix": ("KPHX", -7, "America/Phoenix", 5.9, 19.3),
+    "Las Vegas": ("KLAS", -7, "America/Los_Angeles", 6.0, 19.2),
     "Los Angeles": ("KLAX", -7, "America/Los_Angeles", 6.2, 19.3), "San Francisco": ("KSFO", -7, "America/Los_Angeles", 6.4, 19.4),
     "Seattle": ("KSEA", -7, "America/Los_Angeles", 6.2, 20.2), "Toronto": ("CYYZ", -4, "America/Toronto", 6.3, 19.9),
     "Mexico City": ("MMMX", -6, "America/Mexico_City", 7.1, 19.9),
@@ -58,7 +62,8 @@ MAP = {
     "Buenos Aires": ("SABE", -3, "America/Argentina/Buenos_Aires", 7.3, 18.3),
 }
 US_F = {"NYC", "Miami", "Chicago", "Dallas", "Austin", "Houston", "Denver", "Phoenix",
-        "Los Angeles", "San Francisco", "Seattle", "Atlanta", "Boston"}
+        "Los Angeles", "San Francisco", "Seattle", "Atlanta", "Boston", "Philadelphia",
+        "Washington DC", "Las Vegas"}
 
 CYCLE_SEC = 120
 EVENT_CACHE_SEC = 600
@@ -240,18 +245,29 @@ def fetch_running(in_window_events):
             day_start_utc = (nowloc.replace(hour=0, minute=0, second=0, microsecond=0)
                              - timedelta(hours=off)).timestamp()
             vals = [tmp for tt, tmp in obs_list if tt >= day_start_utc]
+            # calculate 30-60m trend (rate of change in C/hr) from timestamped observations
+            sorted_obs = sorted([(tt, tmp) for tt, tmp in obs_list if isinstance(tt, (int, float)) and tmp is not None], key=lambda x: x[0])
+            trend = None
+            if len(sorted_obs) >= 2:
+                t_last, temp_last = sorted_obs[-1]
+                for t_prev, temp_prev in reversed(sorted_obs[:-1]):
+                    dt_hr = (t_last - t_prev) / 3600.0
+                    if 0.3 <= dt_hr <= 1.5:
+                        trend = round((temp_last - temp_prev) / dt_hr, 2)
+                        break
             if vals:
-                out[src] = (max(vals), min(vals))
+                out[src] = (max(vals), min(vals), trend)
     return out
 
-def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmin=None):
-    """Conservative deterministic rules. Return list of detection dicts."""
+def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmin=None, trend=None):
+    """Conservative deterministic rules with progressive margin & velocity trend gating."""
     src, off, tz, dawn, lastlight = city_cfg
     is_low = event["title"].startswith("Lowest")
     is_f = event["city"] in US_F
     obs_m = obs * 9 / 5 + 32 if is_f else obs
-    margin = 3.6 if is_f else 2.0   # 2C equivalent; F markets need wider margin due to METAR C quantization
-    bd_min = 1.4 if is_f else 0.8   # 0.8C equivalent boundary margin against resolver-vs-METAR noise
+    margin_base = 3.6 if is_f else 2.0     # 2.0C / 3.6F standard margin
+    margin_strict = 5.0 if is_f else 2.8   # 2.8C / 5.0F strict margin for high-price NOs (>0.75)
+    bd_min = 1.4 if is_f else 0.8          # 0.8C boundary margin against resolver-vs-METAR noise
     out = []
 
     def mk(rule, side, q, r):
@@ -270,7 +286,10 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
         runmax_m = (runmax * 9 / 5 + 32) if (runmax is not None and is_f) else runmax
         runmin_m = (runmin * 9 / 5 + 32) if (runmin is not None and is_f) else runmin
         min_anchor = runmin_m if runmin_m is not None else obs_m
-        if is_low and (dawn - 2.5) <= local_hour <= dawn and not precip:
+        
+        # Velocity filter: block low-side entries if temperature is rapidly falling (trend < -0.3 C/hr)
+        trend_ok_low = (trend is None) or (trend >= -0.3)
+        if is_low and (dawn - 2.5) <= local_hour <= dawn and not precip and trend_ok_low:
             # R1 lotto: running min inside bucket, boundary distance >= bd_min, ask dirt cheap -> floor q 0.15
             min_in_bucket = (r["lo"] <= min_anchor < r["hi"]) and in_bucket
             bd_low = min(min_anchor - r["lo"], r["hi"] - min_anchor) if min_in_bucket else 0
@@ -278,14 +297,18 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                 q = 0.15
                 if q - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
                     out.append(mk("R1_low_lotto", "YES", q, r))
-            # R2 dead-below: bucket top <= running-min - margin -> ceiling q_yes 0.05
-            if r["hi"] <= min_anchor - margin and r["yes_bid"] is not None:
-                q_no = 0.95
+            # R2 dead-below: progressive margin based on price
+            if r["yes_bid"] is not None:
                 no_ask = 1 - r["yes_bid"]
-                if q_no - no_ask - fee(no_ask) > 0.05:
-                    out.append(mk("R2_low_dead_below", "NO", q_no, r))
-        if (not is_low) and local_hour >= lastlight - 2.5 and local_hour <= lastlight and not precip:
-            # R4 high-side lotto: running max inside bucket, boundary distance >= bd_min, ask dirt cheap -> floor q 0.15
+                req_margin = margin_strict if no_ask > 0.75 else margin_base
+                if r["hi"] <= min_anchor - req_margin:
+                    q_no = 0.98 if no_ask > 0.75 else 0.95
+                    if q_no - no_ask - fee(no_ask) > 0.05:
+                        out.append(mk("R2_low_dead_below", "NO", q_no, r))
+                        
+        # Velocity filter: block high-side entries if temperature is still surging (trend > +0.3 C/hr)
+        trend_ok_high = (trend is None) or (trend <= 0.3)
+        if (not is_low) and local_hour >= lastlight - 2.5 and local_hour <= lastlight and not precip and trend_ok_high:
             max_anchor = runmax_m if runmax_m is not None else obs_m
             max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m or obs_m < r["hi"])
             bd_high = min(max_anchor - r["lo"], r["hi"] - max_anchor) if max_in_bucket else 0
@@ -293,12 +316,14 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                 q4 = 0.15
                 if q4 - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
                     out.append(mk("R4_high_lotto", "YES", q4, r))
-            # R3 dead-above after peak: bucket bottom >= running-max + margin -> ceiling q_yes 0.05
-            if r["lo"] >= max_anchor + margin and r["yes_bid"] is not None:
-                q_no = 0.95
+            # R3 dead-above after peak: progressive margin based on price
+            if r["yes_bid"] is not None:
                 no_ask = 1 - r["yes_bid"]
-                if q_no - no_ask - fee(no_ask) > 0.05:
-                    out.append(mk("R3_high_dead_above", "NO", q_no, r))
+                req_margin = margin_strict if no_ask > 0.75 else margin_base
+                if r["lo"] >= max_anchor + req_margin:
+                    q_no = 0.98 if no_ask > 0.75 else 0.95
+                    if q_no - no_ask - fee(no_ask) > 0.05:
+                        out.append(mk("R3_high_dead_above", "NO", q_no, r))
     return out
 
 def official_outcome(det):
@@ -445,7 +470,9 @@ def cycle(events_cache):
         local_hour = local.hour + local.minute / 60
         raw = raws.get("VHHH" if src == "hko" else src, "")
         precip = bool(re.search(r"\b(RA|SN|SHRA|-RA|RA\s|TSRA|RASN|SNRA|SHSN)\b", raw))
-        runmax, runmin = running.get(src, (None, None))
+        run_info = running.get(src, (None, None, None))
+        runmax, runmin = run_info[0], run_info[1]
+        trend = run_info[2] if len(run_info) > 2 else None
         book = top_of_book(e)
         active += 1
 
@@ -469,9 +496,9 @@ def cycle(events_cache):
         log(SURVEY, {"ts": now.isoformat(), "title": e["title"], "city": city,
                      "side": "low" if is_low else "high", "min_to_lock": minutes_to_lock,
                      "runmax": runmax, "runmin": runmin, "obs": obs, "obs_age_min": obs_age_min,
-                     "precip": precip, "buckets": rel})
+                     "precip": precip, "buckets": rel, "trend_c_per_hr": trend})
 
-        for d in detectors(e, MAP[city], local_hour, obs, precip, book, runmax, runmin):
+        for d in detectors(e, MAP[city], local_hour, obs, precip, book, runmax, runmin, trend):
             if d.get("shares", 0) < 5:   # CLOB minimum order size
                 continue
             key = f"{e['title']}|{d['bucket']}|{d['side']}"
@@ -480,13 +507,13 @@ def cycle(events_cache):
             bd = next((x["bd"] for x in rel if x["b"] == d["bucket"] and x["bd"] is not None), None)
             rec = {"ts": now.isoformat(), "key": key, "city": city, "title": e["title"],
                    "slug": e.get("slug"), "end": e["endDate"], "resolver_obs_c": obs,
-                   "runmax_c": runmax, "runmin_c": runmin,
+                   "runmax_c": runmax, "runmin_c": runmin, "trend_c_per_hr": trend,
                    "minutes_to_lock": minutes_to_lock, "obs_age_min": obs_age_min,
                    "boundary_distance": bd, **d}
             log(DET, rec)
             pending[key] = rec
             px = d.get("yes_ask") if d["side"] == "YES" else round(1 - d["yes_bid"], 3)
-            say(f"[ALERT] {d['rule']} {city} {d['bucket']} {d['side']} px={px} edge={d['edge']} obs={obs}C runmax={runmax} runmin={runmin}")
+            say(f"[ALERT] {d['rule']} {city} {d['bucket']} {d['side']} px={px} edge={d['edge']} obs={obs}C runmax={runmax} runmin={runmin} trend={trend}")
         save_seen(seen)  # per-event persistence prevents duplicate re-fires after mid-cycle errors
     save_seen(seen)
     with open(os.path.join(DATA, "pending.json"), "w", encoding="utf-8") as f:
