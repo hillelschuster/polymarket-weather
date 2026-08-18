@@ -79,12 +79,12 @@ ASK_MAX_LOTTO = 0.002
 def say(msg):
     line = f"[{datetime.now(timezone.utc).isoformat(timespec='seconds')}] {msg}"
     try:
-        with open(RUNLOG, "a", encoding="utf-8") as f:
+        with open(RUNLOG, "a", encoding="utf-8", errors="replace") as f:
             f.write(line + "\n")
     except Exception:
         pass
     try:
-        if sys.stdout:
+        if sys.stdout and sys.stdout.isatty():
             print(line, flush=True)
     except Exception:
         pass
@@ -111,7 +111,7 @@ def get(url, retries=4, base_delay=1.0, max_delay=15.0, timeout=25):
                 raw_delay = min(base_delay * (2 ** attempt), max_delay)
                 delay = raw_delay * random.uniform(0.75, 1.25)
             time.sleep(delay)
-        except (urllib.error.URLError, TimeoutError, OSError):
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError):
             if attempt >= retries: raise
             delay = min(base_delay * (2 ** attempt), max_delay) * random.uniform(0.75, 1.25)
             time.sleep(delay)
@@ -125,7 +125,12 @@ def atomic_save_json(path, obj):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=1, ensure_ascii=False)
-    os.replace(tmp, path)
+    for _ in range(3):
+        try:
+            os.replace(tmp, path)
+            break
+        except Exception:
+            time.sleep(0.05)
 
 def load_seen():
     try:
@@ -135,9 +140,12 @@ def load_seen():
 def save_seen(s):
     atomic_save_json(SEEN, sorted(s))
 
-MONTHS = {m.lower(): i for i, m in enumerate(
-    ["January","February","March","April","May","June","July","August",
-     "September","October","November","December"], 1)}
+MONTHS = {
+    "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
+    "april": 4, "apr": 4, "may": 5, "june": 6, "jun": 6, "july": 7, "jul": 7,
+    "august": 8, "aug": 8, "september": 9, "sep": 9, "sept": 9, "october": 10, "oct": 10,
+    "november": 11, "nov": 11, "december": 12, "dec": 12
+}
 
 def target_local_date(title, ref_dt=None):
     """'... on August 16?' -> (2026, 8, 16). Handles year boundaries adaptively."""
@@ -212,49 +220,56 @@ def fetch_obs(events):
     return temps, raws, times
 
 def bucket_parse(gt):
-    """-> (lo, hi, val) supporting negative numbers, decimals, and boundary phrases."""
-    gt = gt.strip()
-    m_range = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:-|to)\s*(-?\d+(?:\.\d+)?)", gt)
+    """-> (lo, hi, val) supporting negative numbers, decimals, unicode dashes, and boundary phrases."""
+    if not gt: return None
+    gt = str(gt).strip()
+    m_range = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(-?\d+(?:\.\d+)?)", gt)
     if m_range:
         a, b = float(m_range.group(1)), float(m_range.group(2))
-        return (a - 0.5, b + 0.5, a)
+        return (min(a, b) - 0.5, max(a, b) + 0.5, min(a, b))
     m_single = re.search(r"(-?\d+(?:\.\d+)?)", gt)
     if not m_single: return None
     v = float(m_single.group(1))
     gt_lower = gt.lower()
-    if "or below" in gt_lower or "below" in gt_lower or "<" in gt_lower:
+    if any(p in gt_lower for p in ("or below", "below", "or less", "less", "<")):
         return (float("-inf"), v + 0.5, v)
-    if "or higher" in gt_lower or "above" in gt_lower or ">" in gt_lower:
+    if any(p in gt_lower for p in ("or higher", "above", "or more", "more", ">")):
         return (v - 0.5, float("inf"), v)
     return (v - 0.5, v + 0.5, v)
 
 def top_of_book(event):
     rows = []
-    for m in event["markets"]:
-        bp = bucket_parse(m.get("groupItemTitle") or "")
-        if not bp: continue
-        toks = json.loads(m["clobTokenIds"]) if isinstance(m.get("clobTokenIds"), str) else m.get("clobTokenIds")
-        outcomes = json.loads(m.get("outcomes")) if isinstance(m.get("outcomes"), str) else m.get("outcomes")
-        yes_idx = outcomes.index("Yes") if outcomes and "Yes" in outcomes else 0
+    for m in event.get("markets") or []:
         try:
+            raw_title = (m.get("groupItemTitle") or "").strip()
+            bp = bucket_parse(raw_title)
+            if not bp: continue
+            toks = m.get("clobTokenIds")
+            if isinstance(toks, str): toks = json.loads(toks)
+            outcomes = m.get("outcomes")
+            if isinstance(outcomes, str): outcomes = json.loads(outcomes)
+            yes_idx = outcomes.index("Yes") if outcomes and "Yes" in outcomes else 0
+            if not toks or len(toks) <= yes_idx: continue
+
             bk = get(f"https://clob.polymarket.com/book?token_id={toks[yes_idx]}")
+            if not isinstance(bk, dict): continue
+            bids = sorted(bk.get("bids") or [], key=lambda x: float(x.get("price", 0)))
+            asks = sorted(bk.get("asks") or [], key=lambda x: float(x.get("price", 0)))
+            rows.append({"bucket": raw_title, "lo": bp[0], "hi": bp[1], "val": bp[2],
+                         "tokens": toks, "yes_idx": yes_idx,
+                         "yes_bid": float(bids[-1]["price"]) if bids else None,
+                         "yes_bid_sz": float(bids[-1]["size"]) if bids else 0,
+                         "yes_ask": float(asks[0]["price"]) if asks else None,
+                         "yes_ask_sz": float(asks[0]["size"]) if asks else 0})
+            time.sleep(0.04)  # Rate pacing to prevent IP burst collisions with other bots
         except Exception:
             continue
-        bids = sorted(bk.get("bids") or [], key=lambda x: float(x["price"]))
-        asks = sorted(bk.get("asks") or [], key=lambda x: float(x["price"]))
-        rows.append({"bucket": m.get("groupItemTitle").strip(), "lo": bp[0], "hi": bp[1], "val": bp[2],
-                     "tokens": toks, "yes_idx": yes_idx,
-                     "yes_bid": float(bids[-1]["price"]) if bids else None,
-                     "yes_bid_sz": float(bids[-1]["size"]) if bids else 0,
-                     "yes_ask": float(asks[0]["price"]) if asks else None,
-                     "yes_ask_sz": float(asks[0]["size"]) if asks else 0})
-        time.sleep(0.04)  # Rate pacing to prevent IP burst collisions with other bots
     rows.sort(key=lambda r: r["val"])
     return rows
 
 def fetch_running(in_window_events):
-    """Running (day_max, day_min) per station, restricted to each event's local calendar day.
-    Returns {(station): (runmax, runmin)} using up to 14h of recent METARs."""
+    """Running (day_max, day_min, trend) per station, restricted to each event's local calendar day.
+    Uses instantaneous METARs for trend velocity and remarks extrema for daily bounds."""
     out = {}
     stations = sorted({(MAP[e["city"]][0], MAP[e["city"]][1]) for e in in_window_events})
     if not stations: return out
@@ -265,28 +280,34 @@ def fetch_running(in_window_events):
             ms = get("https://aviationweather.gov/api/data/metar?ids=%s&hours=14&format=json" % ids)
         except Exception as ex:
             say("recent metar err %s" % ex); continue
-        by = {}
-        for m in ms:
+        instant_by = {}
+        extremes_by = {}
+        for m in (ms or []):
+            if not isinstance(m, dict): continue
+            icao = m.get("icaoId")
+            if not icao: continue
             t, tmp = m.get("obsTime"), m.get("temp")
             raw = m.get("rawOb") or ""
             if isinstance(t, (int, float)):
-                if tmp is not None:
-                    by.setdefault(m["icaoId"], []).append((t, tmp))
+                if isinstance(tmp, (int, float)):
+                    instant_by.setdefault(icao, []).append((t, float(tmp)))
+                    extremes_by.setdefault(icao, []).append((t, float(tmp)))
                 m6 = re.search(r"\b1([01])(\d{3})\b", raw)
                 if m6:
-                    by.setdefault(m["icaoId"], []).append((t, (-1 if m6.group(1) == "1" else 1) * int(m6.group(2)) / 10))
+                    extremes_by.setdefault(icao, []).append((t, (-1 if m6.group(1) == "1" else 1) * int(m6.group(2)) / 10))
                 n6 = re.search(r"\b2([01])(\d{3})\b", raw)
                 if n6:
-                    by.setdefault(m["icaoId"], []).append((t, (-1 if n6.group(1) == "1" else 1) * int(n6.group(2)) / 10))
+                    extremes_by.setdefault(icao, []).append((t, (-1 if n6.group(1) == "1" else 1) * int(n6.group(2)) / 10))
         for (src, off), _res in [(c, None) for c in chunk]:
             st = "VHHH" if src == "hko" else src
-            obs_list = by.get(st) or []
+            ext_list = extremes_by.get(st) or []
+            inst_list = instant_by.get(st) or []
             nowloc = datetime.now(timezone.utc) + timedelta(hours=off)
             day_start_utc = (nowloc.replace(hour=0, minute=0, second=0, microsecond=0)
                              - timedelta(hours=off)).timestamp()
-            vals = [tmp for tt, tmp in obs_list if tt >= day_start_utc]
-            # calculate 30-60m trend (rate of change in C/hr) from timestamped observations
-            sorted_obs = sorted([(tt, tmp) for tt, tmp in obs_list if isinstance(tt, (int, float)) and tmp is not None], key=lambda x: x[0])
+            vals = [tmp for tt, tmp in ext_list if tt >= day_start_utc]
+            # calculate 30-90m trend (instantaneous rate of change in C/hr) strictly from instantaneous obs
+            sorted_obs = sorted([(tt, tmp) for tt, tmp in inst_list if isinstance(tt, (int, float)) and tmp is not None], key=lambda x: x[0])
             trend = None
             if len(sorted_obs) >= 2:
                 t_last, temp_last = sorted_obs[-1]
@@ -312,6 +333,7 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
 
     def mk(rule, side, q, r):
         px = r["yes_ask"] if side == "YES" else 1 - r["yes_bid"]
+        px = max(0.001, float(px))
         avail = (r["yes_ask_sz"] if side == "YES" else r["yes_bid_sz"]) * 0.9
         want = (SIZE_LOTTO if rule in ("R1_low_lotto", "R4_high_lotto") else SIZE_LOCKED) / px
         shares = max(0, int(min(want, avail)))
@@ -326,7 +348,7 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
         runmax_m = (runmax * 9 / 5 + 32) if (runmax is not None and is_f) else runmax
         runmin_m = (runmin * 9 / 5 + 32) if (runmin is not None and is_f) else runmin
         min_anchor = runmin_m if runmin_m is not None else obs_m
-        
+
         # Velocity filter: block low-side entries if temperature is rapidly falling (trend < -0.3 C/hr)
         trend_ok_low = (trend is None) or (trend >= -0.3)
         if is_low and (dawn - 2.5) <= local_hour <= dawn and not precip and trend_ok_low:
@@ -345,12 +367,12 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                     q_no = 0.98 if no_ask > 0.75 else 0.95
                     if q_no - no_ask - fee(no_ask) > 0.05:
                         out.append(mk("R2_low_dead_below", "NO", q_no, r))
-                        
+
         # Velocity filter: block high-side entries if temperature is still surging (trend > +0.3 C/hr)
         trend_ok_high = (trend is None) or (trend <= 0.3)
         if (not is_low) and local_hour >= lastlight - 2.5 and local_hour <= lastlight and not precip and trend_ok_high:
             max_anchor = runmax_m if runmax_m is not None else obs_m
-            max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m or obs_m < r["hi"])
+            max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m < r["hi"])
             bd_high = min(max_anchor - r["lo"], r["hi"] - max_anchor) if max_in_bucket else 0
             if max_in_bucket and bd_high >= bd_min and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
                 q4 = 0.15
@@ -364,6 +386,7 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                     q_no = 0.98 if no_ask > 0.75 else 0.95
                     if q_no - no_ask - fee(no_ask) > 0.05:
                         out.append(mk("R3_high_dead_above", "NO", q_no, r))
+    return out
     return out
 
 def official_outcome(det):
@@ -419,7 +442,8 @@ def settle_past(seen_pending):
             bucket_hit = official
             ex = -999  # official market resolution; station value not needed
             px = det.get("px") or (det["yes_ask"] if det["side"] == "YES" else 1 - det["yes_bid"])
-            shares = det.get("shares") or det["size"] / px
+            px = max(0.001, float(px))
+            shares = det.get("shares") if det.get("shares") is not None else (det.get("size_usd", 0) / px)
             pos_won = bucket_hit if det["side"] == "YES" else (not bucket_hit)
             pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
             log(CLO, {"ts": now.isoformat(), "key": key, "city": det["city"], "station": "OFFICIAL",
@@ -453,7 +477,8 @@ def settle_past(seen_pending):
             bucket_hit = det["lo"] <= ex < det["hi"]
             pos_won = bucket_hit if det["side"] == "YES" else (not bucket_hit)
             px = det.get("px") or (det["yes_ask"] if det["side"] == "YES" else 1 - det["yes_bid"])
-            shares = det.get("shares") or det["size"] / max(0.001, px)
+            px = max(0.001, float(px))
+            shares = det.get("shares") if det.get("shares") is not None else (det.get("size_usd", 0) / px)
             pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
             log(CLO, {"ts": now.isoformat(), "key": key, "city": det["city"], "station": station,
                       "title": det["title"], "bucket": det["bucket"], "side": det["side"],
@@ -491,7 +516,7 @@ def cycle(events_cache):
             end = datetime.fromisoformat((e["endDate"] or "").replace("Z", "+00:00"))
         except Exception: continue
         hrs = (end - now).total_seconds() / 3600
-        if not (0 < hrs < 40): continue
+        if not (-14 < hrs < 48): continue
         local = now + timedelta(hours=off)
         local_hour = local.hour + local.minute / 60
         # CRITICAL: only act inside the event's own local calendar day
@@ -514,7 +539,7 @@ def cycle(events_cache):
         local = now + timedelta(hours=off)
         local_hour = local.hour + local.minute / 60
         raw = raws.get("VHHH" if src == "hko" else src, "")
-        precip = bool(re.search(r"\b(RA|SN|SHRA|-RA|RA\s|TSRA|RASN|SNRA|SHSN)\b", raw))
+        precip = bool(re.search(r"(?:^|\s)([-+]?(?:RA|SN|DZ|PL|GR|GS|SHRA|TSRA|RASN|SNRA|SHSN))\b", raw))
         run_info = running.get(src, (None, None, None))
         runmax, runmin = run_info[0], run_info[1]
         trend = run_info[2] if len(run_info) > 2 else None

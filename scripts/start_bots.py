@@ -7,9 +7,11 @@ os.makedirs(DATA, exist_ok=True)
 LOG = os.path.join(DATA, "run.log")
 
 py = sys.executable
-flags = 0x00000008 | 0x00000200 | 0x08000000  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP | CREATE_NO_WINDOW
+# Win32: CREATE_NO_WINDOW (0x08000000) | CREATE_NEW_PROCESS_GROUP (0x00000200)
+# NOTE: Never combine DETACHED_PROCESS (0x08) with CREATE_NO_WINDOW (0x08000000)
+flags = subprocess.CREATE_NO_WINDOW | subprocess.CREATE_NEW_PROCESS_GROUP if sys.platform == "win32" else 0
 
-with open(LOG, "a", encoding="utf-8") as f:
+with open(LOG, "a", encoding="utf-8", errors="replace") as f:
     p1 = subprocess.Popen([py, "-u", os.path.join(ROOT, "scripts", "supervisor.py")],
                           cwd=ROOT, creationflags=flags, stdout=f, stderr=f, close_fds=True)
     p2 = subprocess.Popen([py, "-u", os.path.join(ROOT, "scripts", "live_trader.py")],

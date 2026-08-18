@@ -22,6 +22,7 @@ from datetime import datetime, timezone, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
+os.makedirs(DATA, exist_ok=True)
 DET = os.path.join(DATA, "detections.jsonl")
 STATE = os.path.join(DATA, "live_state.json")
 ORDERS = os.path.join(DATA, "live_orders.jsonl")
@@ -52,38 +53,59 @@ def env():
            "LOTTO_DAY_CAP": str(DEFAULT_LOTTO_DAY_CAP),
            "ALERT_MAX_AGE_SEC": str(DEFAULT_ALERT_MAX_AGE_SEC)}
     try:
-        for line in open(ENVF, encoding="utf-8"):
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line: continue
-            k, v = line.split("=", 1)
-            cfg[k.strip()] = v.strip().strip('"').strip("'")
-    except FileNotFoundError:
+        if os.path.exists(ENVF):
+            with open(ENVF, "r", encoding="utf-8-sig", errors="replace") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line: continue
+                    k, v = line.split("=", 1)
+                    v = v.split("#", 1)[0].strip()
+                    cfg[k.strip()] = v.strip('"').strip("'")
+    except Exception:
         pass
+    for k in cfg:
+        if k in os.environ:
+            cfg[k] = os.environ[k]
     return cfg
 
 def say(msg):
     line = f"[{datetime.now(timezone.utc).isoformat(timespec='seconds')}] [TRADER] {msg}"
     try:
-        with open(RUNLOG, "a", encoding="utf-8") as f: f.write(line + "\n")
+        with open(RUNLOG, "a", encoding="utf-8", errors="replace") as f: f.write(line + "\n")
     except Exception: pass
     try:
-        if sys.stdout:
+        if sys.stdout and sys.stdout.isatty():
             print(line, flush=True)
     except Exception: pass
 
 def jload(path, default):
     try:
-        with open(path, encoding="utf-8") as f: return json.load(f)
+        with open(path, encoding="utf-8", errors="replace") as f: return json.load(f)
     except Exception: return default
 
 def jsave(path, obj):
     tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(obj, f, indent=1)
-    os.replace(tmp, path)
+    with open(tmp, "w", encoding="utf-8", errors="replace") as f:
+        json.dump(obj, f, indent=1, ensure_ascii=False)
+    for attempt in range(5):
+        try:
+            os.replace(tmp, path)
+            return
+        except (PermissionError, OSError):
+            if attempt == 4:
+                try:
+                    with open(path, "w", encoding="utf-8", errors="replace") as f:
+                        json.dump(obj, f, indent=1, ensure_ascii=False)
+                    if os.path.exists(tmp): os.remove(tmp)
+                    return
+                except Exception as ex:
+                    say(f"CRITICAL: jsave failed for {path}: {ex}")
+                    raise
+            time.sleep(0.05 * (2 ** attempt))
 
 def jlog(path, obj):
-    with open(path, "a", encoding="utf-8") as f: f.write(json.dumps(obj) + "\n")
+    with open(path, "a", encoding="utf-8", errors="replace") as f:
+        f.write(json.dumps(obj, ensure_ascii=False) + "\n")
 
 def get(url, retries=4, base_delay=1.0, max_delay=15.0, timeout=25):
     """Resilient HTTP client with exponential backoff, jitter, and 429 Retry-After compliance."""
@@ -106,7 +128,7 @@ def get(url, retries=4, base_delay=1.0, max_delay=15.0, timeout=25):
                 raw_delay = min(base_delay * (2 ** attempt), max_delay)
                 delay = raw_delay * random.uniform(0.75, 1.25)
             time.sleep(delay)
-        except (urllib.error.URLError, TimeoutError, OSError):
+        except (urllib.error.URLError, TimeoutError, OSError, json.JSONDecodeError, ValueError):
             if attempt >= retries: raise
             delay = min(base_delay * (2 ** attempt), max_delay) * random.uniform(0.75, 1.25)
             time.sleep(delay)
@@ -120,27 +142,33 @@ def fresh_book(det):
     if not toks:  # legacy detection: fetch from gamma by slug
         try:
             ev = get(f"https://gamma-api.polymarket.com/events?slug={det['slug']}")
-            if isinstance(ev, list): ev = ev[0]
-            for m in ev.get("markets") or []:
+            if isinstance(ev, list): ev = ev[0] if ev else None
+            for m in (ev.get("markets") or []) if isinstance(ev, dict) else []:
                 if (m.get("groupItemTitle") or "").strip() == det["bucket"]:
-                    toks = json.loads(m["clobTokenIds"]) if isinstance(m.get("clobTokenIds"), str) else m["clobTokenIds"]
+                    toks = json.loads(m["clobTokenIds"]) if isinstance(m.get("clobTokenIds"), str) else m.get("clobTokenIds")
                     det["tokens"] = toks
                     det["yes_idx"] = 0
                     break
         except Exception as ex:
             say(f"gamma fallback err {ex}")
             return None, None, None, None
-    if not toks: return None, None, None, None
+    if not toks or not isinstance(toks, (list, tuple)) or len(toks) < 2:
+        return None, None, None, None
     yi = det.get("yes_idx", 0)
-    bk = get(f"https://clob.polymarket.com/book?token_id={toks[yi]}")
-    bids = sorted(bk.get("bids") or [], key=lambda x: float(x["price"]))
-    asks = sorted(bk.get("asks") or [], key=lambda x: float(x["price"]))
-    yes_bid = float(bids[-1]["price"]) if bids else None
-    yes_bid_sz = float(bids[-1]["size"]) if bids else 0
-    yes_ask = float(asks[0]["price"]) if asks else None
-    yes_ask_sz = float(asks[0]["size"]) if asks else 0
-    asks_all = [(float(a["price"]), float(a["size"])) for a in asks]
-    return (yes_bid, yes_bid_sz, toks, yi), (yes_ask, yes_ask_sz, toks, yi), det, asks_all
+    try:
+        bk = get(f"https://clob.polymarket.com/book?token_id={toks[yi]}")
+        if not isinstance(bk, dict): return None, None, None, None
+        bids = sorted(bk.get("bids") or [], key=lambda x: float(x["price"]))
+        asks = sorted(bk.get("asks") or [], key=lambda x: float(x["price"]))
+        yes_bid = float(bids[-1]["price"]) if bids else None
+        yes_bid_sz = float(bids[-1]["size"]) if bids else 0
+        yes_ask = float(asks[0]["price"]) if asks else None
+        yes_ask_sz = float(asks[0]["size"]) if asks else 0
+        asks_all = [(float(a["price"]), float(a["size"])) for a in asks]
+        return (yes_bid, yes_bid_sz, toks, yi), (yes_ask, yes_ask_sz, toks, yi), det, asks_all
+    except Exception as ex:
+        say(f"fresh_book clob fetch err: {ex}")
+        return None, None, None, None
 
 def tick_round(p):
     return max(TICK, round(p / TICK) * TICK)
@@ -148,7 +176,7 @@ def tick_round(p):
 def place_order(cfg, token_id, price, size):
     """Marketable FAK buy. Returns (ok, detail)."""
     from py_clob_client.client import ClobClient
-    from py_clob_client.clob_types import OrderArgs, OrderType
+    from py_clob_client.clob_types import OrderArgs, OrderType, BUY
     host = "https://clob.polymarket.com"
     key = cfg["PRIVATE_KEY"]
     chain = int(cfg.get("CHAIN_ID") or 137)
@@ -157,8 +185,10 @@ def place_order(cfg, token_id, price, size):
                         funder=funder) if funder else ClobClient(host, key=key, chain_id=chain)
     client.set_api_creds(client.create_or_derive_api_creds())
     order = client.create_and_post_order(
-        OrderArgs(token_id=token_id, price=round(price, 3), size=size),
-        orderType=OrderType.FAK)
+        OrderArgs(token_id=str(token_id), price=round(float(price), 3), size=float(size), side=BUY),
+        order_type=OrderType.FAK)
+    if isinstance(order, dict) and not order.get("success", True):
+        raise RuntimeError(f"CLOB rejected order: {order.get('errorMsg') or order}")
     return True, order
 
 def process(cfg):
@@ -183,7 +213,7 @@ def process(cfg):
                 except Exception:
                     continue
     except FileNotFoundError:
-        return
+        dets = []
 
     # ---- Self-Healing Pruning of Expired Open Positions ----
     nowts = datetime.now(timezone.utc)
@@ -203,6 +233,8 @@ def process(cfg):
         if end:
             try:
                 end_dt = datetime.fromisoformat(str(end).replace("Z", "+00:00"))
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=timezone.utc)
                 if nowts > end_dt + timedelta(hours=2):
                     expired = True
                     reason = f"event endDate {end} + 2h passed"
@@ -211,6 +243,8 @@ def process(cfg):
         if not expired and ts:
             try:
                 ts_dt = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                if ts_dt.tzinfo is None:
+                    ts_dt = ts_dt.replace(tzinfo=timezone.utc)
                 if nowts > ts_dt + timedelta(hours=12):
                     expired = True
                     reason = f"position age > 12h ({ts})"
@@ -234,21 +268,28 @@ def process(cfg):
 
         # ---- Gate 0: Alert Freshness & Event Expiration (Fail-Loud / No Legacy Execution) ----
         det_ts_str = det.get("ts")
-        if det_ts_str:
-            try:
-                det_dt = datetime.fromisoformat(str(det_ts_str).replace("Z", "+00:00"))
-                age_sec = (nowts - det_dt).total_seconds()
-                if age_sec > alert_max_age_sec:
-                    state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_stale_alert", "det_age_min": round(age_sec / 60, 1)}
-                    jlog(ORDERS, {**base, "result": "REJECTED_STALE_ALERT", "det_age_min": round(age_sec / 60, 1)})
-                    say(f"[SKIP-STALE] {key} detected {age_sec/60:.1f}m ago (max {alert_max_age_sec/60:.0f}m) — skipped")
-                    continue
-            except Exception:
-                pass
+        if not det_ts_str:
+            state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_missing_ts"}
+            continue
+        try:
+            det_dt = datetime.fromisoformat(str(det_ts_str).replace("Z", "+00:00"))
+            if det_dt.tzinfo is None:
+                det_dt = det_dt.replace(tzinfo=timezone.utc)
+            age_sec = (nowts - det_dt).total_seconds()
+            if age_sec > alert_max_age_sec:
+                state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_stale_alert", "det_age_min": round(age_sec / 60, 1)}
+                jlog(ORDERS, {**base, "result": "REJECTED_STALE_ALERT", "det_age_min": round(age_sec / 60, 1)})
+                say(f"[SKIP-STALE] {key} detected {age_sec/60:.1f}m ago (max {alert_max_age_sec/60:.0f}m) — skipped")
+                continue
+        except Exception:
+            state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_invalid_ts"}
+            continue
 
         if end_val:
             try:
                 end_dt = datetime.fromisoformat(str(end_val).replace("Z", "+00:00"))
+                if end_dt.tzinfo is None:
+                    end_dt = end_dt.replace(tzinfo=timezone.utc)
                 if nowts >= end_dt:
                     state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_event_ended", "end": end_val}
                     jlog(ORDERS, {**base, "result": "REJECTED_EVENT_ENDED", "end": end_val})
@@ -257,22 +298,26 @@ def process(cfg):
             except Exception:
                 pass
 
-        state["processed"][key] = {"ts": datetime.now(timezone.utc).isoformat(), "action": "seen"}
-
         # ---- gates ----
         if rule not in live_rules:
-            state["processed"][key]["action"] = "skip_rule_not_whitelisted"; continue
+            state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_rule_not_whitelisted"}
+            continue
         if os.path.exists(PAUSE):
-            say("PAUSE file present — no new orders"); state["processed"][key]["action"] = "skip_paused"; continue
+            say("PAUSE file present — no new orders"); continue
         if len(state["open"]) >= max_open:
-            state["processed"][key]["action"] = "skip_max_open"; continue
+            continue  # transient limit: allow next pass to reconsider once slot frees up
         if daily["trades"] >= max_trades_day or daily["cost"] >= max_cost_day:
-            state["processed"][key]["action"] = "skip_daily_cap"; continue
+            state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_daily_cap"}
+            continue
         if any(v.get("city") == det["city"] for v in state["open"].values()):
-            state["processed"][key]["action"] = "skip_city_dup"; continue
+            continue  # transient: do not permanently blacklist; wait until city slot clears
+
+        state["processed"][key] = {"ts": datetime.now(timezone.utc).isoformat(), "action": "seen"}
 
         yes, ask, det2, asks_all = fresh_book(det)
-        if not yes: state["processed"][key]["action"] = "skip_no_book"; continue
+        if not yes or (yes[0] is None and ask[0] is None):
+            state["processed"][key]["action"] = "skip_no_book"
+            continue
         side = det["side"]
         is_lotto = rule in LOTTO_RULES
         sweep = None
@@ -283,7 +328,7 @@ def process(cfg):
             sweep = []
             for px, sz in asks_all:
                 if px > ASK_TIER_LOTTO: break
-                take = min(sz * 0.9, rem / px)
+                take = min(sz * 0.9, rem / max(TICK, px))
                 if take < 1: break
                 sweep.append((px, int(take))); rem -= int(take) * px
                 if rem <= px: break
@@ -321,7 +366,7 @@ def process(cfg):
             else:
                 card_tier = min(card, 10.0) # Defensive Card ($10.0, ~1/14 Kelly)
 
-            shares = int(min(card_tier / px_now, 0.9 * sz_now))
+            shares = int(min(card_tier / max(TICK, px_now), 0.9 * sz_now))
             if shares < 5:
                 state["processed"][key]["action"] = "skip_thin"; jlog(ORDERS, {**base, "result": "REJECTED_THIN", "depth": sz_now}); continue
             limit_px = px_now
@@ -361,6 +406,7 @@ if __name__ == "__main__":
     say(f"trader start | LIVE_ENABLED={cfg['LIVE_ENABLED']} DRY_RUN={cfg['DRY_RUN']} key={'set' if cfg['PRIVATE_KEY'] else 'MISSING'} once={once}")
     while True:
         try:
+            cfg = env()  # Dynamic hot reload
             process(cfg)
         except Exception as ex:
             say("pass error: " + str(ex))
