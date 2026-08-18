@@ -275,7 +275,7 @@ def fetch_running(in_window_events):
     if not stations: return out
     for i in range(0, len(stations), 10):
         chunk = stations[i:i+10]
-        ids = ",".join("VHHH" if s == "hko" else s for s, _ in chunk)
+        ids = ",".join(s for s, _ in chunk)
         try:
             ms = get("https://aviationweather.gov/api/data/metar?ids=%s&hours=14&format=json" % ids)
         except Exception as ex:
@@ -299,7 +299,7 @@ def fetch_running(in_window_events):
                 if n6:
                     extremes_by.setdefault(icao, []).append((t, (-1 if n6.group(1) == "1" else 1) * int(n6.group(2)) / 10))
         for (src, off), _res in [(c, None) for c in chunk]:
-            st = "VHHH" if src == "hko" else src
+            st = src
             ext_list = extremes_by.get(st) or []
             inst_list = instant_by.get(st) or []
             nowloc = datetime.now(timezone.utc) + timedelta(hours=off)
@@ -390,13 +390,20 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
 
 def official_outcome(det):
     """If the market itself has resolved (closed + outcomePrices), return bucket_hit (bool)
-    from the official result; else None. Preferred over any station proxy."""
+    from the official result; else None. Settle strictly on official exchange ground truth."""
     try:
-        evg = get(f"https://gamma-api.polymarket.com/events?slug={det['slug']}")
+        slug = det.get("slug")
+        if not slug:
+            t = det.get("title", "").replace("?", "").strip()
+            t = re.sub(r"[^a-zA-Z0-9\s-]", "", t).strip().lower()
+            slug = re.sub(r"\s+", "-", t) + "-2026"
+        evg = get(f"https://gamma-api.polymarket.com/events?slug={slug}")
         if isinstance(evg, list): evg = evg[0] if evg else None
         if not evg or not evg.get("closed"): return None
         for m in evg.get("markets") or []:
-            if (m.get("groupItemTitle") or "").strip() == det["bucket"]:
+            b_title = (m.get("groupItemTitle") or "").strip().replace("\ufffd", "°")
+            det_b = (det.get("bucket") or "").strip().replace("\ufffd", "°")
+            if b_title == det_b:
                 op = m.get("outcomePrices")
                 if op is None: return None
                 prices = json.loads(op) if isinstance(op, str) else op
@@ -410,87 +417,33 @@ def official_outcome(det):
     return None
 
 def settle_past(seen_pending):
-    """Fetch IEM daily data for closed+detected events, resolve winner, log paper PnL."""
+    """Settle detected events strictly against Polymarket's official resolution API.
+    Zero proxy guessing. If the market is not officially closed on Polymarket, keep pending."""
     now = datetime.now(timezone.utc)
     done = []
     for key, det in list(seen_pending.items()):
-        try:
-            end = datetime.fromisoformat(det["end"].replace("Z", "+00:00"))
-        except Exception:
-            continue
-        if det["city"] not in MAP:
-            if det["city"] == "Hong Kong":
-                src, off, tz, dawn, lastlight = ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8)
-            else:
-                continue
-        else:
-            src, off, tz, dawn, lastlight = MAP[det["city"]]
-        # settle only after the event's LOCAL day has fully ended (endDate alone is too
-        # early for US/EU high markets whose day continues past the admin endDate)
-        tld = target_local_date(det["title"])
-        if tld is not None:
-            local_day_end_utc = datetime(tld[0], tld[1], tld[2], tzinfo=timezone.utc) \
-                + timedelta(days=1) - timedelta(hours=off)
-            settle_when = local_day_end_utc + timedelta(hours=2)
-        else:
-            settle_when = end + timedelta(hours=3)
-        if now < settle_when: continue
-        station = "VHHH" if src == "hko" else src
         official = official_outcome(det)
-        if official is not None:
-            bucket_hit = official
-            ex = -999  # official market resolution; station value not needed
-            px = det.get("px") or (det["yes_ask"] if det["side"] == "YES" else 1 - det["yes_bid"])
-            px = max(0.001, float(px))
-            shares = det.get("shares") if det.get("shares") is not None else (det.get("size_usd", 0) / px)
-            pos_won = bucket_hit if det["side"] == "YES" else (not bucket_hit)
-            pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
-            log(CLO, {"ts": now.isoformat(), "key": key, "city": det["city"], "station": "OFFICIAL",
-                      "title": det["title"], "bucket": det["bucket"], "side": det["side"],
-                      "bucket_hit": bucket_hit, "pos_won": pos_won,
-                      "paper_size_usd": round(shares * px, 2), "shares": round(shares, 1),
-                      "entry_px": round(px, 4), "resolver_extremum": ex,
-                      "won": pos_won, "paper_pnl": round(pnl, 2), "note": "official_outcome"})
-            say(f"[SETTLED-OFFICIAL] {det['city']} {det['bucket']} {det['side']} bucket_hit={bucket_hit} pos_won={pos_won} pnl={pnl:+.2f}")
-            done.append(key)
+        if official is None:
+            # Polymarket has not officially closed/resolved the contract yet — keep pending
             continue
-        tld = target_local_date(det["title"])
-        if tld is not None:
-            y, m, d = tld
-        else:
-            loc = end + timedelta(hours=off)
-            y, m, d = loc.year, loc.month, loc.day
-        url = (f"https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station={station}&data=tmpc"
-               f"&year1={y}&month1={m}&day1={d}"
-               f"&year2={y}&month2={m}&day2={d}"
-               f"&tz={tz}&format=onlycomma&latlon=no&missing=M&trace=T&direct=no&report_type=3&report_type=4")
-        try:
-            req = urllib.request.Request(url, headers={"User-Agent": "supervisor"})
-            vals = []
-            for line in urllib.request.urlopen(req, timeout=40).read().decode().strip().split("\n")[1:]:
-                p = line.split(",")
-                if len(p) > 2 and p[2] not in ("M", ""): vals.append(float(p[2]))
-            if not vals: continue
-            extremum = min(vals) if det["title"].startswith("Lowest") else max(vals)
-            ex = extremum * 9 / 5 + 32 if det["city"] in US_F else extremum
-            bucket_hit = det["lo"] <= ex < det["hi"]
-            pos_won = bucket_hit if det["side"] == "YES" else (not bucket_hit)
-            px = det.get("px") or (det["yes_ask"] if det["side"] == "YES" else 1 - det["yes_bid"])
-            px = max(0.001, float(px))
-            shares = det.get("shares") if det.get("shares") is not None else (det.get("size_usd", 0) / px)
-            pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
-            log(CLO, {"ts": now.isoformat(), "key": key, "city": det["city"], "station": station,
-                      "title": det["title"], "slug": det.get("slug"), "bucket": det["bucket"], "side": det["side"],
-                      "bucket_hit": bucket_hit, "pos_won": pos_won,
-                      "paper_size_usd": round(shares * px, 2), "shares": round(shares, 1),
-                      "entry_px": round(px, 4),
-                      "resolver_extremum": round(ex, 1), "won": pos_won, "paper_pnl": round(pnl, 2),
-                      "note": "IEM proxy" if station == "VHHH" else ""})
-            say(f"[SETTLED] {det['city']} {det['bucket']} {det['side']} bucket_hit={bucket_hit} pos_won={pos_won} pnl={pnl:+.2f}")
-            done.append(key)
-        except Exception as ex:
-            say("settle err %s %s" % (key, ex))
-    for k in done: seen_pending.pop(k)
+        bucket_hit = official
+        pos_won = bucket_hit if det["side"] == "YES" else (not bucket_hit)
+        px = det.get("px") or (det["yes_ask"] if det["side"] == "YES" else 1 - det["yes_bid"])
+        px = max(0.001, float(px))
+        shares = det.get("shares") if det.get("shares") is not None else (det.get("size_usd", 0) / px)
+        pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
+        log(CLO, {
+            "ts": now.isoformat(), "key": key, "city": det["city"], "station": "OFFICIAL_POLYMARKET",
+            "title": det["title"], "slug": det.get("slug"), "bucket": det["bucket"], "side": det["side"],
+            "bucket_hit": bucket_hit, "pos_won": pos_won,
+            "paper_size_usd": round(shares * px, 2), "shares": round(shares, 1),
+            "entry_px": round(px, 4), "resolver_extremum": -999,
+            "won": pos_won, "paper_pnl": round(pnl, 2), "note": "re-verified official settlement"
+        })
+        say(f"[SETTLED-OFFICIAL] {det['city']} {det['bucket']} {det['side']} bucket_hit={bucket_hit} pos_won={pos_won} pnl={pnl:+.2f}")
+        done.append(key)
+    for k in done:
+        seen_pending.pop(k, None)
 
 def cycle(events_cache):
     now = datetime.now(timezone.utc)

@@ -37,7 +37,7 @@ DEFAULT_LOTTO_SWEEP_CAP = 5.0
 DEFAULT_LOTTO_DAY_CAP = 10.0
 DEFAULT_ALERT_MAX_AGE_SEC = 600  # 10 minutes max alert latency
 
-BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
+BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above", "R1_low_lotto", "R4_high_lotto")
 LOTTO_RULES = ("R1_low_lotto", "R4_high_lotto")
 ASK_TIER_LOTTO = 0.002   # sweep displayed YES levels only up to the audited tier cap
 PX_TOL = 0.03            # max slippage vs alert price
@@ -49,7 +49,7 @@ def env():
     cfg = {"LIVE_ENABLED": "false", "PRIVATE_KEY": "", "FUNDER": "", "DRY_RUN": "true", "CHAIN_ID": "137",
            "CARD": str(DEFAULT_CARD), "MAX_OPEN": str(DEFAULT_MAX_OPEN),
            "MAX_TRADES_DAY": str(DEFAULT_MAX_TRADES_DAY), "MAX_COST_DAY": str(DEFAULT_MAX_COST_DAY),
-           "ALLOW_LOTTOS": "false", "LOTTO_SWEEP_CAP": str(DEFAULT_LOTTO_SWEEP_CAP),
+           "ALLOW_LOTTOS": "true", "LOTTO_SWEEP_CAP": str(DEFAULT_LOTTO_SWEEP_CAP),
            "LOTTO_DAY_CAP": str(DEFAULT_LOTTO_DAY_CAP),
            "ALERT_MAX_AGE_SEC": str(DEFAULT_ALERT_MAX_AGE_SEC)}
     try:
