@@ -77,14 +77,40 @@ def jload(path, default):
     except Exception: return default
 
 def jsave(path, obj):
-    with open(path, "w", encoding="utf-8") as f: json.dump(obj, f, indent=1)
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=1)
+    os.replace(tmp, path)
 
 def jlog(path, obj):
     with open(path, "a", encoding="utf-8") as f: f.write(json.dumps(obj) + "\n")
 
-def get(url):
-    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
-    return json.load(urllib.request.urlopen(req, timeout=30))
+def get(url, retries=4, base_delay=1.0, max_delay=15.0, timeout=25):
+    """Resilient HTTP client with exponential backoff, jitter, and 429 Retry-After compliance."""
+    import random
+    req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "PolymarketWeatherTrader/2.0"})
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as r:
+                return json.loads(r.read().decode())
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (429, 500, 502, 503, 504) or attempt >= retries:
+                raise
+            retry_after = exc.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    delay = min(float(retry_after), max_delay)
+                except ValueError:
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+            else:
+                raw_delay = min(base_delay * (2 ** attempt), max_delay)
+                delay = raw_delay * random.uniform(0.75, 1.25)
+            time.sleep(delay)
+        except (urllib.error.URLError, TimeoutError, OSError):
+            if attempt >= retries: raise
+            delay = min(base_delay * (2 ** attempt), max_delay) * random.uniform(0.75, 1.25)
+            time.sleep(delay)
+    raise RuntimeError(f"HTTP request failed after {retries} retries: {url}")
 
 def fee(p): return 0.05 * p * (1 - p)
 
@@ -103,8 +129,8 @@ def fresh_book(det):
                     break
         except Exception as ex:
             say(f"gamma fallback err {ex}")
-            return None, None, None
-    if not toks: return None, None, None
+            return None, None, None, None
+    if not toks: return None, None, None, None
     yi = det.get("yes_idx", 0)
     bk = get(f"https://clob.polymarket.com/book?token_id={toks[yi]}")
     bids = sorted(bk.get("bids") or [], key=lambda x: float(x["price"]))
@@ -148,8 +174,14 @@ def process(cfg):
     live_rules = BASE_LIVE_RULES + (LOTTO_RULES if allow_lottos else ())
     dets = []
     try:
-        with open(DET, encoding="utf-8") as f:
-            dets = [json.loads(l) for l in f]
+        with open(DET, "r", encoding="utf-8", errors="replace") as f:
+            for l in f:
+                l = l.strip()
+                if not l: continue
+                try:
+                    dets.append(json.loads(l))
+                except Exception:
+                    continue
     except FileNotFoundError:
         return
 

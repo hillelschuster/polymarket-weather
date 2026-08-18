@@ -89,18 +89,43 @@ def say(msg):
     except Exception:
         pass
 
-def get(url, retries=2):
-    for a in range(retries + 1):
+def get(url, retries=4, base_delay=1.0, max_delay=15.0, timeout=25):
+    """Production-grade resilient HTTP GET with exponential backoff, jitter, and Retry-After support."""
+    import random
+    headers = {"Accept": "application/json", "User-Agent": "PolymarketWeatherSupervisor/2.0"}
+    req = urllib.request.Request(url, headers=headers)
+    for attempt in range(retries + 1):
         try:
-            req = urllib.request.Request(url, headers={"Accept": "application/json", "User-Agent": "Mozilla/5.0"})
-            return json.load(urllib.request.urlopen(req, timeout=30))
-        except Exception:
-            if a == retries: raise
-            time.sleep(2)
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                return json.loads(response.read().decode())
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (429, 500, 502, 503, 504) or attempt >= retries:
+                raise
+            retry_after = exc.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    delay = min(float(retry_after), max_delay)
+                except ValueError:
+                    delay = min(base_delay * (2 ** attempt), max_delay)
+            else:
+                raw_delay = min(base_delay * (2 ** attempt), max_delay)
+                delay = raw_delay * random.uniform(0.75, 1.25)
+            time.sleep(delay)
+        except (urllib.error.URLError, TimeoutError, OSError):
+            if attempt >= retries: raise
+            delay = min(base_delay * (2 ** attempt), max_delay) * random.uniform(0.75, 1.25)
+            time.sleep(delay)
+    raise RuntimeError(f"HTTP request failed after {retries} retries: {url}")
 
 def log(path, obj):
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(obj, ensure_ascii=False) + "\n")
+
+def atomic_save_json(path, obj):
+    tmp = path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(obj, f, indent=1, ensure_ascii=False)
+    os.replace(tmp, path)
 
 def load_seen():
     try:
@@ -108,19 +133,29 @@ def load_seen():
     except Exception: return set()
 
 def save_seen(s):
-    with open(SEEN, "w", encoding="utf-8") as f: json.dump(sorted(s), f)
+    atomic_save_json(SEEN, sorted(s))
 
 MONTHS = {m.lower(): i for i, m in enumerate(
     ["January","February","March","April","May","June","July","August",
      "September","October","November","December"], 1)}
 
-def target_local_date(title):
-    """'... on August 16?' -> date(2026, 8, 16). None if unparseable."""
+def target_local_date(title, ref_dt=None):
+    """'... on August 16?' -> (2026, 8, 16). Handles year boundaries adaptively."""
+    m_year = re.search(r"(\b20\d\d\b)", title)
     m = re.search(r"on (\w+) (\d+)", title)
     if not m: return None
     mi = MONTHS.get(m.group(1).lower())
     if not mi: return None
-    return datetime.now(timezone.utc).year, mi, int(m.group(2))
+    day = int(m.group(2))
+    if m_year:
+        return int(m_year.group(1)), mi, day
+    ref = ref_dt or datetime.now(timezone.utc)
+    y = ref.year
+    if ref.month == 12 and mi == 1:
+        y += 1
+    elif ref.month == 1 and mi == 12:
+        y -= 1
+    return y, mi, day
 
 def fee(p): return 0.05 * p * (1 - p)
 
@@ -177,16 +212,20 @@ def fetch_obs(events):
     return temps, raws, times
 
 def bucket_parse(gt):
-    """-> (lo, hi, val) in market units; None if unparseable."""
+    """-> (lo, hi, val) supporting negative numbers, decimals, and boundary phrases."""
     gt = gt.strip()
-    m = re.match(r"^(\d+)-(\d+)°F", gt)
-    if m:
-        a, b = int(m.group(1)), int(m.group(2)); return (a - 0.5, b + 0.5, a)
-    m = re.match(r"^(\d+)", gt)
-    if not m: return None
-    v = int(m.group(1))
-    if "or below" in gt: return (float("-inf"), v + 0.5, v)
-    if "or higher" in gt: return (v - 0.5, float("inf"), v)
+    m_range = re.search(r"(-?\d+(?:\.\d+)?)\s*(?:-|to)\s*(-?\d+(?:\.\d+)?)", gt)
+    if m_range:
+        a, b = float(m_range.group(1)), float(m_range.group(2))
+        return (a - 0.5, b + 0.5, a)
+    m_single = re.search(r"(-?\d+(?:\.\d+)?)", gt)
+    if not m_single: return None
+    v = float(m_single.group(1))
+    gt_lower = gt.lower()
+    if "or below" in gt_lower or "below" in gt_lower or "<" in gt_lower:
+        return (float("-inf"), v + 0.5, v)
+    if "or higher" in gt_lower or "above" in gt_lower or ">" in gt_lower:
+        return (v - 0.5, float("inf"), v)
     return (v - 0.5, v + 0.5, v)
 
 def top_of_book(event):
@@ -209,6 +248,7 @@ def top_of_book(event):
                      "yes_bid_sz": float(bids[-1]["size"]) if bids else 0,
                      "yes_ask": float(asks[0]["price"]) if asks else None,
                      "yes_ask_sz": float(asks[0]["size"]) if asks else 0})
+        time.sleep(0.04)  # Rate pacing to prevent IP burst collisions with other bots
     rows.sort(key=lambda r: r["val"])
     return rows
 
@@ -391,10 +431,15 @@ def settle_past(seen_pending):
             say(f"[SETTLED-OFFICIAL] {det['city']} {det['bucket']} {det['side']} bucket_hit={bucket_hit} pos_won={pos_won} pnl={pnl:+.2f}")
             done.append(key)
             continue
-        day = (end + timedelta(hours=off)).strftime("%Y-%m-%d")
+        tld = target_local_date(det["title"])
+        if tld is not None:
+            y, m, d = tld
+        else:
+            loc = end + timedelta(hours=off)
+            y, m, d = loc.year, loc.month, loc.day
         url = (f"https://mesonet.agron.iastate.edu/cgi-bin/request/asos.py?station={station}&data=tmpc"
-               f"&year1={day[:4]}&month1={int(day[5:7])}&day1={int(day[8:10])}"
-               f"&year2={int(day[:4])}&month2={int(day[5:7])}&day2={int(day[8:10])}"
+               f"&year1={y}&month1={m}&day1={d}"
+               f"&year2={y}&month2={m}&day2={d}"
                f"&tz={tz}&format=onlycomma&latlon=no&missing=M&trace=T&direct=no&report_type=3&report_type=4")
         try:
             req = urllib.request.Request(url, headers={"User-Agent": "supervisor"})
@@ -408,7 +453,7 @@ def settle_past(seen_pending):
             bucket_hit = det["lo"] <= ex < det["hi"]
             pos_won = bucket_hit if det["side"] == "YES" else (not bucket_hit)
             px = det.get("px") or (det["yes_ask"] if det["side"] == "YES" else 1 - det["yes_bid"])
-            shares = det.get("shares") or det["size"] / px
+            shares = det.get("shares") or det["size"] / max(0.001, px)
             pnl = (shares * (1 if pos_won else 0)) - shares * px - fee(px) * shares
             log(CLO, {"ts": now.isoformat(), "key": key, "city": det["city"], "station": station,
                       "title": det["title"], "bucket": det["bucket"], "side": det["side"],
@@ -516,11 +561,9 @@ def cycle(events_cache):
             say(f"[ALERT] {d['rule']} {city} {d['bucket']} {d['side']} px={px} edge={d['edge']} obs={obs}C runmax={runmax} runmin={runmin} trend={trend}")
         save_seen(seen)  # per-event persistence prevents duplicate re-fires after mid-cycle errors
     save_seen(seen)
-    with open(os.path.join(DATA, "pending.json"), "w", encoding="utf-8") as f:
-        json.dump(pending, f)
+    atomic_save_json(os.path.join(DATA, "pending.json"), pending)
     settle_past(pending)
-    with open(os.path.join(DATA, "pending.json"), "w", encoding="utf-8") as f:
-        json.dump(pending, f)
+    atomic_save_json(os.path.join(DATA, "pending.json"), pending)
     say(f"cycle done: {len(events)} events, {active} in window, {len(pending)} pending")
     return events_cache
 
