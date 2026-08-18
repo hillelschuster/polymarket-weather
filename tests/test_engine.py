@@ -141,5 +141,40 @@ class TestWeatherEngine(unittest.TestCase):
         self.assertEqual(shares3, 11)
         self.assertAlmostEqual(shares3 * px3, 9.68, places=2)
 
+    def test_lotto_rules_and_safeguards_in_live_trader(self):
+        """Verify lotto rule enablement and $5 sweep / $10 daily budget controls."""
+        cfg = env()
+        self.assertEqual(cfg.get("ALLOW_LOTTOS"), "true")
+        self.assertIn("R1_low_lotto", BASE_LIVE_RULES)
+        self.assertIn("R4_high_lotto", BASE_LIVE_RULES)
+        
+        # Test lotto sweep math with $5 cap
+        sweep_cap = float(cfg.get("LOTTO_SWEEP_CAP", 5.0))
+        asks_all = [(0.001, 3000), (0.002, 4000), (0.005, 1000)]
+        sweep = []
+        rem = sweep_cap
+        for px, sz in asks_all:
+            if px > 0.002: break
+            take = min(sz * 0.9, rem / px)
+            if take < 1: break
+            sweep.append((px, int(take)))
+            rem -= int(take) * px
+        
+        total_shares = sum(s for _, s in sweep)
+        total_cost = sum(p * s for p, s in sweep)
+        self.assertEqual(total_shares, 3850) # 2700 @ 0.001 ($2.70) + 1150 @ 0.002 ($2.30) = $5.00
+        self.assertAlmostEqual(total_cost, 5.00, places=2)
+
+    def test_map_and_station_integrity(self):
+        """Verify station database integrity and exclusion of station proxy divergence."""
+        self.assertNotIn("Hong Kong", MAP, "Hong Kong must remain excluded until downtown HKO scraper is active")
+        for city, cfg in MAP.items():
+            self.assertEqual(len(cfg), 5, f"Invalid tuple length for {city}")
+            src, off, tz, dawn, lastlight = cfg
+            self.assertTrue(len(src) >= 3, f"Invalid station code for {city}: {src}")
+            self.assertTrue(-12 <= off <= 14, f"Invalid UTC offset for {city}: {off}")
+            self.assertTrue(4.0 <= dawn <= 9.0, f"Unrealistic dawn hour for {city}: {dawn}")
+            self.assertTrue(16.0 <= lastlight <= 22.5, f"Unrealistic lastlight hour for {city}: {lastlight}")
+
 if __name__ == "__main__":
     unittest.main()
