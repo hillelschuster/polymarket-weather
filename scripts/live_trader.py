@@ -17,10 +17,17 @@ Run:      python scripts/live_trader.py            (loop, 30s)
 Test:     python scripts/live_trader.py --once     (single pass, respects DRY_RUN)
 Stop:     create data/PAUSE  |  kill process
 """
-import json, os, sys, time, urllib.request
+import json, os, sys, time, urllib.request, re
 from datetime import datetime, timezone, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+try:
+    from scripts.supervisor import bucket_parse, MAP, US_F
+except ImportError:
+    from supervisor import bucket_parse, MAP, US_F
+
 DATA = os.path.join(ROOT, "data")
 os.makedirs(DATA, exist_ok=True)
 DET = os.path.join(DATA, "detections.jsonl")
@@ -173,10 +180,10 @@ def fresh_book(det):
 def tick_round(p):
     return max(TICK, round(p / TICK) * TICK)
 
-def place_order(cfg, token_id, price, size):
-    """Marketable FAK buy. Returns (ok, detail)."""
+def place_order(cfg, token_id, price, size, side="BUY"):
+    """Marketable FAK order (BUY or SELL). Returns (ok, detail)."""
     from py_clob_client.client import ClobClient
-    from py_clob_client.clob_types import OrderArgs, OrderType, BUY
+    from py_clob_client.clob_types import OrderArgs, OrderType, BUY, SELL
     host = "https://clob.polymarket.com"
     key = cfg["PRIVATE_KEY"]
     chain = int(cfg.get("CHAIN_ID") or 137)
@@ -184,12 +191,124 @@ def place_order(cfg, token_id, price, size):
     client = ClobClient(host, key=key, chain_id=chain, signature_type=1 if funder else 0,
                         funder=funder) if funder else ClobClient(host, key=key, chain_id=chain)
     client.set_api_creds(client.create_or_derive_api_creds())
+    clob_side = BUY if str(side).upper() == "BUY" else SELL
     order = client.create_and_post_order(
-        OrderArgs(token_id=str(token_id), price=round(float(price), 3), size=float(size), side=BUY),
+        OrderArgs(token_id=str(token_id), price=round(float(price), 3), size=float(size), side=clob_side),
         order_type=OrderType.FAK)
     if isinstance(order, dict) and not order.get("success", True):
-        raise RuntimeError(f"CLOB rejected order: {order.get('errorMsg') or order}")
+        raise RuntimeError(f"CLOB rejected {side} order: {order.get('errorMsg') or order}")
     return True, order
+
+def run_position_guard(cfg, state):
+    """
+    PositionGuard Active Monitor:
+    1. Checks open positions against live sensor telemetry and CLOB bids.
+    2. If distance to bucket drops below 0.7C (1.3F), executes marketable FAK SELL
+       to salvage 70-85% of capital instead of taking a 100% loss.
+    """
+    now = datetime.now(timezone.utc)
+    open_positions = state.get("open", {})
+    if not open_positions: return
+
+    open_cities = list({v.get("city") for v in open_positions.values() if v.get("city")})
+    if not open_cities: return
+
+    stations = [MAP[c][0] for c in open_cities if c in MAP and MAP[c][0] != "hko"]
+    temps = {}
+    if stations:
+        try:
+            ms = get(f"https://aviationweather.gov/api/data/metar?ids={','.join(stations)}&hours=2&format=json")
+            for m in (ms or []):
+                icao = m.get("icaoId")
+                tmp = m.get("temp")
+                if icao and tmp is not None:
+                    temps[icao] = float(tmp)
+        except Exception as ex:
+            say(f"[GUARD] telemetry fetch err: {ex}")
+    if "Hong Kong" in open_cities:
+        try:
+            r = get("https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en", timeout=10)
+            hko_temp = next((s["value"] for s in r.get("temperature", {}).get("data", []) if s.get("place") == "Hong Kong Observatory"), None)
+            if hko_temp is not None: temps["hko"] = float(hko_temp)
+        except Exception: pass
+
+    closed_keys = []
+    for key, pos in list(open_positions.items()):
+        city = pos.get("city")
+        rule = pos.get("rule", "")
+        side = pos.get("side", "")
+        token = pos.get("token")
+        shares = pos.get("shares", 0)
+        entry_px = pos.get("px", 0.0)
+        is_dry = pos.get("dry", True)
+        if not city or not token or shares <= 0: continue
+        if city not in MAP: continue
+
+        src = MAP[city][0]
+        obs_c = temps.get(src)
+        if obs_c is None: continue
+        is_f = city in US_F
+        obs = obs_c * 9 / 5 + 32 if is_f else obs_c
+
+        bp = bucket_parse(pos.get("bucket"))
+        if not bp: continue
+        b_lo, b_hi = bp[0], bp[1]
+
+        should_exit = False
+        exit_reason = ""
+        if rule == "R2_low_dead_below" and side == "NO":
+            dist = obs - b_hi
+            if dist < (1.3 if is_f else 0.7):
+                should_exit = True
+                exit_reason = f"Low margin compressed: obs={obs:.1f}, bucket_hi={b_hi:.1f}, dist={dist:.2f}"
+        elif rule == "R3_high_dead_above" and side == "NO":
+            dist = b_lo - obs
+            if dist < (1.3 if is_f else 0.7):
+                should_exit = True
+                exit_reason = f"High margin compressed: obs={obs:.1f}, bucket_lo={b_lo:.1f}, dist={dist:.2f}"
+
+        if not should_exit: continue
+
+        say(f"[GUARD TRIGGERED] {key} -> {exit_reason}")
+        try:
+            bk = get(f"https://clob.polymarket.com/book?token_id={token}")
+            bids = sorted(bk.get("bids") or [], key=lambda x: float(x.get("price", 0)))
+            if not bids:
+                say(f"[GUARD] No bids on book for {token}. Forced write-off.")
+                closed_keys.append(key)
+                continue
+            best_bid_px = float(bids[-1]["price"])
+            best_bid_sz = float(bids[-1]["size"])
+            exit_shares = min(shares, best_bid_sz)
+            if exit_shares < 1:
+                say(f"[GUARD] Bid size too small ({best_bid_sz}) for {key}")
+                continue
+
+            recovered = round(exit_shares * best_bid_px, 2)
+            saved_loss = round(exit_shares * (entry_px - best_bid_px), 2)
+            if is_dry:
+                say(f"[GUARD DRY EXIT] SOLD {exit_shares} sh @ {best_bid_px:.3f} | Recovered: ${recovered} | Loss: -${saved_loss}")
+                jlog(ORDERS, {"ts": now.isoformat(), "key": key, "result": "GUARD_DRY_EXIT",
+                              "exit_px": best_bid_px, "entry_px": entry_px, "shares": exit_shares, "recovered": recovered})
+                if exit_shares >= shares:
+                    closed_keys.append(key)
+                else:
+                    pos["shares"] -= exit_shares
+            else:
+                ok, detail = place_order(cfg, token, tick_round(best_bid_px), exit_shares, side="SELL")
+                say(f"[GUARD LIVE EXIT] SOLD {exit_shares} sh @ {best_bid_px:.3f} | Recovered: ${recovered}")
+                jlog(ORDERS, {"ts": now.isoformat(), "key": key, "result": "GUARD_LIVE_EXIT",
+                              "exit_px": best_bid_px, "entry_px": entry_px, "shares": exit_shares, "resp": str(detail)[:300]})
+                if exit_shares >= shares:
+                    closed_keys.append(key)
+                else:
+                    pos["shares"] -= exit_shares
+        except Exception as ex:
+            say(f"[GUARD ERROR] {key}: {ex}")
+
+    for k in closed_keys:
+        state["open"].pop(k, None)
+        state["processed"][k] = {"ts": now.isoformat(), "action": "guard_exited"}
 
 def process(cfg):
     state = jload(STATE, {"processed": {}, "open": {}, "daily": {}})
@@ -253,6 +372,9 @@ def process(cfg):
         if expired:
             say(f"[PRUNE-EXPIRED] Closed open position slot: {k} ({reason})")
             del state["open"][k]
+
+    # ---- Run Active PositionGuard Monitor ----
+    run_position_guard(cfg, state)
 
     for det in dets:
         key = det["key"]
@@ -381,7 +503,7 @@ def process(cfg):
                           "px": round(px_now, 4), "shares": shares, "cost": round(cost, 2),
                           "levels": sweep, "edge_now": round(edge_now, 3), "token": token})
             say(f"DRY_RUN would {'SWEEP' if is_lotto else 'BUY'} {side} {det['city']} {det['bucket']} avg_px={px_now:.4f} x{shares} (~${cost:.0f}) edge={edge_now:.3f}")
-            state["open"][key] = {**base, "px": round(px_now, 4), "shares": shares, "dry": True}
+            state["open"][key] = {**base, "token": token, "px": round(px_now, 4), "shares": shares, "dry": True}
             daily["trades"] += 1; daily["cost"] += round(cost, 2)
             if is_lotto: daily["lotto_cost"] = round(daily.get("lotto_cost", 0.0) + cost, 2)
         else:
@@ -391,7 +513,7 @@ def process(cfg):
                               "px": round(px_now, 4), "shares": shares, "limit_px": limit_px,
                               "levels": sweep, "token": token, "resp": str(detail)[:400]})
                 say(f"LIVE {'SWEEP' if is_lotto else 'BUY'} {side} {det['city']} {det['bucket']} avg_px={px_now:.4f} x{shares}")
-                state["open"][key] = {**base, "px": round(px_now, 4), "shares": shares, "dry": False}
+                state["open"][key] = {**base, "token": token, "px": round(px_now, 4), "shares": shares, "dry": False}
                 daily["trades"] += 1; daily["cost"] += round(cost, 2)
                 if is_lotto: daily["lotto_cost"] = round(daily.get("lotto_cost", 0.0) + cost, 2)
             except Exception as ex:

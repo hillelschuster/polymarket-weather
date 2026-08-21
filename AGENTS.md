@@ -61,3 +61,9 @@ Never hard-code city -> resolver station assumptions. Parse and archive the exac
 ## Core research question
 
 > What information about a weather settlement becomes knowable before Polymarket prices it correctly, and what is the highest-PnL way to monetize that gap?
+
+## Behavioral constraints
+
+1. **Answer only what is asked.** Provide direct answers to questions. Do not run commands, restart processes, modify files, or spawn subagents unless explicitly instructed.
+2. **Require explicit confirmation.** Never edit code, modify configuration, or execute system actions without prior user approval. Propose first and wait for a clear green light.
+3. **Strict output formatting.** No tables, no flowcharts, no ASCII diagrams. Use clean markdown bullet points, code snippets, and indented text only.
