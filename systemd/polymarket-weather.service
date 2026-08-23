@@ -6,14 +6,14 @@ Wants=network-online.target
 [Service]
 Type=simple
 User=root
-WorkingDirectory=/root/Polymarket-weather
-ExecStart=/root/Polymarket-weather/venv/bin/python -u /root/Polymarket-weather/scripts/watchdog.py
+WorkingDirectory=/opt/polyweather-bot
+ExecStart=/opt/polyweather-bot/venv/bin/python -u /opt/polyweather-bot/scripts/watchdog.py
 Restart=always
 RestartSec=10
 KillMode=mixed
 TimeoutStopSec=15
-StandardOutput=append:/root/Polymarket-weather/data/run.log
-StandardError=append:/root/Polymarket-weather/data/run.log
+StandardOutput=append:/opt/polyweather-bot/data/run.log
+StandardError=append:/opt/polyweather-bot/data/run.log
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
