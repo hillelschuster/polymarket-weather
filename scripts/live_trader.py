@@ -370,8 +370,23 @@ def process(cfg):
             except Exception:
                 pass
         if expired:
-            say(f"[PRUNE-EXPIRED] Closed open position slot: {k} ({reason})")
+            say(f"[PRUNE-EXPIRED] Released open slot, awaiting settlement: {k} ({reason})")
+            jlog(ORDERS, {
+                "ts": nowts.isoformat(),
+                "key": k,
+                "result": "PRUNED_AWAITING_SETTLEMENT",
+                "reason": reason,
+                "entry_px": v.get("px"),
+                "shares": v.get("shares"),
+                "city": v.get("city"),
+                "bucket": v.get("bucket"),
+                "side": v.get("side")
+            })
             del state["open"][k]
+            state["processed"][k] = {
+                "ts": nowts.isoformat(),
+                "action": "pruned_awaiting_settlement"
+            }
 
     # ---- Run Active PositionGuard Monitor ----
     run_position_guard(cfg, state)
