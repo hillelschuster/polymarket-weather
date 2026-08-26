@@ -333,7 +333,10 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
     is_f = event["city"] in US_F
     obs_m = obs * 9 / 5 + 32 if is_f else obs
     margin_base = 3.6 if is_f else 2.0     # 2.0C / 3.6F standard margin
-    margin_strict = 5.5 if is_f else 3.0   # 3.0C / 5.5F strict margin for high-price NOs (>0.75)
+    if trend is not None and abs(trend) <= 0.2:
+        margin_strict = 4.0 if is_f else 2.2
+    else:
+        margin_strict = 5.5 if is_f else 3.0   # 3.0C / 5.5F strict margin for high-price NOs (>0.75)
     bd_min = 1.4 if is_f else 0.8          # 0.8C boundary margin against resolver-vs-METAR noise
     out = []
 
@@ -355,7 +358,7 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
 
         # Velocity filter: block low-side entries if temperature is rapidly falling (trend < -0.3 C/hr)
         trend_ok_low = (trend is None) or (trend >= -0.3)
-        if is_low and (dawn - 2.5) <= local_hour <= dawn and not precip and trend_ok_low:
+        if is_low and (dawn - 2.0) <= local_hour <= (dawn + 2.5) and not precip and trend_ok_low:
             # R1 lotto: running min inside bucket, boundary distance >= bd_min, ask dirt cheap -> floor q 0.15
             min_in_bucket = (r["lo"] <= min_anchor < r["hi"]) and (r["lo"] <= obs_m < r["hi"])
             bd_low = min(min_anchor - r["lo"], r["hi"] - min_anchor) if min_in_bucket else 0
@@ -368,26 +371,26 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                 no_ask = 1 - r["yes_bid"]
                 req_margin = margin_strict if no_ask > 0.75 else margin_base
                 if r["hi"] <= min_anchor - req_margin:
-                    q_no = 0.95 if no_ask > 0.75 else 0.92
+                    q_no = 0.97 if no_ask > 0.75 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
                         out.append(mk("R2_low_dead_below", "NO", q_no, r))
 
         # Velocity filter: block high-side entries if temperature is still surging (trend > +0.3 C/hr)
         trend_ok_high = (trend is None) or (trend <= 0.3)
-        if (not is_low) and (lastlight - 2.5) <= local_hour <= lastlight and not precip and trend_ok_high:
+        if (not is_low) and (lastlight - 2.5) <= local_hour <= (lastlight + 3.0) and not precip and trend_ok_high:
             max_anchor = runmax_m if runmax_m is not None else obs_m
             max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m < r["hi"])
             bd_high = min(max_anchor - r["lo"], r["hi"] - max_anchor) if max_in_bucket else 0
-            if max_in_bucket and bd_high >= bd_min and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
-                q4 = 0.15
-                if q4 - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
-                    out.append(mk("R4_high_lotto", "YES", q4, r))
+            if r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO and max_in_bucket and bd_high >= bd_min:
+                q = max(0.15, r["yes_ask"] * 1.5)
+                if q - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
+                    out.append(mk("R4_high_lotto", "YES", q, r))
             # R3 dead-above after peak: progressive margin based on price
             if r["yes_bid"] is not None:
                 no_ask = 1 - r["yes_bid"]
                 req_margin = margin_strict if no_ask > 0.75 else margin_base
                 if r["lo"] >= max_anchor + req_margin:
-                    q_no = 0.95 if no_ask > 0.75 else 0.92
+                    q_no = 0.97 if no_ask > 0.75 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
                         out.append(mk("R3_high_dead_above", "NO", q_no, r))
     return out
@@ -480,7 +483,7 @@ def cycle(events_cache):
         if tld is None or (local.year, local.month, local.day) != tld:
             continue
         is_low = e["title"].startswith("Lowest")
-        in_window = ((dawn - 2.5) <= local_hour <= dawn) if is_low else ((lastlight - 2.5) <= local_hour <= lastlight)
+        in_window = ((dawn - 2.0) <= local_hour <= (dawn + 2.5)) if is_low else ((lastlight - 2.5) <= local_hour <= (lastlight + 3.0))
         if not in_window: continue
         obs = temps.get(src) if src != "hko" else temps.get("hko")
         if obs is None: continue

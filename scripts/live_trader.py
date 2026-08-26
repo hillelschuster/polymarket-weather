@@ -37,9 +37,9 @@ RUNLOG = os.path.join(DATA, "run.log")
 ENVF = os.path.join(ROOT, ".env")
 PAUSE = os.path.join(DATA, "PAUSE")
 DEFAULT_CARD = 25.0
-DEFAULT_MAX_OPEN = 3
-DEFAULT_MAX_TRADES_DAY = 8
-DEFAULT_MAX_COST_DAY = 50.0
+DEFAULT_MAX_OPEN = 5
+DEFAULT_MAX_TRADES_DAY = 12
+DEFAULT_MAX_COST_DAY = 85.0
 DEFAULT_LOTTO_SWEEP_CAP = 5.0
 DEFAULT_LOTTO_DAY_CAP = 10.0
 DEFAULT_ALERT_MAX_AGE_SEC = 600  # 10 minutes max alert latency
@@ -323,6 +323,9 @@ def run_position_guard(cfg, state):
     for k in closed_keys:
         state["open"].pop(k, None)
         state["processed"][k] = {"ts": now.isoformat(), "action": "guard_exited"}
+    
+    if closed_keys:
+        jsave(STATE, state)
 
 def process(cfg):
     state = jload(STATE, {"processed": {}, "open": {}, "daily": {}})
@@ -441,7 +444,7 @@ def process(cfg):
                 end_dt = datetime.fromisoformat(str(end_val).replace("Z", "+00:00"))
                 if end_dt.tzinfo is None:
                     end_dt = end_dt.replace(tzinfo=timezone.utc)
-                if nowts >= end_dt:
+                if nowts >= end_dt + timedelta(hours=14):
                     state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_event_ended", "end": end_val}
                     jlog(ORDERS, {**base, "result": "REJECTED_EVENT_ENDED", "end": end_val})
                     say(f"[SKIP-ENDED] {key} event endDate {end_val} has passed")
