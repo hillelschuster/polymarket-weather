@@ -44,7 +44,7 @@ DEFAULT_LOTTO_SWEEP_CAP = 5.0
 DEFAULT_LOTTO_DAY_CAP = 10.0
 DEFAULT_ALERT_MAX_AGE_SEC = 600  # 10 minutes max alert latency
 
-BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above", "R1_low_lotto", "R4_high_lotto")
+BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
 LOTTO_RULES = ("R1_low_lotto", "R4_high_lotto")
 ASK_TIER_LOTTO = 0.002   # sweep displayed YES levels only up to the audited tier cap
 PX_TOL = 0.03            # max slippage vs alert price
@@ -52,11 +52,25 @@ EDGE_MIN = 0.04          # recomputed edge floor at execution time
 POLL_SEC = 30
 TICK = 0.001
 
+def parse_filled_shares(detail, default_shares=0.0):
+    """Extract actual matched/filled shares from CLOB order response."""
+    if not isinstance(detail, dict):
+        return 0.0
+    for field in ("takingAmount", "taking_amount", "filled_size", "filledSize", "sizeMatched", "size_matched", "matched_size"):
+        if field in detail and detail[field] is not None:
+            try:
+                return float(detail[field])
+            except (ValueError, TypeError):
+                pass
+    if detail.get("status") in ("matched", "filled"):
+        return float(default_shares)
+    return 0.0
+
 def env():
     cfg = {"LIVE_ENABLED": "false", "PRIVATE_KEY": "", "FUNDER": "", "DRY_RUN": "true", "CHAIN_ID": "137",
            "CARD": str(DEFAULT_CARD), "MAX_OPEN": str(DEFAULT_MAX_OPEN),
            "MAX_TRADES_DAY": str(DEFAULT_MAX_TRADES_DAY), "MAX_COST_DAY": str(DEFAULT_MAX_COST_DAY),
-           "ALLOW_LOTTOS": "true", "LOTTO_SWEEP_CAP": str(DEFAULT_LOTTO_SWEEP_CAP),
+           "ALLOW_LOTTOS": "false", "LOTTO_SWEEP_CAP": str(DEFAULT_LOTTO_SWEEP_CAP),
            "LOTTO_DAY_CAP": str(DEFAULT_LOTTO_DAY_CAP),
            "ALERT_MAX_AGE_SEC": str(DEFAULT_ALERT_MAX_AGE_SEC)}
     try:
@@ -523,14 +537,27 @@ def process(cfg):
             if is_lotto: daily["lotto_cost"] = round(daily.get("lotto_cost", 0.0) + cost, 2)
         else:
             try:
+                state["processed"][key] = {"ts": datetime.now(timezone.utc).isoformat(), "action": "submitting_order"}
+                jsave(STATE, state)
                 ok, detail = place_order(cfg, token, tick_round(limit_px), shares)
-                jlog(ORDERS, {**base, "result": "LIVE_SWEEP" if is_lotto else "LIVE_ORDER",
-                              "px": round(px_now, 4), "shares": shares, "limit_px": limit_px,
-                              "levels": sweep, "token": token, "resp": str(detail)[:400]})
-                say(f"LIVE {'SWEEP' if is_lotto else 'BUY'} {side} {det['city']} {det['bucket']} avg_px={px_now:.4f} x{shares}")
-                state["open"][key] = {**base, "token": token, "px": round(px_now, 4), "shares": shares, "dry": False}
-                daily["trades"] += 1; daily["cost"] += round(cost, 2)
-                if is_lotto: daily["lotto_cost"] = round(daily.get("lotto_cost", 0.0) + cost, 2)
+                filled_shares = parse_filled_shares(detail, default_shares=shares)
+                if filled_shares <= 0:
+                    say(f"LIVE {'SWEEP' if is_lotto else 'BUY'} UNFILLED (0 shares filled) {det['city']} {det['bucket']}")
+                    jlog(ORDERS, {**base, "result": "LIVE_UNFILLED", "requested_shares": shares,
+                                  "limit_px": limit_px, "token": token, "resp": str(detail)[:400]})
+                    state["processed"][key]["action"] = "unfilled"
+                else:
+                    actual_cost = round(px_now * filled_shares, 2)
+                    jlog(ORDERS, {**base, "result": "LIVE_SWEEP" if is_lotto else "LIVE_ORDER",
+                                  "px": round(px_now, 4), "shares": filled_shares, "requested_shares": shares,
+                                  "limit_px": limit_px, "levels": sweep, "token": token,
+                                  "cost": actual_cost, "resp": str(detail)[:400]})
+                    say(f"LIVE {'SWEEP' if is_lotto else 'BUY'} {side} {det['city']} {det['bucket']} avg_px={px_now:.4f} x{filled_shares} (req {shares}) cost=${actual_cost:.2f}")
+                    state["open"][key] = {**base, "token": token, "px": round(px_now, 4), "shares": filled_shares, "dry": False}
+                    state["processed"][key]["action"] = "filled" if filled_shares >= shares else "partial_fill"
+                    state["processed"][key]["filled_shares"] = filled_shares
+                    daily["trades"] += 1; daily["cost"] += actual_cost
+                    if is_lotto: daily["lotto_cost"] = round(daily.get("lotto_cost", 0.0) + actual_cost, 2)
             except Exception as ex:
                 say(f"ORDER ERROR {key}: {ex}")
                 jlog(ORDERS, {**base, "result": "ERROR", "err": str(ex)[:300]})

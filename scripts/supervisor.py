@@ -18,7 +18,7 @@ import json, os, re, sys, time, urllib.request
 from datetime import datetime, timezone, timedelta
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA = os.path.join(ROOT, "data")
+DATA = os.environ.get("POLYWEATHER_DATA") or os.path.join(ROOT, "data")
 os.makedirs(DATA, exist_ok=True)
 DET = os.path.join(DATA, "detections.jsonl")
 CLO = os.path.join(DATA, "closures.jsonl")
@@ -29,24 +29,32 @@ RUNLOG = os.path.join(DATA, "run.log")
 # city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
 # city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
 MAP = {
-    "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
-    "Seoul": ("RKSI", 9, "Asia/Seoul", 5.7, 18.7), "Busan": ("RKPK", 9, "Asia/Seoul", 5.8, 18.8),
-    "Tokyo": ("RJTT", 9, "Asia/Tokyo", 5.5, 18.4), "Shanghai": ("ZSPD", 8, "Asia/Shanghai", 5.5, 18.3),
-    "Beijing": ("ZBAA", 8, "Asia/Shanghai", 5.5, 18.9), "Taipei": ("RCSS", 8, "Asia/Taipei", 5.5, 18.2),
-    "Chongqing": ("ZUCK", 8, "Asia/Shanghai", 6.0, 19.3), "Wuhan": ("ZHHH", 8, "Asia/Shanghai", 5.8, 19.0),
-    "Chengdu": ("ZUUU", 8, "Asia/Shanghai", 6.3, 19.5), "Shenzhen": ("ZGSZ", 8, "Asia/Shanghai", 6.1, 18.9),
-    "Guangzhou": ("ZGGG", 8, "Asia/Shanghai", 6.1, 18.9), "Singapore": ("WSSS", 8, "Asia/Singapore", 7.0, 19.1),
-    "Kuala Lumpur": ("WMKK", 8, "Asia/Kuala_Lumpur", 7.1, 19.2), "Manila": ("RPLL", 8, "Asia/Manila", 5.7, 18.2),
-    "Karachi": ("OPKC", 5, "Asia/Karachi", 6.0, 18.9), "Jeddah": ("OEJN", 3, "Asia/Riyadh", 5.9, 18.7),
-    "Tel Aviv": ("LLBG", 3, "Asia/Jerusalem", 6.0, 19.2), "Istanbul": ("LTFM", 3, "Europe/Istanbul", 6.1, 19.9),
-    "Ankara": ("LTAC", 3, "Europe/Istanbul", 6.1, 19.7), "Moscow": ("UUWW", 3, "Europe/Moscow", 5.3, 19.9),
-    "Cape Town": ("FACT", 2, "Africa/Johannesburg", 7.2, 18.3), "Wellington": ("NZWN", 12, "Pacific/Auckland", 7.1, 17.4),
+    # Asian cities — disabled (US & European cities only)
+    # "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
+    # "Seoul": ("RKSI", 9, "Asia/Seoul", 5.7, 18.7), "Busan": ("RKPK", 9, "Asia/Seoul", 5.8, 18.8),
+    # "Tokyo": ("RJTT", 9, "Asia/Tokyo", 5.5, 18.4), "Shanghai": ("ZSPD", 8, "Asia/Shanghai", 5.5, 18.3),
+    # "Beijing": ("ZBAA", 8, "Asia/Shanghai", 5.5, 18.9), "Taipei": ("RCSS", 8, "Asia/Taipei", 5.5, 18.2),
+    # "Chongqing": ("ZUCK", 8, "Asia/Shanghai", 6.0, 19.3), "Wuhan": ("ZHHH", 8, "Asia/Shanghai", 5.8, 19.0),
+    # "Chengdu": ("ZUUU", 8, "Asia/Shanghai", 6.3, 19.5), "Shenzhen": ("ZGSZ", 8, "Asia/Shanghai", 6.1, 18.9),
+    # "Guangzhou": ("ZGGG", 8, "Asia/Shanghai", 6.1, 18.9), "Singapore": ("WSSS", 8, "Asia/Singapore", 7.0, 19.1),
+    # "Kuala Lumpur": ("WMKK", 8, "Asia/Kuala_Lumpur", 7.1, 19.2), "Manila": ("RPLL", 8, "Asia/Manila", 5.7, 18.2),
+    # "Karachi": ("OPKC", 5, "Asia/Karachi", 6.0, 18.9), "Jeddah": ("OEJN", 3, "Asia/Riyadh", 5.9, 18.7),
+    # "Tel Aviv": ("LLBG", 3, "Asia/Jerusalem", 6.0, 19.2),
+    # "Cape Town": ("FACT", 2, "Africa/Johannesburg", 7.2, 18.3), "Wellington": ("NZWN", 12, "Pacific/Auckland", 7.1, 17.4),
+    # "Mexico City": ("MMMX", -6, "America/Mexico_City", 7.1, 19.9),
+    # "Sao Paulo": ("SBSP", -3, "America/Sao_Paulo", 6.3, 17.8),
+    # "Buenos Aires": ("SABE", -3, "America/Argentina/Buenos_Aires", 7.3, 18.3),
+
+    # European cities
     "London": ("EGLC", 1, "Europe/London", 5.9, 20.2), "Paris": ("LFPB", 2, "Europe/Paris", 6.5, 20.8),
     "Amsterdam": ("EHAM", 2, "Europe/Amsterdam", 6.4, 20.7), "Warsaw": ("EPWA", 2, "Europe/Warsaw", 5.5, 19.8),
     "Helsinki": ("EFHK", 3, "Europe/Helsinki", 5.4, 20.9), "Madrid": ("LEMD", 2, "Europe/Madrid", 7.2, 20.9),
     "Milan": ("LIMC", 2, "Europe/Rome", 6.3, 20.2), "Munich": ("EDDM", 2, "Europe/Berlin", 6.2, 20.2),
     "Rome": ("LIRF", 2, "Europe/Rome", 6.2, 20.1), "Frankfurt": ("EDDF", 2, "Europe/Berlin", 6.1, 20.3),
-    "Vienna": ("LOWW", 2, "Europe/Vienna", 5.8, 20.0),
+    "Vienna": ("LOWW", 2, "Europe/Vienna", 5.8, 20.0), "Istanbul": ("LTFM", 3, "Europe/Istanbul", 6.1, 19.9),
+    "Ankara": ("LTAC", 3, "Europe/Istanbul", 6.1, 19.7), "Moscow": ("UUWW", 3, "Europe/Moscow", 5.3, 19.9),
+
+    # US cities
     "NYC": ("KLGA", -4, "America/New_York", 6.1, 19.5), "Miami": ("KMIA", -4, "America/New_York", 6.8, 19.5),
     "Atlanta": ("KATL", -4, "America/New_York", 6.9, 20.1), "Boston": ("KBOS", -4, "America/New_York", 5.9, 19.3),
     "Philadelphia": ("KPHL", -4, "America/New_York", 6.1, 19.4), "Washington DC": ("KDCA", -4, "America/New_York", 6.2, 19.5),
@@ -56,9 +64,6 @@ MAP = {
     "Las Vegas": ("KLAS", -7, "America/Los_Angeles", 6.0, 19.2),
     "Los Angeles": ("KLAX", -7, "America/Los_Angeles", 6.2, 19.3), "San Francisco": ("KSFO", -7, "America/Los_Angeles", 6.4, 19.4),
     "Seattle": ("KSEA", -7, "America/Los_Angeles", 6.2, 20.2), "Toronto": ("CYYZ", -4, "America/Toronto", 6.3, 19.9),
-    "Mexico City": ("MMMX", -6, "America/Mexico_City", 7.1, 19.9),
-    "Sao Paulo": ("SBSP", -3, "America/Sao_Paulo", 6.3, 17.8),
-    "Buenos Aires": ("SABE", -3, "America/Argentina/Buenos_Aires", 7.3, 18.3),
 }
 US_F = {"NYC", "Miami", "Chicago", "Dallas", "Austin", "Houston", "Denver", "Phoenix",
         "Los Angeles", "San Francisco", "Seattle", "Atlanta", "Boston", "Philadelphia",
@@ -200,22 +205,23 @@ def fetch_obs(events):
                 times[m["icaoId"]] = m.get("obsTime")
         except Exception as ex:
             say("metar chunk err: %s" % ex)
-    try:
-        r = get("https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en")
-        temps["hko"] = next((s["value"] for s in r.get("temperature", {}).get("data", [])
-                             if s.get("place") == "Hong Kong Observatory"), None)
-        raws["hko"] = ""
+    if "Hong Kong" in MAP:
         try:
-            times["hko"] = datetime.fromisoformat(r.get("updateTime")).timestamp()
-        except Exception:
-            times["hko"] = None
-        if "VHHH" not in temps:
+            r = get("https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=rhrread&lang=en")
+            temps["hko"] = next((s["value"] for s in r.get("temperature", {}).get("data", [])
+                                 if s.get("place") == "Hong Kong Observatory"), None)
+            raws["hko"] = ""
             try:
-                ms = get("https://aviationweather.gov/api/data/metar?ids=VHHH&format=json")
-                if ms: temps["VHHH"] = ms[0].get("temp"); raws["VHHH"] = ms[0].get("rawOb") or ""; times["VHHH"] = ms[0].get("obsTime")
-            except Exception: pass
-    except Exception as ex:
-        say("hko err: %s" % ex)
+                times["hko"] = datetime.fromisoformat(r.get("updateTime")).timestamp()
+            except Exception:
+                times["hko"] = None
+            if "VHHH" not in temps:
+                try:
+                    ms = get("https://aviationweather.gov/api/data/metar?ids=VHHH&format=json")
+                    if ms: temps["VHHH"] = ms[0].get("temp"); raws["VHHH"] = ms[0].get("rawOb") or ""; times["VHHH"] = ms[0].get("obsTime")
+                except Exception: pass
+        except Exception as ex:
+            say("hko err: %s" % ex)
     return temps, raws, times
 
 def bucket_parse(gt):

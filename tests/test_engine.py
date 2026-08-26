@@ -149,13 +149,29 @@ class TestWeatherEngine(unittest.TestCase):
         self.assertAlmostEqual(shares3 * px3, 9.68, places=2)
 
     def test_base_live_rules_and_safeguards(self):
-        """Verify lotto rule enablement and live rule set integrity."""
+        """Verify lotto rule disablement and live rule set integrity."""
         cfg = env()
-        self.assertEqual(cfg.get("ALLOW_LOTTOS"), "true")
+        self.assertEqual(cfg.get("ALLOW_LOTTOS"), "false")
         self.assertIn("R2_low_dead_below", BASE_LIVE_RULES)
         self.assertIn("R3_high_dead_above", BASE_LIVE_RULES)
-        self.assertIn("R1_low_lotto", BASE_LIVE_RULES)
-        self.assertIn("R4_high_lotto", BASE_LIVE_RULES)
+        self.assertNotIn("R1_low_lotto", BASE_LIVE_RULES)
+        self.assertNotIn("R4_high_lotto", BASE_LIVE_RULES)
+
+    def test_parse_filled_shares(self):
+        """Verify parsing of actual filled shares from CLOB FAK responses."""
+        from scripts.live_trader import parse_filled_shares
+        # Full fill via takingAmount
+        self.assertEqual(parse_filled_shares({"takingAmount": "25.0"}, 25), 25.0)
+        # Partial fill via takingAmount
+        self.assertEqual(parse_filled_shares({"takingAmount": "12.5"}, 25), 12.5)
+        # Zero fill
+        self.assertEqual(parse_filled_shares({"takingAmount": "0"}, 25), 0.0)
+        # Alternate field filled_size
+        self.assertEqual(parse_filled_shares({"filled_size": "10"}, 25), 10.0)
+        # Matched status fallback
+        self.assertEqual(parse_filled_shares({"status": "matched"}, 25), 25.0)
+        # Non-dict / error
+        self.assertEqual(parse_filled_shares(None, 25), 0.0)
 
     def test_position_guard_boundary_compression(self):
         """Verify PositionGuard accurately identifies compressed boundary and triggers defensive stop-loss."""
