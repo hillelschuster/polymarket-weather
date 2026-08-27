@@ -82,7 +82,7 @@ class TestWeatherEngine(unittest.TestCase):
         d14 = next(d for d in dets if d["bucket"] == "14°C")
         self.assertEqual(d14["rule"], "R2_low_dead_below")
         self.assertEqual(d14["px"], 0.85)
-        self.assertEqual(d14["q"], 0.95)
+        self.assertEqual(d14["q"], 0.97)
         self.assertGreater(d14["edge"], 0.04)
 
         # Verify 15C
@@ -111,9 +111,9 @@ class TestWeatherEngine(unittest.TestCase):
         book = [
             {"bucket": "90-91°F", "lo": 89.5, "hi": 91.5, "val": 90.0, "yes_bid": 0.18, "yes_bid_sz": 100, "yes_ask": 0.22, "yes_ask_sz": 100}
         ]
-        # Max achieved = 29.0C (84.2F). Margin for 82c NO is strict 5.5F -> 84.2 + 5.5 = 89.7F.
-        # 90-91F bucket lo (89.5F) is < 89.7F -> blocked by strict 5.5F margin!
-        # But for 92-93F (lo = 91.5F) >= 89.7F -> QUALIFIES!
+        # Max achieved = 29.0C (84.2F). Margin for 82c NO is strict 5.4F -> 84.2 + 5.4 = 89.6F.
+        # 90-91F bucket lo (89.5F) is < 89.6F -> blocked by strict margin!
+        # But for 92-93F (lo = 91.5F) >= 89.6F -> QUALIFIES!
         book2 = [
             {"bucket": "92-93°F", "lo": 91.5, "hi": 93.5, "val": 92.0, "yes_bid": 0.18, "yes_bid_sz": 100, "yes_ask": 0.22, "yes_ask_sz": 100}
         ]
@@ -124,34 +124,34 @@ class TestWeatherEngine(unittest.TestCase):
         self.assertEqual(dets[0]["side"], "NO")
 
     def test_live_trader_sizing_tiers(self):
-        """Verify Fractional Kelly position sizing tiers: $25 for <=0.70, $18 for 0.70-0.85, $10 for >0.85."""
-        card = 25.0
-        # Tier 1: px = 0.65 -> card_tier = $25.0 -> shares = int(min(25.0 / 0.65, 0.9 * 100)) = 38
+        """Verify Dynamic Sizing tiers under $150 Capital Model: $15 for <=0.70, $12 for 0.70-0.84, $8 for 0.85-0.91."""
+        remaining_budget = 150.0
         sz_now = 100
+        # Tier 1: px = 0.65 -> card_tier = $15.0 -> shares = int(min(15.0 / 0.65, 0.9 * 100)) = 23
         px1 = 0.65
-        card_tier1 = card
+        card_tier1 = min(15.0, remaining_budget)
         shares1 = int(min(card_tier1 / px1, 0.9 * sz_now))
-        self.assertEqual(shares1, 38)
-        self.assertAlmostEqual(shares1 * px1, 24.70, places=2)
+        self.assertEqual(shares1, 23)
+        self.assertAlmostEqual(shares1 * px1, 14.95, places=2)
 
-        # Tier 2: px = 0.80 -> card_tier = $18.0 -> shares = int(min(18.0 / 0.80, 0.9 * 100)) = 22
+        # Tier 2: px = 0.80 -> card_tier = $12.0 -> shares = int(min(12.0 / 0.80, 0.9 * 100)) = 15
         px2 = 0.80
-        card_tier2 = min(card, 18.0)
+        card_tier2 = min(12.0, remaining_budget)
         shares2 = int(min(card_tier2 / px2, 0.9 * sz_now))
-        self.assertEqual(shares2, 22)
-        self.assertAlmostEqual(shares2 * px2, 17.60, places=2)
+        self.assertEqual(shares2, 15)
+        self.assertAlmostEqual(shares2 * px2, 12.00, places=2)
 
-        # Tier 3: px = 0.88 -> card_tier = $10.0 -> shares = int(min(10.0 / 0.88, 0.9 * 100)) = 11
+        # Tier 3: px = 0.88 -> card_tier = $8.0 -> shares = int(min(8.0 / 0.88, 0.9 * 100)) = 9
         px3 = 0.88
-        card_tier3 = min(card, 10.0)
+        card_tier3 = min(8.0, remaining_budget)
         shares3 = int(min(card_tier3 / px3, 0.9 * sz_now))
-        self.assertEqual(shares3, 11)
-        self.assertAlmostEqual(shares3 * px3, 9.68, places=2)
+        self.assertEqual(shares3, 9)
+        self.assertAlmostEqual(shares3 * px3, 7.92, places=2)
 
     def test_base_live_rules_and_safeguards(self):
-        """Verify lotto rule disablement and live rule set integrity."""
+        """Verify lotto rule enablement and live rule set integrity."""
         cfg = env()
-        self.assertEqual(cfg.get("ALLOW_LOTTOS"), "false")
+        self.assertEqual(cfg.get("ALLOW_LOTTOS"), "true")
         self.assertIn("R2_low_dead_below", BASE_LIVE_RULES)
         self.assertIn("R3_high_dead_above", BASE_LIVE_RULES)
         self.assertNotIn("R1_low_lotto", BASE_LIVE_RULES)

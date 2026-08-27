@@ -29,21 +29,21 @@ RUNLOG = os.path.join(DATA, "run.log")
 # city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
 # city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
 MAP = {
-    # Asian cities — disabled (US & European cities only)
-    # "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
-    # "Seoul": ("RKSI", 9, "Asia/Seoul", 5.7, 18.7), "Busan": ("RKPK", 9, "Asia/Seoul", 5.8, 18.8),
-    # "Tokyo": ("RJTT", 9, "Asia/Tokyo", 5.5, 18.4), "Shanghai": ("ZSPD", 8, "Asia/Shanghai", 5.5, 18.3),
-    # "Beijing": ("ZBAA", 8, "Asia/Shanghai", 5.5, 18.9), "Taipei": ("RCSS", 8, "Asia/Taipei", 5.5, 18.2),
-    # "Chongqing": ("ZUCK", 8, "Asia/Shanghai", 6.0, 19.3), "Wuhan": ("ZHHH", 8, "Asia/Shanghai", 5.8, 19.0),
-    # "Chengdu": ("ZUUU", 8, "Asia/Shanghai", 6.3, 19.5), "Shenzhen": ("ZGSZ", 8, "Asia/Shanghai", 6.1, 18.9),
-    # "Guangzhou": ("ZGGG", 8, "Asia/Shanghai", 6.1, 18.9), "Singapore": ("WSSS", 8, "Asia/Singapore", 7.0, 19.1),
-    # "Kuala Lumpur": ("WMKK", 8, "Asia/Kuala_Lumpur", 7.1, 19.2), "Manila": ("RPLL", 8, "Asia/Manila", 5.7, 18.2),
-    # "Karachi": ("OPKC", 5, "Asia/Karachi", 6.0, 18.9), "Jeddah": ("OEJN", 3, "Asia/Riyadh", 5.9, 18.7),
-    # "Tel Aviv": ("LLBG", 3, "Asia/Jerusalem", 6.0, 19.2),
-    # "Cape Town": ("FACT", 2, "Africa/Johannesburg", 7.2, 18.3), "Wellington": ("NZWN", 12, "Pacific/Auckland", 7.1, 17.4),
-    # "Mexico City": ("MMMX", -6, "America/Mexico_City", 7.1, 19.9),
-    # "Sao Paulo": ("SBSP", -3, "America/Sao_Paulo", 6.3, 17.8),
-    # "Buenos Aires": ("SABE", -3, "America/Argentina/Buenos_Aires", 7.3, 18.3),
+    # Asian & Global cities (Restored & Verified)
+    "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
+    "Seoul": ("RKSI", 9, "Asia/Seoul", 5.7, 18.7), "Busan": ("RKPK", 9, "Asia/Seoul", 5.8, 18.8),
+    "Tokyo": ("RJTT", 9, "Asia/Tokyo", 5.5, 18.4), "Shanghai": ("ZSPD", 8, "Asia/Shanghai", 5.5, 18.3),
+    "Beijing": ("ZBAA", 8, "Asia/Shanghai", 5.5, 18.9), "Taipei": ("RCSS", 8, "Asia/Taipei", 5.5, 18.2),
+    "Chongqing": ("ZUCK", 8, "Asia/Shanghai", 6.0, 19.3), "Wuhan": ("ZHHH", 8, "Asia/Shanghai", 5.8, 19.0),
+    "Chengdu": ("ZUUU", 8, "Asia/Shanghai", 6.3, 19.5), "Shenzhen": ("ZGSZ", 8, "Asia/Shanghai", 6.1, 18.9),
+    "Guangzhou": ("ZGGG", 8, "Asia/Shanghai", 6.1, 18.9), "Singapore": ("WSSS", 8, "Asia/Singapore", 7.0, 19.1),
+    "Kuala Lumpur": ("WMKK", 8, "Asia/Kuala_Lumpur", 7.1, 19.2), "Manila": ("RPLL", 8, "Asia/Manila", 5.7, 18.2),
+    "Karachi": ("OPKC", 5, "Asia/Karachi", 6.0, 18.9), "Jeddah": ("OEJN", 3, "Asia/Riyadh", 5.9, 18.7),
+    "Tel Aviv": ("LLBG", 3, "Asia/Jerusalem", 6.0, 19.2),
+    "Cape Town": ("FACT", 2, "Africa/Johannesburg", 7.2, 18.3), "Wellington": ("NZWN", 12, "Pacific/Auckland", 7.1, 17.4),
+    "Mexico City": ("MMMX", -6, "America/Mexico_City", 7.1, 19.9),
+    "Sao Paulo": ("SBGR", -3, "America/Sao_Paulo", 6.3, 17.8),
+    "Buenos Aires": ("SAEZ", -3, "America/Argentina/Buenos_Aires", 7.3, 18.3),
 
     # European cities
     "London": ("EGLC", 1, "Europe/London", 5.9, 20.2), "Paris": ("LFPB", 2, "Europe/Paris", 6.5, 20.8),
@@ -71,13 +71,9 @@ US_F = {"NYC", "Miami", "Chicago", "Dallas", "Austin", "Houston", "Denver", "Pho
 
 CYCLE_SEC = 120
 EVENT_CACHE_SEC = 600
-# $250 sizing card (10% per locked position, ~$3 lotto)
-SIZE_LOCKED = 25.0   # >=90% confidence states
-SIZE_LOTTO = 3.0     # cheap asks <= 0.002
-# Audit 2026-08-16 tier math: break-even q = p+0.05*p*(1-p) = 0.21% at 0.002 vs 1.05-2.1%
-# at 0.01-0.02; state-sample 95% lower bound 0.84% clears ONLY the <=0.002 tier (4x).
-# Both Paris lotto losses were 0.01-0.019 entries; the HK win was 0.001.
-# 1-2c states remain recorded by the survey logger for later re-admission with evidence.
+# $150 bankroll sizing card ($15 high edge, $12 mid, $8 defensive, $2.50 lotto)
+SIZE_LOCKED = 15.0   # >=90% confidence states
+SIZE_LOTTO = 2.50    # cheap asks <= 0.002
 ASK_MAX_LOTTO = 0.002
 
 def say(msg):
@@ -138,11 +134,13 @@ def atomic_save_json(path, obj):
 
 def load_seen():
     try:
-        with open(SEEN, encoding="utf-8") as f: return set(json.load(f))
-    except Exception: return set()
+        with open(SEEN, encoding="utf-8") as f:
+            d = json.load(f)
+            return d if isinstance(d, dict) else {k: 0 for k in d}
+    except Exception: return {}
 
 def save_seen(s):
-    atomic_save_json(SEEN, sorted(s))
+    atomic_save_json(SEEN, s)
 
 MONTHS = {
     "january": 1, "jan": 1, "february": 2, "feb": 2, "march": 3, "mar": 3,
@@ -280,7 +278,7 @@ def fetch_running(in_window_events):
     if not stations: return out
     for i in range(0, len(stations), 10):
         chunk = stations[i:i+10]
-        ids = ",".join(s for s, _ in chunk)
+        ids = ",".join(("VHHH" if s == "hko" else s) for s, _ in chunk)
         try:
             # LOOKBACK FIX: 28 hours guarantees full 00:00 to 23:59 civil day coverage
             ms = get("https://aviationweather.gov/api/data/metar?ids=%s&hours=28&format=json" % ids)
@@ -332,11 +330,8 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
     is_low = event["title"].startswith("Lowest")
     is_f = event["city"] in US_F
     obs_m = obs * 9 / 5 + 32 if is_f else obs
-    margin_base = 3.6 if is_f else 2.0     # 2.0C / 3.6F standard margin
-    if trend is not None and abs(trend) <= 0.2:
-        margin_strict = 4.0 if is_f else 2.2
-    else:
-        margin_strict = 5.5 if is_f else 3.0   # 3.0C / 5.5F strict margin for high-price NOs (>0.75)
+    margin_base = 3.6 if is_f else 2.0     # 2.0C / 3.6F standard margin (p <= 0.70)
+    margin_strict = 5.4 if is_f else 3.0   # 3.0C / 5.4F strict margin for high-price NOs (>0.70)
     bd_min = 1.4 if is_f else 0.8          # 0.8C boundary margin against resolver-vs-METAR noise
     out = []
 
@@ -369,9 +364,9 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
             # R2 dead-below: progressive margin based on price
             if r["yes_bid"] is not None:
                 no_ask = 1 - r["yes_bid"]
-                req_margin = margin_strict if no_ask > 0.75 else margin_base
+                req_margin = margin_strict if no_ask > 0.70 else margin_base
                 if r["hi"] <= min_anchor - req_margin:
-                    q_no = 0.97 if no_ask > 0.75 else 0.92
+                    q_no = 0.97 if no_ask > 0.70 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
                         out.append(mk("R2_low_dead_below", "NO", q_no, r))
 
@@ -388,9 +383,9 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
             # R3 dead-above after peak: progressive margin based on price
             if r["yes_bid"] is not None:
                 no_ask = 1 - r["yes_bid"]
-                req_margin = margin_strict if no_ask > 0.75 else margin_base
+                req_margin = margin_strict if no_ask > 0.70 else margin_base
                 if r["lo"] >= max_anchor + req_margin:
-                    q_no = 0.97 if no_ask > 0.75 else 0.92
+                    q_no = 0.97 if no_ask > 0.70 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
                         out.append(mk("R3_high_dead_above", "NO", q_no, r))
     return out
@@ -531,8 +526,8 @@ def cycle(events_cache):
             if d.get("shares", 0) < 5:   # CLOB minimum order size
                 continue
             key = f"{e['title']}|{d['bucket']}|{d['side']}"
-            if key in seen: continue
-            seen.add(key)
+            if key in seen and (now.timestamp() - float(seen.get(key, 0))) < 1800: continue
+            seen[key] = now.timestamp()
             bd = next((x["bd"] for x in rel if x["b"] == d["bucket"] and x["bd"] is not None), None)
             rec = {"ts": now.isoformat(), "key": key, "city": city, "title": e["title"],
                    "slug": e.get("slug"), "end": e["endDate"], "resolver_obs_c": obs,

@@ -36,12 +36,13 @@ ORDERS = os.path.join(DATA, "live_orders.jsonl")
 RUNLOG = os.path.join(DATA, "run.log")
 ENVF = os.path.join(ROOT, ".env")
 PAUSE = os.path.join(DATA, "PAUSE")
-DEFAULT_CARD = 25.0
-DEFAULT_MAX_OPEN = 5
-DEFAULT_MAX_TRADES_DAY = 12
-DEFAULT_MAX_COST_DAY = 85.0
-DEFAULT_LOTTO_SWEEP_CAP = 5.0
-DEFAULT_LOTTO_DAY_CAP = 10.0
+DEFAULT_MAX_TOTAL_EXPOSURE_USD = 150.0
+DEFAULT_CARD = 15.0
+DEFAULT_MAX_OPEN = 15
+DEFAULT_MAX_TRADES_DAY = 20
+DEFAULT_MAX_COST_DAY = 150.0
+DEFAULT_LOTTO_SWEEP_CAP = 2.50
+DEFAULT_LOTTO_DAY_CAP = 6.00
 DEFAULT_ALERT_MAX_AGE_SEC = 600  # 10 minutes max alert latency
 
 BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
@@ -68,9 +69,10 @@ def parse_filled_shares(detail, default_shares=0.0):
 
 def env():
     cfg = {"LIVE_ENABLED": "false", "PRIVATE_KEY": "", "FUNDER": "", "DRY_RUN": "true", "CHAIN_ID": "137",
+           "MAX_TOTAL_EXPOSURE_USD": str(DEFAULT_MAX_TOTAL_EXPOSURE_USD),
            "CARD": str(DEFAULT_CARD), "MAX_OPEN": str(DEFAULT_MAX_OPEN),
            "MAX_TRADES_DAY": str(DEFAULT_MAX_TRADES_DAY), "MAX_COST_DAY": str(DEFAULT_MAX_COST_DAY),
-           "ALLOW_LOTTOS": "false", "LOTTO_SWEEP_CAP": str(DEFAULT_LOTTO_SWEEP_CAP),
+           "ALLOW_LOTTOS": "true", "LOTTO_SWEEP_CAP": str(DEFAULT_LOTTO_SWEEP_CAP),
            "LOTTO_DAY_CAP": str(DEFAULT_LOTTO_DAY_CAP),
            "ALERT_MAX_AGE_SEC": str(DEFAULT_ALERT_MAX_AGE_SEC)}
     try:
@@ -410,7 +412,17 @@ def process(cfg):
 
     for det in dets:
         key = det["key"]
-        if key in state["processed"]: continue
+        p_entry = state["processed"].get(key)
+        if p_entry and isinstance(p_entry, dict) and p_entry.get("ts"):
+            try:
+                p_dt = datetime.fromisoformat(str(p_entry["ts"]).replace("Z", "+00:00"))
+                if p_dt.tzinfo is None: p_dt = p_dt.replace(tzinfo=timezone.utc)
+                if (nowts - p_dt).total_seconds() < 1800:
+                    continue
+            except Exception:
+                pass
+        elif key in state["processed"]:
+            continue
 
         rule = det.get("rule")
         end_val = det.get("end") or det.get("endDate")
@@ -458,6 +470,14 @@ def process(cfg):
             continue
         if os.path.exists(PAUSE):
             say("PAUSE file present — no new orders"); continue
+        
+        # Dynamic Capital Ceiling: sum of open position costs cannot exceed $150.00
+        locked_usd = sum(float(pos.get("cost", 0.0)) for pos in state.get("open", {}).values())
+        max_total_exposure = float(cfg.get("MAX_TOTAL_EXPOSURE_USD") or DEFAULT_MAX_TOTAL_EXPOSURE_USD)
+        remaining_budget = max(0.0, max_total_exposure - locked_usd)
+        if remaining_budget < 0.50:
+            continue  # transient: wait until an open position settles
+
         if len(state["open"]) >= max_open:
             continue  # transient limit: allow next pass to reconsider once slot frees up
         if daily["trades"] >= max_trades_day or daily["cost"] >= max_cost_day:
@@ -478,7 +498,7 @@ def process(cfg):
         if is_lotto:
             # sweep every displayed YES level up to the audited tier cap (0.002),
             # bounded by the per-ticket dollar cap; one FAK at the tier limit walks the levels
-            rem = float(cfg.get("LOTTO_SWEEP_CAP") or DEFAULT_LOTTO_SWEEP_CAP)
+            rem = min(float(cfg.get("LOTTO_SWEEP_CAP") or DEFAULT_LOTTO_SWEEP_CAP), remaining_budget)
             sweep = []
             for px, sz in asks_all:
                 if px > ASK_TIER_LOTTO: break
@@ -505,20 +525,26 @@ def process(cfg):
                 px_now, sz_now = 1 - yes[0], yes[1]
             if px_now is None or px_now > (det.get("px") or 0) + PX_TOL:
                 state["processed"][key]["action"] = "skip_price_moved"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE", "px_now": round(px_now,3) if px_now else None}); continue
-            if px_now > 0.92:
+            if px_now > 0.91:
                 state["processed"][key]["action"] = "skip_price_ceiling"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE_CEILING", "px_now": round(px_now,3)}); continue
             q = det["q"]
             edge_now = q - px_now - fee(px_now)
             if edge_now < EDGE_MIN:
                 state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "px_now": round(px_now,3), "edge_now": round(edge_now,3)}); continue
             
-            # Dynamic Fractional Kelly Price-Tier Sizing
+            # Dynamic Sizing Tiers ($150 Capital Limit Model)
             if px_now <= 0.70:
-                card_tier = card            # Full Card ($25.0, ~1/8.5 Kelly)
-            elif px_now <= 0.85:
-                card_tier = min(card, 18.0) # Medium Card ($18.0, ~1/11 Kelly)
+                card_tier = min(15.0, remaining_budget)
+            elif px_now <= 0.84:
+                card_tier = min(12.0, remaining_budget)
+            elif px_now <= 0.91:
+                card_tier = min(8.0, remaining_budget)
             else:
-                card_tier = min(card, 10.0) # Defensive Card ($10.0, ~1/14 Kelly)
+                card_tier = 0.0
+
+            if card_tier < (5 * px_now):
+                state["processed"][key]["action"] = "skip_capital_cap"
+                continue
 
             shares = int(min(card_tier / max(TICK, px_now), 0.9 * sz_now))
             if shares < 5:
