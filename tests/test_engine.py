@@ -123,8 +123,60 @@ class TestWeatherEngine(unittest.TestCase):
         self.assertEqual(dets[0]["bucket"], "92-93°F")
         self.assertEqual(dets[0]["side"], "NO")
 
+    def test_alpha_detector_r5_dead_below_high(self):
+        """Verify R5 dead-below detection in a Highest temperature event (monotone peak property)."""
+        event = {"title": "Highest temperature in London on August 18?", "city": "London", "markets": []}
+        city_cfg = MAP["London"]  # lastlight = 20.2 -> window: 16.7 to 23.2
+        book = [
+            {"bucket": "20°C", "lo": 19.5, "hi": 20.5, "val": 20.0, "yes_bid": 0.15, "yes_bid_sz": 100, "yes_ask": 0.20, "yes_ask_sz": 100},
+            {"bucket": "21°C", "lo": 20.5, "hi": 21.5, "val": 21.0, "yes_bid": 0.30, "yes_bid_sz": 100, "yes_ask": 0.35, "yes_ask_sz": 100},
+            {"bucket": "24°C", "lo": 23.5, "hi": 24.5, "val": 24.0, "yes_bid": 0.80, "yes_bid_sz": 100, "yes_ask": 0.85, "yes_ask_sz": 100},
+            {"bucket": "28°C", "lo": 27.5, "hi": 28.5, "val": 28.0, "yes_bid": 0.15, "yes_bid_sz": 100, "yes_ask": 0.20, "yes_ask_sz": 100}
+        ]
+        # Achieved running max = 24.0C, obs = 23.5C at 18:00 local time
+        # For 20C: hi (20.5) <= 24.0 - 3.0 (strict margin for 85c NO) = 21.0 -> R5 QUALIFIES!
+        # For 21C: hi (21.5) <= 24.0 - 2.0 (base margin for 70c NO) = 22.0 -> R5 QUALIFIES!
+        # For 28C: lo (27.5) >= 24.0 + 3.0 (strict margin for 85c NO) = 27.0 -> R3 QUALIFIES!
+        dets = detectors(event, city_cfg, local_hour=18.0, obs=23.5, precip=False, book=book, runmax=24.0, trend=0.0)
+        self.assertEqual(len(dets), 3)
+
+        d20 = next(d for d in dets if d["bucket"] == "20°C")
+        self.assertEqual(d20["rule"], "R5_high_dead_below")
+        self.assertEqual(d20["side"], "NO")
+        self.assertEqual(d20["px"], 0.85)
+        self.assertEqual(d20["q"], 0.97)
+        self.assertGreater(d20["edge"], 0.04)
+
+        d21 = next(d for d in dets if d["bucket"] == "21°C")
+        self.assertEqual(d21["rule"], "R5_high_dead_below")
+        self.assertEqual(d21["side"], "NO")
+        self.assertEqual(d21["px"], 0.70)
+        self.assertEqual(d21["q"], 0.92)
+        self.assertGreater(d21["edge"], 0.04)
+
+        d28 = next(d for d in dets if d["bucket"] == "28°C")
+        self.assertEqual(d28["rule"], "R3_high_dead_above")
+        self.assertEqual(d28["side"], "NO")
+
+    def test_widened_decision_windows(self):
+        """Verify widened decision windows trigger correctly at boundary hours."""
+        event_low = {"title": "Lowest temperature in London on August 18?", "city": "London", "markets": []}
+        event_high = {"title": "Highest temperature in London on August 18?", "city": "London", "markets": []}
+        city_cfg = MAP["London"] # dawn = 5.9, lastlight = 20.2
+        book = [
+            {"bucket": "14°C", "lo": 13.5, "hi": 14.5, "val": 14.0, "yes_bid": 0.15, "yes_bid_sz": 100, "yes_ask": 0.20, "yes_ask_sz": 100},
+            {"bucket": "28°C", "lo": 27.5, "hi": 28.5, "val": 28.0, "yes_bid": 0.15, "yes_bid_sz": 100, "yes_ask": 0.20, "yes_ask_sz": 100}
+        ]
+        # Low window: [5.9 - 2.5 = 3.4, 5.9 + 2.5 = 8.4]
+        self.assertTrue(len(detectors(event_low, city_cfg, local_hour=3.5, obs=18.0, precip=False, book=book, runmin=18.0, trend=0.0)) > 0)
+        self.assertEqual(len(detectors(event_low, city_cfg, local_hour=3.0, obs=18.0, precip=False, book=book, runmin=18.0, trend=0.0)), 0)
+
+        # High window: [20.2 - 3.5 = 16.7, 20.2 + 3.0 = 23.2]
+        self.assertTrue(len(detectors(event_high, city_cfg, local_hour=17.0, obs=24.0, precip=False, book=book, runmax=24.0, trend=0.0)) > 0)
+        self.assertEqual(len(detectors(event_high, city_cfg, local_hour=16.0, obs=24.0, precip=False, book=book, runmax=24.0, trend=0.0)), 0)
+
     def test_live_trader_sizing_tiers(self):
-        """Verify Dynamic Sizing tiers under $150 Capital Model: $15 for <=0.70, $12 for 0.70-0.84, $8 for 0.85-0.91."""
+        """Verify Dynamic Sizing tiers under $150 Capital Model: $15 for <=0.70, $12 for 0.70-0.85, $8 for 0.85-0.94."""
         remaining_budget = 150.0
         sz_now = 100
         # Tier 1: px = 0.65 -> card_tier = $15.0 -> shares = int(min(15.0 / 0.65, 0.9 * 100)) = 23
@@ -149,11 +201,12 @@ class TestWeatherEngine(unittest.TestCase):
         self.assertAlmostEqual(shares3 * px3, 7.92, places=2)
 
     def test_base_live_rules_and_safeguards(self):
-        """Verify lotto rule enablement and live rule set integrity."""
+        """Verify lotto rule enablement and live rule set integrity including R5."""
         cfg = env()
         self.assertEqual(cfg.get("ALLOW_LOTTOS"), "true")
         self.assertIn("R2_low_dead_below", BASE_LIVE_RULES)
         self.assertIn("R3_high_dead_above", BASE_LIVE_RULES)
+        self.assertIn("R5_high_dead_below", BASE_LIVE_RULES)
         self.assertNotIn("R1_low_lotto", BASE_LIVE_RULES)
         self.assertNotIn("R4_high_lotto", BASE_LIVE_RULES)
 

@@ -39,17 +39,19 @@ PAUSE = os.path.join(DATA, "PAUSE")
 DEFAULT_MAX_TOTAL_EXPOSURE_USD = 150.0
 DEFAULT_CARD = 15.0
 DEFAULT_MAX_OPEN = 15
-DEFAULT_MAX_TRADES_DAY = 20
-DEFAULT_MAX_COST_DAY = 150.0
+DEFAULT_MAX_TRADES_DAY = 30
+DEFAULT_MAX_COST_DAY = 300.0
 DEFAULT_LOTTO_SWEEP_CAP = 2.50
 DEFAULT_LOTTO_DAY_CAP = 6.00
 DEFAULT_ALERT_MAX_AGE_SEC = 600  # 10 minutes max alert latency
 
-BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above")
+BASE_LIVE_RULES = ("R2_low_dead_below", "R3_high_dead_above", "R5_high_dead_below")
 LOTTO_RULES = ("R1_low_lotto", "R4_high_lotto")
 ASK_TIER_LOTTO = 0.002   # sweep displayed YES levels only up to the audited tier cap
+PRICE_CEILING = 0.94     # Audited optimal price cap (6.06% net ROI floor)
 PX_TOL = 0.03            # max slippage vs alert price
-EDGE_MIN = 0.04          # recomputed edge floor at execution time
+EDGE_MIN = 0.030         # 3.0c recomputed edge floor at execution time
+MAX_SLIPPAGE = 0.08      # Anomaly filter vs alert price
 POLL_SEC = 30
 TICK = 0.001
 
@@ -272,7 +274,7 @@ def run_position_guard(cfg, state):
 
         should_exit = False
         exit_reason = ""
-        if rule == "R2_low_dead_below" and side == "NO":
+        if rule in ("R2_low_dead_below", "R5_high_dead_below") and side == "NO":
             dist = obs - b_hi
             if dist < (1.3 if is_f else 0.7):
                 should_exit = True
@@ -483,8 +485,10 @@ def process(cfg):
         if daily["trades"] >= max_trades_day or daily["cost"] >= max_cost_day:
             state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_daily_cap"}
             continue
-        if any(v.get("city") == det["city"] for v in state["open"].values()):
-            continue  # transient: do not permanently blacklist; wait until city slot clears
+        city_positions = [v for v in state["open"].values() if v.get("city") == det["city"]]
+        city_cost = sum(float(p.get("cost", 0.0)) for p in city_positions)
+        if len(city_positions) >= 3 or city_cost >= 35.0:
+            continue  # City multi-bucket quota reached (allow up to 3 dead buckets or $35 exposure)
 
         state["processed"][key] = {"ts": datetime.now(timezone.utc).isoformat(), "action": "seen"}
 
@@ -523,21 +527,30 @@ def process(cfg):
             else:
                 if yes[0] is None: state["processed"][key]["action"] = "skip_no_bid"; continue
                 px_now, sz_now = 1 - yes[0], yes[1]
-            if px_now is None or px_now > (det.get("px") or 0) + PX_TOL:
-                state["processed"][key]["action"] = "skip_price_moved"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE", "px_now": round(px_now,3) if px_now else None}); continue
-            if px_now > 0.91:
-                state["processed"][key]["action"] = "skip_price_ceiling"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE_CEILING", "px_now": round(px_now,3)}); continue
-            q = det["q"]
+            if px_now is None or px_now <= 0:
+                state["processed"][key]["action"] = "skip_invalid_price"; continue
+            if px_now > PRICE_CEILING:
+                state["processed"][key]["action"] = "skip_price_ceiling"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE_CEILING", "px_now": round(px_now,3), "ceiling": PRICE_CEILING}); continue
+            
+            # Pure Dynamic Edge Gating
+            q = det.get("q")
+            if q is None:
+                q = 0.97 if px_now > 0.70 else 0.92
             edge_now = q - px_now - fee(px_now)
             if edge_now < EDGE_MIN:
-                state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "px_now": round(px_now,3), "edge_now": round(edge_now,3)}); continue
+                state["processed"][key]["action"] = "skip_edge_gone"; jlog(ORDERS, {**base, "result": "REJECTED_EDGE", "px_now": round(px_now,3), "edge_now": round(edge_now,3), "edge_min": EDGE_MIN}); continue
             
-            # Dynamic Sizing Tiers ($150 Capital Limit Model)
+            # Anomaly circuit breaker (only active if alert_px was non-zero)
+            alert_px = det.get("px")
+            if alert_px is not None and alert_px > 0 and (px_now - alert_px) > MAX_SLIPPAGE:
+                state["processed"][key]["action"] = "skip_price_moved"; jlog(ORDERS, {**base, "result": "REJECTED_PRICE_SLIPPAGE", "px_now": round(px_now,3), "alert_px": round(alert_px,3)}); continue
+
+            # Dynamic Sizing Tiers ($150–$200 Capital Model)
             if px_now <= 0.70:
                 card_tier = min(15.0, remaining_budget)
-            elif px_now <= 0.84:
+            elif px_now <= 0.85:
                 card_tier = min(12.0, remaining_budget)
-            elif px_now <= 0.91:
+            elif px_now <= PRICE_CEILING:
                 card_tier = min(8.0, remaining_budget)
             else:
                 card_tier = 0.0

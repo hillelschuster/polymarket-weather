@@ -353,7 +353,7 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
 
         # Velocity filter: block low-side entries if temperature is rapidly falling (trend < -0.3 C/hr)
         trend_ok_low = (trend is None) or (trend >= -0.3)
-        if is_low and (dawn - 2.0) <= local_hour <= (dawn + 2.5) and not precip and trend_ok_low:
+        if is_low and (dawn - 2.5) <= local_hour <= (dawn + 2.5) and not precip and trend_ok_low:
             # R1 lotto: running min inside bucket, boundary distance >= bd_min, ask dirt cheap -> floor q 0.15
             min_in_bucket = (r["lo"] <= min_anchor < r["hi"]) and (r["lo"] <= obs_m < r["hi"])
             bd_low = min(min_anchor - r["lo"], r["hi"] - min_anchor) if min_in_bucket else 0
@@ -370,9 +370,9 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                     if q_no - no_ask - fee(no_ask) > 0.04:
                         out.append(mk("R2_low_dead_below", "NO", q_no, r))
 
-        # Velocity filter: block high-side entries if temperature is still surging (trend > +0.3 C/hr)
-        trend_ok_high = (trend is None) or (trend <= 0.3)
-        if (not is_low) and (lastlight - 2.5) <= local_hour <= (lastlight + 3.0) and not precip and trend_ok_high:
+        # Velocity filter: block high-side entries if temperature is still surging (trend > +0.3 C/hr, unless rain locks the peak)
+        trend_ok_high = (trend is None) or (trend <= 0.3) or precip
+        if (not is_low) and (lastlight - 3.5) <= local_hour <= (lastlight + 3.0) and trend_ok_high:
             max_anchor = runmax_m if runmax_m is not None else obs_m
             max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m < r["hi"])
             bd_high = min(max_anchor - r["lo"], r["hi"] - max_anchor) if max_in_bucket else 0
@@ -380,14 +380,16 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                 q = max(0.15, r["yes_ask"] * 1.5)
                 if q - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
                     out.append(mk("R4_high_lotto", "YES", q, r))
-            # R3 dead-above after peak: progressive margin based on price
+            # R3 dead-above after peak & R5 dead-below for highs: progressive margin based on price
             if r["yes_bid"] is not None:
                 no_ask = 1 - r["yes_bid"]
                 req_margin = margin_strict if no_ask > 0.70 else margin_base
-                if r["lo"] >= max_anchor + req_margin:
-                    q_no = 0.97 if no_ask > 0.70 else 0.92
-                    if q_no - no_ask - fee(no_ask) > 0.04:
+                q_no = 0.97 if no_ask > 0.70 else 0.92
+                if q_no - no_ask - fee(no_ask) > 0.04:
+                    if r["lo"] >= max_anchor + req_margin:
                         out.append(mk("R3_high_dead_above", "NO", q_no, r))
+                    elif r["hi"] <= max_anchor - req_margin:
+                        out.append(mk("R5_high_dead_below", "NO", q_no, r))
     return out
 
 def official_outcome(det):
@@ -478,7 +480,7 @@ def cycle(events_cache):
         if tld is None or (local.year, local.month, local.day) != tld:
             continue
         is_low = e["title"].startswith("Lowest")
-        in_window = ((dawn - 2.0) <= local_hour <= (dawn + 2.5)) if is_low else ((lastlight - 2.5) <= local_hour <= (lastlight + 3.0))
+        in_window = ((dawn - 2.5) <= local_hour <= (dawn + 2.5)) if is_low else ((lastlight - 3.5) <= local_hour <= (lastlight + 3.0))
         if not in_window: continue
         obs = temps.get(src) if src != "hko" else temps.get("hko")
         if obs is None: continue
