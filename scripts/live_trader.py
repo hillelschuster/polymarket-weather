@@ -235,11 +235,11 @@ def run_position_guard(cfg, state):
     temps = {}
     if stations:
         try:
-            ms = get(f"https://aviationweather.gov/api/data/metar?ids={','.join(stations)}&hours=2&format=json")
+            ms = get(f"https://aviationweather.gov/api/data/metar?ids={','.join(stations)}&format=json")
             for m in (ms or []):
                 icao = m.get("icaoId")
                 tmp = m.get("temp")
-                if icao and tmp is not None:
+                if icao and tmp is not None and icao not in temps:
                     temps[icao] = float(tmp)
         except Exception as ex:
             say(f"[GUARD] telemetry fetch err: {ex}")
@@ -445,12 +445,12 @@ def process(cfg):
                 det_dt = det_dt.replace(tzinfo=timezone.utc)
             age_sec = (nowts - det_dt).total_seconds()
             if age_sec > alert_max_age_sec:
-                state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_stale_alert", "det_age_min": round(age_sec / 60, 1)}
+                state["processed"][key] = {"ts": "2099-01-01T00:00:00+00:00", "action": "skip_stale_alert", "det_age_min": round(age_sec / 60, 1)}
                 jlog(ORDERS, {**base, "result": "REJECTED_STALE_ALERT", "det_age_min": round(age_sec / 60, 1)})
                 say(f"[SKIP-STALE] {key} detected {age_sec/60:.1f}m ago (max {alert_max_age_sec/60:.0f}m) — skipped")
                 continue
         except Exception:
-            state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_invalid_ts"}
+            state["processed"][key] = {"ts": "2099-01-01T00:00:00+00:00", "action": "skip_invalid_ts"}
             continue
 
         if end_val:
@@ -474,11 +474,14 @@ def process(cfg):
             say("PAUSE file present — no new orders"); continue
         
         # Dynamic Capital Ceiling: sum of open position costs cannot exceed $150.00
-        locked_usd = sum(float(pos.get("cost", 0.0)) for pos in state.get("open", {}).values())
+        current_exposure = sum(float(pos.get("cost") or (pos.get("px", 0.0) * pos.get("shares", 0.0))) for pos in state.get("open", {}).values())
         max_total_exposure = float(cfg.get("MAX_TOTAL_EXPOSURE_USD") or DEFAULT_MAX_TOTAL_EXPOSURE_USD)
-        remaining_budget = max(0.0, max_total_exposure - locked_usd)
-        if remaining_budget < 0.50:
-            continue  # transient: wait until an open position settles
+        
+        # ---- Gate 1: Execution Budget, Sizing & Capital Constraints ----
+        remaining_budget = max(0.0, max_total_exposure - current_exposure)
+        if remaining_budget < 5 * 0.001:
+            state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_capital_cap"}
+            continue
 
         if len(state["open"]) >= max_open:
             continue  # transient limit: allow next pass to reconsider once slot frees up
@@ -486,7 +489,7 @@ def process(cfg):
             state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_daily_cap"}
             continue
         city_positions = [v for v in state["open"].values() if v.get("city") == det["city"]]
-        city_cost = sum(float(p.get("cost", 0.0)) for p in city_positions)
+        city_cost = sum(float(p.get("cost") or (p.get("px", 0.0) * p.get("shares", 0.0))) for p in city_positions)
         if len(city_positions) >= 3 or city_cost >= 35.0:
             continue  # City multi-bucket quota reached (allow up to 3 dead buckets or $35 exposure)
 

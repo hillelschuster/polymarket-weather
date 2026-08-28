@@ -303,7 +303,7 @@ def fetch_running(in_window_events):
                 if n6:
                     extremes_by.setdefault(icao, []).append((t, (-1 if n6.group(1) == "1" else 1) * int(n6.group(2)) / 10))
         for (src, off), _res in [(c, None) for c in chunk]:
-            st = src
+            st = "VHHH" if src == "hko" else src
             ext_list = extremes_by.get(st) or []
             inst_list = instant_by.get(st) or []
             nowloc = datetime.now(timezone.utc) + timedelta(hours=off)
