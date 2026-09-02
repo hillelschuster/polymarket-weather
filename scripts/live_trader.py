@@ -268,7 +268,13 @@ def run_position_guard(cfg, state):
     jsave(STATE, state)
 
 def process(cfg):
-    state = jload(STATE, {"processed": {}, "open": {}, "daily": {}, "det_offset": 0})
+    state = jload(STATE, {"processed": {}, "open": {}, "daily": {}, "settling": {}, "det_offset": 0})
+    if not isinstance(state, dict):
+        state = {"processed": {}, "open": {}, "daily": {}, "settling": {}, "det_offset": 0}
+    if not isinstance(state.get("daily"), dict): state["daily"] = {}
+    if not isinstance(state.get("open"), dict): state["open"] = {}
+    if not isinstance(state.get("processed"), dict): state["processed"] = {}
+    if not isinstance(state.get("settling"), dict): state["settling"] = {}
     today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
     daily = state["daily"].setdefault(today, {"trades": 0, "cost": 0.0})
     max_open = int(cfg.get("MAX_OPEN") or DEFAULT_MAX_OPEN)
