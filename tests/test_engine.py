@@ -254,6 +254,96 @@ class TestWeatherEngine(unittest.TestCase):
         dist = obs - b_hi
         self.assertLess(dist, 0.7, "Distance should trigger PositionGuard compression trigger")
 
+    def test_detectors_require_running_extrema(self):
+        """Verify detectors require cumulative running extrema and do not fall back to instantaneous obs."""
+        event_high = {"title": "Highest temperature in Paris on August 20?", "city": "Paris"}
+        cfg = MAP["Paris"]
+        book = [{"bucket": "35°C", "lo": 34.5, "hi": 35.5, "val": 35, "yes_bid": 0.10, "yes_bid_sz": 100}]
+        # Without runmax, high-side detector must NOT fire
+        dets = detectors(event_high, cfg, local_hour=18.0, obs=26.0, precip=False, book=book, runmax=None, trend=0.0)
+        self.assertEqual(len(dets), 0, "Detector must require runmax for high-side decisions")
+
+        event_low = {"title": "Lowest temperature in Paris on August 20?", "city": "Paris"}
+        book_low = [{"bucket": "14°C", "lo": 13.5, "hi": 14.5, "val": 14, "yes_bid": 0.15, "yes_bid_sz": 100}]
+        # Without runmin, low-side detector must NOT fire
+        dets_low = detectors(event_low, cfg, local_hour=5.5, obs=18.0, precip=False, book=book_low, runmin=None, trend=0.0)
+        self.assertEqual(len(dets_low), 0, "Detector must require runmin for low-side decisions")
+
+    def test_precip_does_not_override_velocity(self):
+        """Verify that precipitation does NOT bypass the velocity trend filter on high-side contracts."""
+        event = {"title": "Highest temperature in Paris on August 20?", "city": "Paris"}
+        cfg = MAP["Paris"]
+        book = [{"bucket": "35°C", "lo": 34.5, "hi": 35.5, "val": 35, "yes_bid": 0.10, "yes_bid_sz": 100}]
+        # Surge of +0.5 C/hr with precip=True must be BLOCKED
+        dets = detectors(event, cfg, local_hour=18.0, obs=26.0, precip=True, book=book, runmax=28.0, trend=0.5)
+        self.assertEqual(len(dets), 0, "Temperature surging +0.5 C/hr must be blocked even if precip is True")
+
+    def test_position_guard_empty_book_retains_position(self):
+        """Verify PositionGuard retains open positions if order book has no bids instead of dropping tracking."""
+        from unittest.mock import patch
+        cfg = {"DRY_RUN": "true", "LIVE_ENABLED": "false"}
+        state = {
+            "open": {
+                "Lowest temperature in Paris on August 19?|18°C|NO": {
+                    "city": "Paris", "bucket": "18°C", "side": "NO",
+                    "rule": "R2_low_dead_below", "token": "tok123",
+                    "shares": 10, "px": 0.89, "dry": True
+                }
+            },
+            "processed": {}
+        }
+        # Mock weather response to indicate compression (obs=19.0C -> dist=0.5C < 0.7C)
+        # And mock CLOB book to return empty bids
+        with patch("scripts.live_trader.get") as mock_get:
+            def side_effect(url, **kwargs):
+                if "aviationweather" in url:
+                    return [{"icaoId": "LFPB", "temp": 19.0}]
+                elif "clob" in url:
+                    return {"bids": [], "asks": []}
+                return {}
+            mock_get.side_effect = side_effect
+            run_position_guard(cfg, state)
+            # Position must STILL remain in open!
+            self.assertIn("Lowest temperature in Paris on August 19?|18°C|NO", state["open"],
+                          "Position must be retained in state['open'] when no exit bids exist")
+
+    def test_position_guard_bypasses_r5_monotonic(self):
+        """Verify PositionGuard bypasses R5_high_dead_below positions when evening temperature drops."""
+        from unittest.mock import patch
+        cfg = {"DRY_RUN": "true", "LIVE_ENABLED": "false"}
+        state = {
+            "open": {
+                "Highest temperature in Paris on August 20?|20°C|NO": {
+                    "city": "Paris", "bucket": "20°C", "side": "NO",
+                    "rule": "R5_high_dead_below", "token": "tok456",
+                    "shares": 10, "px": 0.85, "dry": True
+                }
+            },
+            "processed": {}
+        }
+        # Mock weather showing cool evening temp (obs=18.0C -> dist = 18.0 - 20.5 = -2.5C < 0.7C)
+        with patch("scripts.live_trader.get") as mock_get:
+            def side_effect(url, **kwargs):
+                if "aviationweather" in url:
+                    return [{"icaoId": "LFPB", "temp": 18.0}]
+                elif "clob" in url:
+                    return {"bids": [{"price": 0.75, "size": 50}], "asks": []}
+                return {}
+            mock_get.side_effect = side_effect
+            run_position_guard(cfg, state)
+            # Position must STILL remain in open because R5 is monotonic!
+            self.assertIn("Highest temperature in Paris on August 20?|20°C|NO", state["open"],
+                          "R5 positions must not be dumped during evening cooling")
+
+    def test_fee_inclusive_sizing_exact(self):
+        """Verify fee-inclusive card sizing guarantees total outlay never exceeds card_tier."""
+        px = 0.70
+        card_tier = 15.0
+        eff_px = px + fee(px) # 0.70 + 0.0105 = 0.7105
+        shares = int(card_tier / eff_px) # int(15.0 / 0.7105) = 21
+        total_cost = round(eff_px * shares, 2)
+        self.assertLessEqual(total_cost, card_tier, "Total outlay with fee must not exceed card_tier")
+
     def test_map_and_station_integrity(self):
         """Verify station database integrity and valid window ranges."""
         for city, cfg in MAP.items():
@@ -266,3 +356,4 @@ class TestWeatherEngine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

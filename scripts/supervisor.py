@@ -16,6 +16,7 @@ Stop:                      close the "weather-supervisor" window / kill python.
 """
 import json, os, re, sys, time, urllib.request
 from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.environ.get("POLYWEATHER_DATA") or os.path.join(ROOT, "data")
@@ -26,7 +27,6 @@ SURVEY = os.path.join(DATA, "survey.jsonl")
 SEEN = os.path.join(DATA, "seen.json")
 RUNLOG = os.path.join(DATA, "run.log")
 
-# city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
 # city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
 MAP = {
     # Asian & Global cities (Restored & Verified)
@@ -71,10 +71,8 @@ US_F = {"NYC", "Miami", "Chicago", "Dallas", "Austin", "Houston", "Denver", "Pho
 
 CYCLE_SEC = 120
 EVENT_CACHE_SEC = 600
-# $150 bankroll sizing card ($15 high edge, $12 mid, $8 defensive, $2.50 lotto)
+# Sizing card for high-confidence dead-bucket NOs
 SIZE_LOCKED = 15.0   # >=90% confidence states
-SIZE_LOTTO = 2.50    # cheap asks <= 0.002
-ASK_MAX_LOTTO = 0.002
 
 def say(msg):
     line = f"[{datetime.now(timezone.utc).isoformat(timespec='seconds')}] {msg}"
@@ -251,7 +249,7 @@ def top_of_book(event):
             if isinstance(toks, str): toks = json.loads(toks)
             outcomes = m.get("outcomes")
             if isinstance(outcomes, str): outcomes = json.loads(outcomes)
-            yes_idx = outcomes.index("Yes") if outcomes and "Yes" in outcomes else 0
+            yes_idx = next((i for i, o in enumerate(outcomes) if str(o).lower() == "yes"), 0) if outcomes else 0
             if not toks or len(toks) <= yes_idx: continue
 
             bk = get(f"https://clob.polymarket.com/book?token_id={toks[yes_idx]}")
@@ -274,11 +272,11 @@ def fetch_running(in_window_events):
     """Running (day_max, day_min, trend) per station, restricted to each event's local calendar day.
     Uses instantaneous METARs for trend velocity and remarks extrema for daily bounds."""
     out = {}
-    stations = sorted({(MAP[e["city"]][0], MAP[e["city"]][1]) for e in in_window_events})
+    stations = sorted({(MAP[e["city"]][0], MAP[e["city"]][1], MAP[e["city"]][2]) for e in in_window_events})
     if not stations: return out
     for i in range(0, len(stations), 10):
         chunk = stations[i:i+10]
-        ids = ",".join(("VHHH" if s == "hko" else s) for s, _ in chunk)
+        ids = ",".join(("VHHH" if s == "hko" else s) for s, _, _ in chunk)
         try:
             # LOOKBACK FIX: 28 hours guarantees full 00:00 to 23:59 civil day coverage
             ms = get("https://aviationweather.gov/api/data/metar?ids=%s&hours=28&format=json" % ids)
@@ -293,33 +291,48 @@ def fetch_running(in_window_events):
             t, tmp = m.get("obsTime"), m.get("temp")
             raw = m.get("rawOb") or ""
             if isinstance(t, (int, float)):
-                if isinstance(tmp, (int, float)):
+                # Decode high-precision T-group remarks (tenths Celsius): T(sn)(TTT)
+                mT = re.search(r"\bT([01])(\d{3})(?:[01]\d{3})?\b", raw)
+                if mT:
+                    sign = -1.0 if mT.group(1) == "1" else 1.0
+                    t_val = sign * (int(mT.group(2)) / 10.0)
+                    instant_by.setdefault(icao, []).append((t, t_val))
+                    extremes_by.setdefault(icao, []).append((t, t_val, False))
+                elif isinstance(tmp, (int, float)):
                     instant_by.setdefault(icao, []).append((t, float(tmp)))
-                    extremes_by.setdefault(icao, []).append((t, float(tmp)))
+                    extremes_by.setdefault(icao, []).append((t, float(tmp), False))
                 m6 = re.search(r"\b1([01])(\d{3})\b", raw)
                 if m6:
-                    extremes_by.setdefault(icao, []).append((t, (-1 if m6.group(1) == "1" else 1) * int(m6.group(2)) / 10))
+                    extremes_by.setdefault(icao, []).append((t, (-1 if m6.group(1) == "1" else 1) * int(m6.group(2)) / 10, True))
                 n6 = re.search(r"\b2([01])(\d{3})\b", raw)
                 if n6:
-                    extremes_by.setdefault(icao, []).append((t, (-1 if n6.group(1) == "1" else 1) * int(n6.group(2)) / 10))
-        for (src, off), _res in [(c, None) for c in chunk]:
+                    extremes_by.setdefault(icao, []).append((t, (-1 if n6.group(1) == "1" else 1) * int(n6.group(2)) / 10, True))
+        for (src, off, tz), _res in [(c, None) for c in chunk]:
             st = "VHHH" if src == "hko" else src
             ext_list = extremes_by.get(st) or []
             inst_list = instant_by.get(st) or []
-            nowloc = datetime.now(timezone.utc) + timedelta(hours=off)
-            day_start_utc = (nowloc.replace(hour=0, minute=0, second=0, microsecond=0)
-                             - timedelta(hours=off)).timestamp()
-            vals = [tmp for tt, tmp in ext_list if tt >= day_start_utc]
+            now_utc = datetime.now(timezone.utc)
+            now_ts = now_utc.timestamp()
+            try:
+                nowloc = now_utc.astimezone(ZoneInfo(tz))
+                day_start_utc = nowloc.replace(hour=0, minute=0, second=0, microsecond=0).astimezone(timezone.utc).timestamp()
+            except Exception:
+                nowloc = now_utc + timedelta(hours=off)
+                day_start_utc = (nowloc.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=off)).timestamp()
+            # 15-minute tolerance captures routine 05:50-05:55Z synoptic transmissions
+            vals = [tmp for tt, tmp, is_6h in ext_list if tt >= day_start_utc and (not is_6h or tt >= day_start_utc + 6 * 3600 - 900)]
             # calculate 30-90m trend (instantaneous rate of change in C/hr) strictly from instantaneous obs
             sorted_obs = sorted([(tt, tmp) for tt, tmp in inst_list if isinstance(tt, (int, float)) and tmp is not None], key=lambda x: x[0])
             trend = None
             if len(sorted_obs) >= 2:
                 t_last, temp_last = sorted_obs[-1]
-                for t_prev, temp_prev in reversed(sorted_obs[:-1]):
-                    dt_hr = (t_last - t_prev) / 3600.0
-                    if 0.3 <= dt_hr <= 1.5:
-                        trend = round((temp_last - temp_prev) / dt_hr, 2)
-                        break
+                # Guard against stale telemetry: trend only valid if latest obs <= 90m old
+                if now_ts - t_last <= 5400:
+                    for t_prev, temp_prev in reversed(sorted_obs[:-1]):
+                        dt_hr = (t_last - t_prev) / 3600.0
+                        if 0.3 <= dt_hr <= 1.5:
+                            trend = round((temp_last - temp_prev) / dt_hr, 2)
+                            break
             if vals:
                 out[src] = (max(vals), min(vals), trend)
     return out
@@ -332,63 +345,54 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
     obs_m = obs * 9 / 5 + 32 if is_f else obs
     margin_base = 3.6 if is_f else 2.0     # 2.0C / 3.6F standard margin (p <= 0.70)
     margin_strict = 5.4 if is_f else 3.0   # 3.0C / 5.4F strict margin for high-price NOs (>0.70)
-    bd_min = 1.4 if is_f else 0.8          # 0.8C boundary margin against resolver-vs-METAR noise
     out = []
 
     def mk(rule, side, q, r):
-        px = r["yes_ask"] if side == "YES" else 1 - r["yes_bid"]
-        px = max(0.001, float(px))
-        avail = (r["yes_ask_sz"] if side == "YES" else r["yes_bid_sz"]) * 0.9
-        want = (SIZE_LOTTO if rule in ("R1_low_lotto", "R4_high_lotto") else SIZE_LOCKED) / px
+        px = max(0.001, float(1 - r["yes_bid"]))
+        avail = float(r.get("yes_bid_sz", 0)) * 0.9
+        card_tier = 15.0 if px <= 0.70 else (12.0 if px <= 0.85 else 8.0)
+        eff_px = px + fee(px)
+        want = card_tier / eff_px
         shares = max(0, int(min(want, avail)))
         edge = q - px - fee(px)
         return dict(rule=rule, side=side, q=q, edge=round(edge, 3), px=round(px, 4),
-                    size_usd=round(shares * px, 2), shares=shares, **r)
+                    size_usd=round(shares * eff_px, 2), shares=shares, **r)
 
     for r in book:
         # state anchors: RUNNING extremes for the local day
         runmax_m = (runmax * 9 / 5 + 32) if (runmax is not None and is_f) else runmax
         runmin_m = (runmin * 9 / 5 + 32) if (runmin is not None and is_f) else runmin
-        min_anchor = runmin_m if runmin_m is not None else obs_m
 
         # Velocity filter: block low-side entries if temperature is rapidly falling (trend < -0.3 C/hr)
         trend_ok_low = (trend is None) or (trend >= -0.3)
-        if is_low and (dawn - 2.5) <= local_hour <= (dawn + 2.5) and not precip and trend_ok_low:
-            # R1 lotto: running min inside bucket, boundary distance >= bd_min, ask dirt cheap -> floor q 0.15
-            min_in_bucket = (r["lo"] <= min_anchor < r["hi"]) and (r["lo"] <= obs_m < r["hi"])
-            bd_low = min(min_anchor - r["lo"], r["hi"] - min_anchor) if min_in_bucket else 0
-            if min_in_bucket and bd_low >= bd_min and r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO:
-                q = 0.15
-                if q - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
-                    out.append(mk("R1_low_lotto", "YES", q, r))
+        if is_low and runmin is not None and (dawn - 2.5) <= local_hour <= (dawn + 2.5) and not precip and trend_ok_low:
             # R2 dead-below: progressive margin based on price
-            if r["yes_bid"] is not None:
+            if r.get("yes_bid") is not None:
                 no_ask = 1 - r["yes_bid"]
                 req_margin = margin_strict if no_ask > 0.70 else margin_base
-                if r["hi"] <= min_anchor - req_margin:
+                if r["hi"] <= runmin_m - req_margin:
                     q_no = 0.97 if no_ask > 0.70 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
                         out.append(mk("R2_low_dead_below", "NO", q_no, r))
 
-        # Velocity filter: block high-side entries if temperature is still surging (trend > +0.3 C/hr, unless rain locks the peak)
-        trend_ok_high = (trend is None) or (trend <= 0.3) or precip
-        if (not is_low) and (lastlight - 3.5) <= local_hour <= (lastlight + 3.0) and trend_ok_high:
-            max_anchor = runmax_m if runmax_m is not None else obs_m
-            max_in_bucket = (r["lo"] <= max_anchor < r["hi"]) and (r["lo"] <= obs_m < r["hi"])
-            bd_high = min(max_anchor - r["lo"], r["hi"] - max_anchor) if max_in_bucket else 0
-            if r["yes_ask"] is not None and r["yes_ask"] <= ASK_MAX_LOTTO and max_in_bucket and bd_high >= bd_min:
-                q = max(0.15, r["yes_ask"] * 1.5)
-                if q - r["yes_ask"] - fee(r["yes_ask"]) > 0.10:
-                    out.append(mk("R4_high_lotto", "YES", q, r))
-            # R3 dead-above after peak & R5 dead-below for highs: progressive margin based on price
-            if r["yes_bid"] is not None:
+        # High-side contracts: R3 dead-above & R5 dead-below in afternoon window
+        trend_ok_high = (trend is None) or (trend <= 0.3)
+        in_afternoon = (lastlight - 3.5) <= local_hour <= (lastlight + 3.0)
+        if (not is_low) and runmax is not None and in_afternoon:
+            if r.get("yes_bid") is not None:
                 no_ask = 1 - r["yes_bid"]
-                req_margin = margin_strict if no_ask > 0.70 else margin_base
-                q_no = 0.97 if no_ask > 0.70 else 0.92
-                if q_no - no_ask - fee(no_ask) > 0.04:
-                    if r["lo"] >= max_anchor + req_margin:
-                        out.append(mk("R3_high_dead_above", "NO", q_no, r))
-                    elif r["hi"] <= max_anchor - req_margin:
+                # R3 dead-above after peak heating window
+                if trend_ok_high:
+                    req_margin = margin_strict if no_ask > 0.70 else margin_base
+                    q_no = 0.97 if no_ask > 0.70 else 0.92
+                    if q_no - no_ask - fee(no_ask) > 0.04:
+                        if r["lo"] >= runmax_m + req_margin:
+                            out.append(mk("R3_high_dead_above", "NO", q_no, r))
+                # R5 dead-below (MONOTONIC: daily high can never decrease)
+                mono_buf = 1.0 if is_f else 0.6
+                if r["hi"] <= runmax_m - mono_buf:
+                    q_no = 0.97 if no_ask > 0.70 else 0.92
+                    if q_no - no_ask - fee(no_ask) > 0.04:
                         out.append(mk("R5_high_dead_below", "NO", q_no, r))
     return out
 
@@ -413,7 +417,7 @@ def official_outcome(det):
                 prices = json.loads(op) if isinstance(op, str) else op
                 outcomes = m.get("outcomes") or ["Yes", "No"]
                 if isinstance(outcomes, str): outcomes = json.loads(outcomes)
-                yi = outcomes.index("Yes") if "Yes" in outcomes else 0
+                yi = next((i for i, o in enumerate(outcomes) if str(o).lower() == "yes"), 0) if outcomes else 0
                 if len(prices) > yi and prices[yi] is not None:
                     return float(prices[yi]) > 0.5
     except Exception:
@@ -473,8 +477,11 @@ def cycle(events_cache):
         except Exception: continue
         hrs = (end - now).total_seconds() / 3600
         if not (-14 < hrs < 48): continue
-        local = now + timedelta(hours=off)
-        local_hour = local.hour + local.minute / 60
+        try:
+            local = now.astimezone(ZoneInfo(tz))
+        except Exception:
+            local = now + timedelta(hours=off)
+        local_hour = local.hour + local.minute / 60.0
         # CRITICAL: only act inside the event's own local calendar day
         tld = target_local_date(e["title"])
         if tld is None or (local.year, local.month, local.day) != tld:
@@ -492,8 +499,11 @@ def cycle(events_cache):
     for e, obs in in_window_events:
         city = e["city"]
         src, off, tz, dawn, lastlight = MAP[city]
-        local = now + timedelta(hours=off)
-        local_hour = local.hour + local.minute / 60
+        try:
+            local = now.astimezone(ZoneInfo(tz))
+        except Exception:
+            local = now + timedelta(hours=off)
+        local_hour = local.hour + local.minute / 60.0
         raw = raws.get("VHHH" if src == "hko" else src, "")
         precip = bool(re.search(r"(?:^|\s)([-+]?(?:RA|SN|DZ|PL|GR|GS|SHRA|TSRA|RASN|SNRA|SHSN))\b", raw))
         run_info = running.get(src, (None, None, None))
