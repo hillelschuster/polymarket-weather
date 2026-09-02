@@ -108,7 +108,7 @@ def get(url, retries=4, base_delay=1.0, max_delay=15.0, timeout=25):
 
 def tick_round(p): return max(TICK, round(p / TICK) * TICK)
 
-def parse_filled_shares(detail, default_shares=0.0, side="BUY"):
+def parse_filled_shares(detail, default_shares=0.0, side="BUY", client=None):
     if not isinstance(detail, dict): return 0.0
     for f in ("filled_size", "filledSize", "sizeMatched", "size_matched", "matched_size"):
         if detail.get(f) is not None:
@@ -122,6 +122,23 @@ def parse_filled_shares(detail, default_shares=0.0, side="BUY"):
             v = float(detail[target_f])
             return v / 1e6 if v > 10000 else v
         except Exception: pass
+
+    # If orderID is present, query client.get_order() for exact fill status
+    order_id = detail.get("orderID") or detail.get("orderId")
+    if order_id and client is not None:
+        try:
+            order_info = client.get_order(order_id)
+            if isinstance(order_info, dict):
+                for f in ("size_matched", "sizeMatched", "filled_size"):
+                    if order_info.get(f) is not None:
+                        v = float(order_info[f])
+                        return v / 1e6 if v > 10000 else v
+        except Exception: pass
+
+    # In py_clob_client, a successful FAK order returns {"success": True, "orderID": "...", "orderHashes": [...]}
+    if detail.get("success") is True and detail.get("orderHashes"):
+        return float(default_shares)
+
     return float(default_shares) if detail.get("status") in ("matched", "filled") else 0.0
 
 def get_clob_client(cfg):
@@ -248,7 +265,7 @@ def run_position_guard(cfg, state):
                         pos["cost"] = round(float(pos.get("cost", 0.0)) * (pos["shares"] / old_sh), 2)
             else:
                 ok, detail = place_order(cfg, token, tick_round(bid_px), exit_sh, side="SELL")
-                act_exit = parse_filled_shares(detail, default_shares=exit_sh, side="SELL")
+                act_exit = parse_filled_shares(detail, default_shares=exit_sh, side="SELL", client=get_clob_client(cfg))
                 if act_exit > 0:
                     say(f"[GUARD LIVE EXIT] SOLD {act_exit} @ {bid_px:.3f}")
                     jlog(ORDERS, {"ts": now.isoformat(), "key": key, "result": "GUARD_LIVE_EXIT", "exit_px": bid_px, "entry_px": entry_px, "shares": act_exit})
@@ -394,7 +411,7 @@ def process(cfg):
                 state["processed"][key] = {"ts": nowts.isoformat(), "action": "submitting_order"}
                 jsave(STATE, state)
                 ok, detail = place_order(cfg, token, tick_round(px_now), shares, side="BUY")
-                filled = parse_filled_shares(detail, default_shares=shares, side="BUY")
+                filled = parse_filled_shares(detail, default_shares=shares, side="BUY", client=get_clob_client(cfg))
                 if filled > 0:
                     act_cost = round(eff_px * filled, 2)
                     jlog(ORDERS, {**base, "result": "LIVE_ORDER", "px": round(px_now, 4), "shares": filled, "cost": act_cost, "token": token})

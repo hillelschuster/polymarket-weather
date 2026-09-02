@@ -287,7 +287,9 @@ def fetch_running(in_window_events):
         except Exception as ex:
             say("recent metar err %s" % ex); continue
         instant_by = {}
-        extremes_by = {}
+        instant_by = {}
+        max6_by = {}
+        min6_by = {}
         for m in (ms or []):
             if not isinstance(m, dict): continue
             icao = m.get("icaoId")
@@ -295,25 +297,29 @@ def fetch_running(in_window_events):
             t, tmp = m.get("obsTime"), m.get("temp")
             raw = m.get("rawOb") or ""
             if isinstance(t, (int, float)):
+                # Restrict remark regexes to RMK section to avoid body false positives
+                rmk_idx = raw.find("RMK")
+                rmk_str = raw[rmk_idx:] if rmk_idx != -1 else raw
                 # Decode high-precision T-group remarks (tenths Celsius): T(sn)(TTT)
-                mT = re.search(r"\bT([01])(\d{3})(?:[01]\d{3})?\b", raw)
+                mT = re.search(r"\bT([01])(\d{3})(?:[01]\d{3})?\b", rmk_str)
                 if mT:
                     sign = -1.0 if mT.group(1) == "1" else 1.0
                     t_val = sign * (int(mT.group(2)) / 10.0)
                     instant_by.setdefault(icao, []).append((t, t_val))
-                    extremes_by.setdefault(icao, []).append((t, t_val, False))
                 elif isinstance(tmp, (int, float)):
                     instant_by.setdefault(icao, []).append((t, float(tmp)))
-                    extremes_by.setdefault(icao, []).append((t, float(tmp), False))
-                m6 = re.search(r"\b1([01])(\d{3})\b", raw)
+
+                # 6-hour synoptic maximum (1snTTT) and minimum (2snTTT) strictly separated
+                m6 = re.search(r"\b1([01])(\d{3})\b", rmk_str)
                 if m6:
-                    extremes_by.setdefault(icao, []).append((t, (-1 if m6.group(1) == "1" else 1) * int(m6.group(2)) / 10, True))
-                n6 = re.search(r"\b2([01])(\d{3})\b", raw)
+                    t_max6 = (-1.0 if m6.group(1) == "1" else 1.0) * (int(m6.group(2)) / 10.0)
+                    max6_by.setdefault(icao, []).append((t, t_max6))
+                n6 = re.search(r"\b2([01])(\d{3})\b", rmk_str)
                 if n6:
-                    extremes_by.setdefault(icao, []).append((t, (-1 if n6.group(1) == "1" else 1) * int(n6.group(2)) / 10, True))
+                    t_min6 = (-1.0 if n6.group(1) == "1" else 1.0) * (int(n6.group(2)) / 10.0)
+                    min6_by.setdefault(icao, []).append((t, t_min6))
         for (src, off, tz), _res in [(c, None) for c in chunk]:
             st = "VHHH" if src == "hko" else src
-            ext_list = extremes_by.get(st) or []
             inst_list = instant_by.get(st) or []
             now_utc = datetime.now(timezone.utc)
             now_ts = now_utc.timestamp()
@@ -323,8 +329,21 @@ def fetch_running(in_window_events):
             except Exception:
                 nowloc = now_utc + timedelta(hours=off)
                 day_start_utc = (nowloc.replace(hour=0, minute=0, second=0, microsecond=0) - timedelta(hours=off)).timestamp()
-            # 15-minute tolerance captures routine 05:50-05:55Z synoptic transmissions
-            vals = [tmp for tt, tmp, is_6h in ext_list if tt >= day_start_utc and (not is_6h or tt >= day_start_utc + 6 * 3600 - 900)]
+            # Instantaneous observations strictly within civil day are candidates for both max and min
+            inst_day = [tmp for tt, tmp in inst_list if tt >= day_start_utc]
+            max_candidates = list(inst_day)
+            min_candidates = list(inst_day)
+
+            # 6h maxima only contribute to max_candidates (with 15m synoptic transmission tolerance)
+            for tt, tmp in (max6_by.get(st) or []):
+                if tt >= day_start_utc + 6 * 3600 - 900:
+                    max_candidates.append(tmp)
+
+            # 6h minima only contribute to min_candidates (with 15m synoptic transmission tolerance)
+            for tt, tmp in (min6_by.get(st) or []):
+                if tt >= day_start_utc + 6 * 3600 - 900:
+                    min_candidates.append(tmp)
+
             # calculate 30-90m trend (instantaneous rate of change in C/hr) strictly from instantaneous obs
             sorted_obs = sorted([(tt, tmp) for tt, tmp in inst_list if isinstance(tt, (int, float)) and tmp is not None], key=lambda x: x[0])
             trend = None
@@ -337,8 +356,10 @@ def fetch_running(in_window_events):
                         if 0.3 <= dt_hr <= 1.5:
                             trend = round((temp_last - temp_prev) / dt_hr, 2)
                             break
-            if vals:
-                out[src] = (max(vals), min(vals), trend)
+            day_max = max(max_candidates) if max_candidates else None
+            day_min = min(min_candidates) if min_candidates else None
+            if day_max is not None or day_min is not None:
+                out[src] = (day_max, day_min, trend)
     return out
 
 def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmin=None, trend=None):

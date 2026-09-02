@@ -414,6 +414,24 @@ class TestWeatherEngine(unittest.TestCase):
         """Verify Chicago maps to O'Hare (KORD) matching Polymarket contract resolution source."""
         self.assertEqual(MAP["Chicago"][0], "KORD", "Chicago must resolve to KORD")
 
+    def test_parse_filled_shares_with_order_hashes(self):
+        """Verify parse_filled_shares treats CLOB success with orderHashes as filled."""
+        from scripts.live_trader import parse_filled_shares
+        detail = {"success": True, "errorMsg": "", "orderID": "0xabc", "orderHashes": ["0xhash1"]}
+        sh = parse_filled_shares(detail, default_shares=15.0, side="BUY")
+        self.assertEqual(sh, 15.0, "Orders with orderHashes must return filled shares")
+
+    def test_parse_filled_shares_with_client_get_order(self):
+        """Verify parse_filled_shares queries client.get_order() when orderID is provided."""
+        from unittest.mock import MagicMock
+        from scripts.live_trader import parse_filled_shares
+        mock_client = MagicMock()
+        mock_client.get_order.return_value = {"size_matched": "12.0", "status": "matched"}
+        detail = {"success": True, "orderID": "0xorder123"}
+        sh = parse_filled_shares(detail, default_shares=15.0, side="BUY", client=mock_client)
+        self.assertEqual(sh, 12.0, "Exact size_matched must be extracted from client.get_order()")
+        mock_client.get_order.assert_called_once_with("0xorder123")
+
     def test_map_and_station_integrity(self):
         """Verify station database integrity and valid window ranges."""
         for city, cfg in MAP.items():
