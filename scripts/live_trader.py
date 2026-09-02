@@ -9,15 +9,16 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 try:
-    from scripts.supervisor import bucket_parse, MAP, US_F, fee, target_local_date
+    from scripts.supervisor import bucket_parse, MAP, US_F, fee, target_local_date, official_outcome
 except ImportError:
-    from supervisor import bucket_parse, MAP, US_F, fee, target_local_date
+    from supervisor import bucket_parse, MAP, US_F, fee, target_local_date, official_outcome
 
 DATA = os.path.join(ROOT, "data")
 os.makedirs(DATA, exist_ok=True)
 DET = os.path.join(DATA, "detections.jsonl")
 STATE = os.path.join(DATA, "live_state.json")
 ORDERS = os.path.join(DATA, "live_orders.jsonl")
+LIVE_CLOSURES = os.path.join(DATA, "live_closures.jsonl")
 RUNLOG = os.path.join(DATA, "run.log")
 ENVF = os.path.join(ROOT, ".env")
 PAUSE = os.path.join(DATA, "PAUSE")
@@ -240,7 +241,11 @@ def run_position_guard(cfg, state):
                 say(f"[GUARD DRY EXIT] SOLD {exit_sh} @ {bid_px:.3f}")
                 jlog(ORDERS, {"ts": now.isoformat(), "key": key, "result": "GUARD_DRY_EXIT", "exit_px": bid_px, "entry_px": entry_px, "shares": exit_sh})
                 if exit_sh >= shares: closed.append(key)
-                else: pos["shares"] -= exit_sh
+                else:
+                    old_sh = pos["shares"]
+                    pos["shares"] -= exit_sh
+                    if old_sh > 0:
+                        pos["cost"] = round(float(pos.get("cost", 0.0)) * (pos["shares"] / old_sh), 2)
             else:
                 ok, detail = place_order(cfg, token, tick_round(bid_px), exit_sh, side="SELL")
                 act_exit = parse_filled_shares(detail, default_shares=exit_sh, side="SELL")
@@ -248,7 +253,11 @@ def run_position_guard(cfg, state):
                     say(f"[GUARD LIVE EXIT] SOLD {act_exit} @ {bid_px:.3f}")
                     jlog(ORDERS, {"ts": now.isoformat(), "key": key, "result": "GUARD_LIVE_EXIT", "exit_px": bid_px, "entry_px": entry_px, "shares": act_exit})
                     if act_exit >= shares: closed.append(key)
-                    else: pos["shares"] -= act_exit
+                    else:
+                        old_sh = pos["shares"]
+                        pos["shares"] -= act_exit
+                        if old_sh > 0:
+                            pos["cost"] = round(float(pos.get("cost", 0.0)) * (pos["shares"] / old_sh), 2)
                 else:
                     say(f"[GUARD UNFILLED] 0 shares matched for {key}")
         except Exception as ex: say(f"[GUARD ERROR] {key}: {ex}")
@@ -256,7 +265,7 @@ def run_position_guard(cfg, state):
     for k in closed:
         state["open"].pop(k, None)
         state["processed"][k] = {"ts": now.isoformat(), "action": "guard_exited"}
-    if closed: jsave(STATE, state)
+    jsave(STATE, state)
 
 def process(cfg):
     state = jload(STATE, {"processed": {}, "open": {}, "daily": {}, "det_offset": 0})
@@ -269,7 +278,8 @@ def process(cfg):
     alert_max_age = int(cfg.get("ALERT_MAX_AGE_SEC") or DEFAULT_ALERT_MAX_AGE_SEC)
     nowts = datetime.now(timezone.utc)
 
-    # Prune expired open positions to release capacity
+    # Prune expired open positions to release capacity and track in settling
+    settling = state.setdefault("settling", {})
     for k, v in list(state["open"].items()):
         end = v.get("end") or v.get("endDate")
         expired = False
@@ -293,8 +303,29 @@ def process(cfg):
                 if nowts > (ts_dt if ts_dt.tzinfo else ts_dt.replace(tzinfo=timezone.utc)) + timedelta(hours=18): expired = True
             except Exception: pass
         if expired:
+            settling[k] = v
             del state["open"][k]
             state["processed"][k] = {"ts": nowts.isoformat(), "action": "pruned_awaiting_settlement"}
+
+    # Settle any positions in settling that have officially resolved on Polymarket
+    for k, pos in list(settling.items()):
+        official = official_outcome(pos)
+        if official is None: continue
+        bucket_hit = official
+        pos_won = (not bucket_hit) if pos.get("side") == "NO" else bucket_hit
+        filled_sh = float(pos.get("shares", 0))
+        cost = float(pos.get("cost", 0))
+        payout = filled_sh * 1.0 if pos_won else 0.0
+        net_pnl = round(payout - cost, 2)
+        jlog(LIVE_CLOSURES, {
+            "ts": nowts.isoformat(), "key": k, "city": pos.get("city"), "bucket": pos.get("bucket"),
+            "side": pos.get("side"), "shares": filled_sh, "entry_px": pos.get("px"),
+            "cost_usd": cost, "won": pos_won, "payout_usd": round(payout, 2), "realized_pnl": net_pnl,
+            "dry": pos.get("dry", True)
+        })
+        say(f"[SETTLED] {k} won={pos_won} pnl=${net_pnl:+.2f}")
+        del settling[k]
+        state["processed"][k] = {"ts": nowts.isoformat(), "action": "settled", "pnl": net_pnl}
 
     run_position_guard(cfg, state)
 
@@ -318,7 +349,9 @@ def process(cfg):
         if daily["trades"] >= max_trades_day or daily["cost"] >= max_cost_day: continue
 
         city_pos = [v for v in state["open"].values() if v.get("city") == det.get("city")]
-        if len(city_pos) >= 3 or sum(float(p.get("cost", 0.0) or (p.get("px", 0.0) * p.get("shares", 0.0))) for p in city_pos) >= 35.0: continue
+        city_exp = sum(float(p.get("cost", 0.0) or (p.get("px", 0.0) * p.get("shares", 0.0))) for p in city_pos)
+        rem_city_budget = max(0.0, 35.0 - city_exp)
+        if len(city_pos) >= 3 or rem_city_budget < 5 * TICK: continue
 
         fb = fresh_book(det)
         if not fb or fb[0] is None: continue
@@ -333,7 +366,8 @@ def process(cfg):
         if edge_now < EDGE_MIN: continue
         if det.get("px") and (px_now - det["px"]) > MAX_SLIPPAGE: continue
 
-        card_tier = min(15.0 if px_now <= 0.70 else (12.0 if px_now <= 0.85 else 8.0), rem_budget)
+        base_card = 15.0 if px_now <= 0.70 else (12.0 if px_now <= 0.85 else 8.0)
+        card_tier = min(base_card, rem_budget, rem_city_budget)
         eff_px = px_now + fee(px_now)
         shares = int(min(card_tier / max(TICK, eff_px), 0.9 * sz_now))
         if shares < 5: continue
@@ -363,10 +397,11 @@ def process(cfg):
                     daily["trades"] += 1; daily["cost"] += act_cost
                     state["processed"][key]["action"] = "filled"
                 else:
-                    state["processed"][key]["action"] = "unfilled"
+                    state["processed"].pop(key, None)
+                    say(f"[ORDER UNFILLED] 0 shares matched for {key}; eligible for retry")
             except Exception as ex:
                 say(f"ORDER ERROR {key}: {ex}")
-                state["processed"][key]["action"] = "order_error"
+                state["processed"].pop(key, None)
     jsave(STATE, state)
 
 if __name__ == "__main__":

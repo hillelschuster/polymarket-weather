@@ -60,7 +60,7 @@ MAP = {
     "NYC": ("KLGA", -4, "America/New_York", 6.1, 19.5), "Miami": ("KMIA", -4, "America/New_York", 6.8, 19.5),
     "Atlanta": ("KATL", -4, "America/New_York", 6.9, 20.1), "Boston": ("KBOS", -4, "America/New_York", 5.9, 19.3),
     "Philadelphia": ("KPHL", -4, "America/New_York", 6.1, 19.4), "Washington DC": ("KDCA", -4, "America/New_York", 6.2, 19.5),
-    "Chicago": ("KMDW", -5, "America/Chicago", 6.0, 19.4), "Dallas": ("KDAL", -5, "America/Chicago", 6.8, 20.1),
+    "Chicago": ("KORD", -5, "America/Chicago", 6.0, 19.4), "Dallas": ("KDAL", -5, "America/Chicago", 6.8, 20.1),
     "Austin": ("KAUS", -5, "America/Chicago", 6.9, 20.2), "Houston": ("KHOU", -5, "America/Chicago", 6.8, 19.9),
     "Denver": ("KDEN", -6, "America/Denver", 6.2, 19.4), "Phoenix": ("KPHX", -7, "America/Phoenix", 5.9, 19.3),
     "Las Vegas": ("KLAS", -7, "America/Los_Angeles", 6.0, 19.2),

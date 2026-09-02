@@ -382,6 +382,38 @@ class TestWeatherEngine(unittest.TestCase):
             res = official_outcome(det)
             self.assertIsNone(res, "Transitional ['0', '0'] must not resolve market prematurely")
 
+    def test_position_guard_partial_exit_scales_cost(self):
+        """Verify PositionGuard scales pos['cost'] proportionally on partial exits."""
+        from unittest.mock import patch
+        cfg = {"DRY_RUN": "true", "LIVE_ENABLED": "false"}
+        state = {
+            "open": {
+                "Lowest temperature in Paris on August 20?|15°C|NO": {
+                    "city": "Paris", "bucket": "15°C", "rule": "R2_low_dead_below",
+                    "shares": 20.0, "cost": 15.0, "px": 0.75, "token": "tok1", "dry": True
+                }
+            },
+            "processed": {}
+        }
+        # Mock weather showing station at 14.5C (dist = 14.5 - 15.5 = -1.0 < 0.7 -> guard triggers)
+        # Mock orderbook with bid size = 10 (partial exit: 10 out of 20 shares)
+        with patch("scripts.live_trader.get") as mock_get:
+            def side_effect(url, **kwargs):
+                if "aviationweather" in url:
+                    return [{"icaoId": "LFPB", "temp": 14.5}]
+                if "clob.polymarket.com/book" in url:
+                    return {"bids": [{"price": 0.70, "size": 10}], "asks": []}
+                return {}
+            mock_get.side_effect = side_effect
+            run_position_guard(cfg, state)
+            pos = state["open"]["Lowest temperature in Paris on August 20?|15°C|NO"]
+            self.assertEqual(pos["shares"], 10.0, "Shares should be decremented by 10")
+            self.assertEqual(pos["cost"], 7.5, "Cost must be scaled to 7.5 to prevent exposure leak")
+
+    def test_chicago_station_is_kord(self):
+        """Verify Chicago maps to O'Hare (KORD) matching Polymarket contract resolution source."""
+        self.assertEqual(MAP["Chicago"][0], "KORD", "Chicago must resolve to KORD")
+
     def test_map_and_station_integrity(self):
         """Verify station database integrity and valid window ranges."""
         for city, cfg in MAP.items():
