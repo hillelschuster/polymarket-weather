@@ -1,5 +1,4 @@
-"""Process Watchdog — monitors and automatically restarts weather supervisor and trader if killed."""
-import subprocess, sys, os, time
+import subprocess, sys, os, time, signal
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, "data")
@@ -40,6 +39,17 @@ if __name__ == "__main__":
     p_sup = spawn("supervisor.py")
     p_trd = spawn("live_trader.py")
     print(f"[WATCHDOG] Initialized: supervisor PID={p_sup.pid}, trader PID={p_trd.pid}")
+
+    def sig_handler(signum, frame):
+        print(f"[WATCHDOG] Received signal {signum}. Cleaning up children...")
+        cleanup_children([p_sup, p_trd])
+        try:
+            if os.path.exists(PID_FILE): os.remove(PID_FILE)
+        except Exception: pass
+        sys.exit(0)
+
+    signal.signal(signal.SIGTERM, sig_handler)
+    signal.signal(signal.SIGINT, sig_handler)
 
     sup_crashes, trd_crashes = [], []
 

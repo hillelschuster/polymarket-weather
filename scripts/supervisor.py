@@ -14,9 +14,11 @@ Windows detached:          run_supervisor.bat
 Single cycle (test):       python scripts/supervisor.py --once
 Stop:                      close the "weather-supervisor" window / kill python.
 """
-import json, os, re, sys, time, urllib.request
+import json, os, re, sys, time, urllib.request, socket
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
+
+socket.setdefaulttimeout(20.0)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.environ.get("POLYWEATHER_DATA") or os.path.join(ROOT, "data")
@@ -123,6 +125,8 @@ def atomic_save_json(path, obj):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=1, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
     for _ in range(3):
         try:
             os.replace(tmp, path)
@@ -415,11 +419,18 @@ def official_outcome(det):
                 op = m.get("outcomePrices")
                 if op is None: return None
                 prices = json.loads(op) if isinstance(op, str) else op
+                if not isinstance(prices, (list, tuple)) or not prices: return None
+                try:
+                    num_prices = [float(p) for p in prices if p is not None]
+                except (ValueError, TypeError): return None
+                # Guard against transitional zeroed prices before UMA settlement finalization
+                if sum(num_prices) < 0.90 or sum(num_prices) > 1.10:
+                    return None
                 outcomes = m.get("outcomes") or ["Yes", "No"]
                 if isinstance(outcomes, str): outcomes = json.loads(outcomes)
                 yi = next((i for i, o in enumerate(outcomes) if str(o).lower() == "yes"), 0) if outcomes else 0
-                if len(prices) > yi and prices[yi] is not None:
-                    return float(prices[yi]) > 0.5
+                if len(num_prices) > yi:
+                    return num_prices[yi] > 0.5
     except Exception:
         return None
     return None

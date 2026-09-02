@@ -1,7 +1,9 @@
 """Live trader — executes supervisor dead-bucket NO detections on Polymarket CLOB with strict risk controls."""
-import json, os, sys, time, urllib.request
+import json, os, sys, time, urllib.request, socket
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
+
+socket.setdefaulttimeout(20.0)
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
@@ -71,6 +73,8 @@ def jsave(path, obj):
     tmp = path + ".tmp"
     with open(tmp, "w", encoding="utf-8", errors="replace") as f:
         json.dump(obj, f, indent=1, ensure_ascii=False)
+        f.flush()
+        os.fsync(f.fileno())
     for _ in range(5):
         try:
             os.replace(tmp, path); return
@@ -130,15 +134,21 @@ def get_clob_client(cfg):
     return _clob_client
 
 def place_order(cfg, token_id, price, size, side="BUY"):
-    from py_clob_client.clob_types import OrderArgs, OrderType, BUY, SELL
+    from py_clob_client.clob_types import OrderArgs, OrderType, PartialCreateOrderOptions, BUY, SELL
     client = get_clob_client(cfg)
     if client is None:
         from py_clob_client.client import ClobClient
         client = ClobClient("https://clob.polymarket.com", key=cfg["PRIVATE_KEY"], chain_id=int(cfg.get("CHAIN_ID") or 137),
                             signature_type=1 if cfg.get("FUNDER") else 0, funder=cfg.get("FUNDER") or None)
         client.set_api_creds(client.create_or_derive_api_creds())
-    order = client.create_and_post_order(OrderArgs(token_id=str(token_id), price=round(float(price), 3), size=float(size),
-                                                   side=BUY if str(side).upper() == "BUY" else SELL), order_type=OrderType.FAK)
+        global _clob_client
+        _clob_client = client
+    order = client.create_and_post_order(
+        OrderArgs(token_id=str(token_id), price=round(float(price), 3), size=float(size),
+                  side=BUY if str(side).upper() == "BUY" else SELL),
+        options=PartialCreateOrderOptions(neg_risk=True, tick_size="0.001"),
+        order_type=OrderType.FAK,
+    )
     if isinstance(order, dict) and not order.get("success", True):
         raise RuntimeError(f"CLOB rejected: {order.get('errorMsg') or order}")
     return True, order
@@ -161,14 +171,24 @@ def read_new_detections(state):
     offset = state.get("det_offset", 0)
     if offset > os.path.getsize(DET): offset = 0
     new_dets = []
-    with open(DET, "r", encoding="utf-8", errors="replace") as f:
+    with open(DET, "rb") as f:
         f.seek(offset)
-        for line in f:
-            line = line.strip()
-            if line:
-                try: new_dets.append(json.loads(line))
-                except Exception: pass
-        state["det_offset"] = f.tell()
+        while True:
+            line_start = f.tell()
+            raw_line = f.readline()
+            if not raw_line: break
+            if not raw_line.endswith(b"\n"):
+                f.seek(line_start)
+                break
+            stripped = raw_line.strip()
+            if not stripped:
+                state["det_offset"] = f.tell()
+                continue
+            try:
+                new_dets.append(json.loads(stripped.decode("utf-8", errors="replace")))
+                state["det_offset"] = f.tell()
+            except Exception:
+                state["det_offset"] = f.tell()
     return new_dets
 
 def run_position_guard(cfg, state):

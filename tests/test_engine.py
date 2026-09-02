@@ -344,6 +344,44 @@ class TestWeatherEngine(unittest.TestCase):
         total_cost = round(eff_px * shares, 2)
         self.assertLessEqual(total_cost, card_tier, "Total outlay with fee must not exceed card_tier")
 
+    def test_read_new_detections_handles_torn_line(self):
+        """Verify read_new_detections does not advance offset on a torn line without trailing newline."""
+        import tempfile
+        from scripts.live_trader import read_new_detections
+        with tempfile.NamedTemporaryFile("wb", delete=False) as f:
+            f.write(b'{"key": "trade1"}\n{"key": "trade2"') # trade2 is torn
+            tmp_path = f.name
+        try:
+            state = {"det_offset": 0}
+            import scripts.live_trader
+            orig_det = scripts.live_trader.DET
+            scripts.live_trader.DET = tmp_path
+            dets = read_new_detections(state)
+            self.assertEqual(len(dets), 1, "Only the complete line should be parsed")
+            self.assertEqual(dets[0]["key"], "trade1")
+            self.assertEqual(state["det_offset"], len(b'{"key": "trade1"}\n'),
+                             "Offset must pause at start of torn line, not at EOF")
+        finally:
+            scripts.live_trader.DET = orig_det
+            if os.path.exists(tmp_path): os.remove(tmp_path)
+
+    def test_official_outcome_rejects_zeroed_prices(self):
+        """Verify official_outcome treats ['0', '0'] placeholder prices as UNRESOLVED (None)."""
+        from unittest.mock import patch
+        from scripts.supervisor import official_outcome
+        det = {"slug": "highest-temp-paris-2026", "bucket": "25°C"}
+        mock_event = [{
+            "closed": True,
+            "markets": [{
+                "groupItemTitle": "25°C",
+                "outcomePrices": '["0", "0"]',
+                "outcomes": ["Yes", "No"]
+            }]
+        }]
+        with patch("scripts.supervisor.get", return_value=mock_event):
+            res = official_outcome(det)
+            self.assertIsNone(res, "Transitional ['0', '0'] must not resolve market prematurely")
+
     def test_map_and_station_integrity(self):
         """Verify station database integrity and valid window ranges."""
         for city, cfg in MAP.items():
