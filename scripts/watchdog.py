@@ -26,6 +26,7 @@ def cleanup_children(procs):
             except Exception:
                 try:
                     p.kill()
+                    p.wait(timeout=2)
                 except Exception:
                     pass
 

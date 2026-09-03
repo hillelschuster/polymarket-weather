@@ -77,10 +77,10 @@ def jsave(path, obj):
         json.dump(obj, f, indent=1, ensure_ascii=False)
         f.flush()
         os.fsync(f.fileno())
-    for _ in range(5):
+    for _ in range(10):
         try:
             os.replace(tmp, path); return
-        except Exception: time.sleep(0.05)
+        except Exception: time.sleep(0.08)
 
 def jlog(path, obj):
     with open(path, "a", encoding="utf-8", errors="replace") as f:
@@ -124,21 +124,21 @@ def parse_filled_shares(detail, default_shares=0.0, side="BUY", client=None):
             return v / 1e6 if v > 10000 else v
         except Exception: pass
 
-    # If orderID is present, query client.get_order() for exact fill status
+    # If orderID is present, query client.get_order() with polling
     order_id = detail.get("orderID") or detail.get("orderId")
     if order_id and client is not None:
-        try:
-            order_info = client.get_order(order_id)
-            if isinstance(order_info, dict):
-                for f in ("size_matched", "sizeMatched", "filled_size"):
-                    if order_info.get(f) is not None:
-                        v = float(order_info[f])
-                        return v / 1e6 if v > 10000 else v
-        except Exception: pass
-
-    # In py_clob_client, a successful FAK order returns {"success": True, "orderID": "...", "orderHashes": [...]}
-    if detail.get("success") is True and detail.get("orderHashes"):
-        return float(default_shares)
+        for _ in range(4):
+            try:
+                order_info = client.get_order(order_id)
+                if isinstance(order_info, dict):
+                    for f in ("size_matched", "sizeMatched", "filled_size"):
+                        if order_info.get(f) is not None:
+                            v = float(order_info[f])
+                            return v / 1e6 if v > 10000 else v
+                    if order_info.get("status") in ("CANCELED", "CANCELLED") and float(order_info.get("size_matched", 0)) == 0:
+                        return 0.0
+            except Exception: pass
+            time.sleep(0.3)
 
     return float(default_shares) if detail.get("status") in ("matched", "filled") else 0.0
 
@@ -168,8 +168,9 @@ def place_order(cfg, token_id, price, size, side="BUY"):
         options=PartialCreateOrderOptions(neg_risk=True, tick_size="0.001"),
         order_type=OrderType.FAK,
     )
-    if isinstance(order, dict) and not order.get("success", True):
-        raise RuntimeError(f"CLOB rejected: {order.get('errorMsg') or order}")
+    if isinstance(order, dict):
+        if not order.get("success", True) or order.get("errorMsg") or order.get("error"):
+            raise RuntimeError(f"CLOB rejected: {order.get('errorMsg') or order.get('error') or order}")
     return True, order
 
 def fresh_book(det):
@@ -253,29 +254,50 @@ def run_position_guard(cfg, state):
             if not bids:
                 say(f"[GUARD WARN] No bids to exit {key}; keeping position open")
                 continue
-            bid_px, exit_sh = float(bids[-1]["price"]), min(shares, float(bids[-1]["size"]))
+            bid_px = float(bids[-1]["price"])
+            avail_bid = int(float(bids[-1].get("size", 0)))
+            exit_sh = min(int(shares), avail_bid)
             if exit_sh < 5: continue
+            if 0 < (int(shares) - exit_sh) < 5:
+                if avail_bid >= int(shares): exit_sh = int(shares)
+                else: exit_sh = int(shares) - 5
+            if exit_sh < 5: continue
+
+            payout = round(exit_sh * bid_px, 2)
+            cost_portion = round(float(pos.get("cost", 0.0)) * (exit_sh / shares), 2) if shares > 0 else 0.0
+            pnl = round(payout - cost_portion, 2)
             if is_dry:
-                say(f"[GUARD DRY EXIT] SOLD {exit_sh} @ {bid_px:.3f}")
+                say(f"[GUARD DRY EXIT] SOLD {exit_sh} @ {bid_px:.3f} pnl=${pnl:+.2f}")
                 jlog(ORDERS, {"ts": now.isoformat(), "key": key, "result": "GUARD_DRY_EXIT", "exit_px": bid_px, "entry_px": entry_px, "shares": exit_sh})
+                jlog(LIVE_CLOSURES, {
+                    "ts": now.isoformat(), "key": key, "city": pos.get("city"), "bucket": pos.get("bucket"),
+                    "side": pos.get("side"), "shares": exit_sh, "entry_px": entry_px, "exit_px": bid_px,
+                    "cost_usd": cost_portion, "won": False, "payout_usd": payout, "realized_pnl": pnl,
+                    "dry": True, "note": "guard_dry_exit"
+                })
                 if exit_sh >= shares: closed.append(key)
                 else:
-                    old_sh = pos["shares"]
                     pos["shares"] -= exit_sh
-                    if old_sh > 0:
-                        pos["cost"] = round(float(pos.get("cost", 0.0)) * (pos["shares"] / old_sh), 2)
+                    pos["cost"] = max(0.0, round(float(pos.get("cost", 0.0)) - cost_portion, 2))
             else:
                 ok, detail = place_order(cfg, token, tick_round(bid_px), exit_sh, side="SELL")
                 act_exit = parse_filled_shares(detail, default_shares=exit_sh, side="SELL", client=get_clob_client(cfg))
                 if act_exit > 0:
-                    say(f"[GUARD LIVE EXIT] SOLD {act_exit} @ {bid_px:.3f}")
+                    act_payout = round(act_exit * bid_px, 2)
+                    act_cost = round(float(pos.get("cost", 0.0)) * (act_exit / shares), 2) if shares > 0 else 0.0
+                    act_pnl = round(act_payout - act_cost, 2)
+                    say(f"[GUARD LIVE EXIT] SOLD {act_exit} @ {bid_px:.3f} pnl=${act_pnl:+.2f}")
                     jlog(ORDERS, {"ts": now.isoformat(), "key": key, "result": "GUARD_LIVE_EXIT", "exit_px": bid_px, "entry_px": entry_px, "shares": act_exit})
+                    jlog(LIVE_CLOSURES, {
+                        "ts": now.isoformat(), "key": key, "city": pos.get("city"), "bucket": pos.get("bucket"),
+                        "side": pos.get("side"), "shares": act_exit, "entry_px": entry_px, "exit_px": bid_px,
+                        "cost_usd": act_cost, "won": False, "payout_usd": act_payout, "realized_pnl": act_pnl,
+                        "dry": False, "note": "guard_live_exit"
+                    })
                     if act_exit >= shares: closed.append(key)
                     else:
-                        old_sh = pos["shares"]
                         pos["shares"] -= act_exit
-                        if old_sh > 0:
-                            pos["cost"] = round(float(pos.get("cost", 0.0)) * (pos["shares"] / old_sh), 2)
+                        pos["cost"] = max(0.0, round(float(pos.get("cost", 0.0)) - act_cost, 2))
                 else:
                     say(f"[GUARD UNFILLED] 0 shares matched for {key}")
         except Exception as ex: say(f"[GUARD ERROR] {key}: {ex}")
@@ -353,30 +375,38 @@ def process(cfg):
 
     run_position_guard(cfg, state)
 
+    if os.path.exists(PAUSE):
+        say("PAUSE file present — skipping detection intake")
+        jsave(STATE, state)
+        return
+
     for det in read_new_detections(state):
         key = det.get("key")
         if not key or det.get("rule") not in BASE_LIVE_RULES or det.get("side") != "NO": continue
-        if det.get("px", 0.0) < PRICE_FLOOR or det.get("px", 0.0) > PRICE_CEILING: continue
-        if key in state["processed"]: continue
+        alert_px = float(det.get("px") or 0.0)
+        if alert_px < PRICE_FLOOR or alert_px > PRICE_CEILING: continue
+        if key in state["processed"] or key in state.get("open", {}) or key in state.get("settling", {}): continue
 
         det_ts_str = det.get("ts")
         if not det_ts_str: continue
         try:
             det_dt = datetime.fromisoformat(str(det_ts_str).replace("Z", "+00:00"))
             if (nowts - (det_dt if det_dt.tzinfo else det_dt.replace(tzinfo=timezone.utc))).total_seconds() > alert_max_age:
-                state["processed"][key] = {"ts": nowts.isoformat(), "action": "skip_stale_alert"}; continue
+                continue
         except Exception: continue
 
-        if os.path.exists(PAUSE): say("PAUSE file present — skipping"); continue
-        cur_exp = sum(float(p.get("cost", 0.0) or (p.get("px", 0.0) * p.get("shares", 0.0))) for p in state["open"].values())
+        open_exp = sum(float(p.get("cost", 0.0) or (p.get("px", 0.0) * p.get("shares", 0.0))) for p in state.get("open", {}).values())
+        settling_exp = sum(float(p.get("cost", 0.0) or (p.get("px", 0.0) * p.get("shares", 0.0))) for p in state.get("settling", {}).values())
+        cur_exp = open_exp + settling_exp
         rem_budget = max(0.0, max_exp - cur_exp)
-        if rem_budget < 5 * TICK or len(state["open"]) >= max_open: continue
+        min_capital = 5 * PRICE_FLOOR
+        if rem_budget < min_capital or len(state["open"]) >= max_open: continue
         if daily["trades"] >= max_trades_day or daily["cost"] >= max_cost_day: continue
 
         city_pos = [v for v in state["open"].values() if v.get("city") == det.get("city")]
         city_exp = sum(float(p.get("cost", 0.0) or (p.get("px", 0.0) * p.get("shares", 0.0))) for p in city_pos)
         rem_city_budget = max(0.0, 35.0 - city_exp)
-        if len(city_pos) >= 3 or rem_city_budget < 5 * TICK: continue
+        if len(city_pos) >= 3 or rem_city_budget < min_capital: continue
 
         fb = fresh_book(det)
         if not fb or fb[0] is None: continue
@@ -391,8 +421,9 @@ def process(cfg):
         if edge_now < EDGE_MIN: continue
         if det.get("px") and (px_now - det["px"]) > MAX_SLIPPAGE: continue
 
+        rem_cost_day = max(0.0, max_cost_day - float(daily.get("cost", 0.0)))
         base_card = 15.0 if px_now <= 0.70 else (12.0 if px_now <= 0.85 else 8.0)
-        card_tier = min(base_card, rem_budget, rem_city_budget)
+        card_tier = min(base_card, rem_budget, rem_city_budget, rem_cost_day)
         eff_px = px_now + fee(px_now)
         shares = int(min(card_tier / max(TICK, eff_px), 0.9 * sz_now))
         if shares < 5: continue
@@ -400,6 +431,7 @@ def process(cfg):
         cost = round(eff_px * shares, 2)
         token = tokens[1 - yi]
         base = {"ts": nowts.isoformat(), "key": key, "rule": det["rule"], "city": det["city"],
+                "title": det.get("title") or key.split("|")[0], "slug": det.get("slug"),
                 "bucket": det["bucket"], "side": "NO", "alert_px": det.get("px"), "end": det.get("end")}
 
         dry = cfg.get("DRY_RUN", "true").lower() != "false" or cfg.get("LIVE_ENABLED", "false").lower() != "true"
@@ -407,6 +439,7 @@ def process(cfg):
             jlog(ORDERS, {**base, "result": "DRY_RUN_WOULD_ORDER", "px": round(px_now, 4), "shares": shares, "cost": cost, "token": token})
             say(f"DRY_RUN BUY NO {det['city']} {det['bucket']} px={px_now:.4f} x{shares} (${cost})")
             state["open"][key] = {**base, "token": token, "px": round(px_now, 4), "shares": shares, "cost": cost, "dry": True}
+            state["processed"][key] = {"ts": nowts.isoformat(), "action": "dry_run_opened"}
             daily["trades"] += 1; daily["cost"] += cost
         else:
             try:

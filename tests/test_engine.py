@@ -393,6 +393,40 @@ class TestWeatherEngine(unittest.TestCase):
             res = official_outcome(det)
             self.assertIsNone(res, "Transitional ['0', '0'] must not resolve market prematurely")
 
+    def test_official_outcome_rejects_transitional_market_prices(self):
+        """Verify official_outcome rejects pre-resolution market midpoints like ['0.65', '0.35']."""
+        from unittest.mock import patch
+        from scripts.supervisor import official_outcome
+        det = {"slug": "highest-temp-paris-2026", "bucket": "25°C"}
+        mock_event = [{
+            "closed": True,
+            "markets": [{
+                "groupItemTitle": "25°C",
+                "outcomePrices": '["0.65", "0.35"]',
+                "outcomes": ["Yes", "No"]
+            }]
+        }]
+        with patch("scripts.supervisor.get", return_value=mock_event):
+            res = official_outcome(det)
+            self.assertIsNone(res, "Pre-resolution market prices summing to 1.0 must not settle prematurely")
+
+    def test_official_outcome_settles_on_binary_finality(self):
+        """Verify official_outcome settles when prices reach binary finality (e.g. ['1', '0'])."""
+        from unittest.mock import patch
+        from scripts.supervisor import official_outcome
+        det = {"key": "Lowest temperature in Paris on August 20?|15°C|NO", "bucket": "15°C"}
+        mock_event = [{
+            "closed": True,
+            "markets": [{
+                "groupItemTitle": "15°C",
+                "outcomePrices": '["1", "0"]',
+                "outcomes": ["Yes", "No"]
+            }]
+        }]
+        with patch("scripts.supervisor.get", return_value=mock_event):
+            res = official_outcome(det)
+            self.assertTrue(res, "Binary finality [1, 0] must settle as bucket_hit = True")
+
     def test_position_guard_partial_exit_scales_cost(self):
         """Verify PositionGuard scales pos['cost'] proportionally on partial exits."""
         from unittest.mock import patch
@@ -425,12 +459,12 @@ class TestWeatherEngine(unittest.TestCase):
         """Verify Chicago maps to O'Hare (KORD) matching Polymarket contract resolution source."""
         self.assertEqual(MAP["Chicago"][0], "KORD", "Chicago must resolve to KORD")
 
-    def test_parse_filled_shares_with_order_hashes(self):
-        """Verify parse_filled_shares treats CLOB success with orderHashes as filled."""
+    def test_parse_filled_shares_with_matched_status(self):
+        """Verify parse_filled_shares treats matched status as filled."""
         from scripts.live_trader import parse_filled_shares
-        detail = {"success": True, "errorMsg": "", "orderID": "0xabc", "orderHashes": ["0xhash1"]}
+        detail = {"success": True, "errorMsg": "", "orderID": "0xabc", "status": "matched"}
         sh = parse_filled_shares(detail, default_shares=15.0, side="BUY")
-        self.assertEqual(sh, 15.0, "Orders with orderHashes must return filled shares")
+        self.assertEqual(sh, 15.0, "Orders with status matched must return filled shares")
 
     def test_parse_filled_shares_with_client_get_order(self):
         """Verify parse_filled_shares queries client.get_order() when orderID is provided."""
@@ -441,7 +475,7 @@ class TestWeatherEngine(unittest.TestCase):
         detail = {"success": True, "orderID": "0xorder123"}
         sh = parse_filled_shares(detail, default_shares=15.0, side="BUY", client=mock_client)
         self.assertEqual(sh, 12.0, "Exact size_matched must be extracted from client.get_order()")
-        mock_client.get_order.assert_called_once_with("0xorder123")
+        mock_client.get_order.assert_called_with("0xorder123")
 
     def test_map_and_station_integrity(self):
         """Verify station database integrity and valid window ranges."""

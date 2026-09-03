@@ -291,7 +291,6 @@ def fetch_running(in_window_events):
         except Exception as ex:
             say("recent metar err %s" % ex); continue
         instant_by = {}
-        instant_by = {}
         max6_by = {}
         min6_by = {}
         for m in (ms or []):
@@ -338,14 +337,14 @@ def fetch_running(in_window_events):
             max_candidates = list(inst_day)
             min_candidates = list(inst_day)
 
-            # 6h maxima only contribute to max_candidates (with 15m synoptic transmission tolerance)
+            # 6h maxima only contribute to max_candidates
             for tt, tmp in (max6_by.get(st) or []):
-                if tt >= day_start_utc + 6 * 3600 - 900:
+                if tt >= day_start_utc + 6 * 3600:
                     max_candidates.append(tmp)
 
-            # 6h minima only contribute to min_candidates (with 15m synoptic transmission tolerance)
+            # 6h minima only contribute to min_candidates
             for tt, tmp in (min6_by.get(st) or []):
-                if tt >= day_start_utc + 6 * 3600 - 900:
+                if tt >= day_start_utc + 6 * 3600:
                     min_candidates.append(tmp)
 
             # calculate 30-90m trend (instantaneous rate of change in C/hr) strictly from instantaneous obs
@@ -353,8 +352,8 @@ def fetch_running(in_window_events):
             trend = None
             if len(sorted_obs) >= 2:
                 t_last, temp_last = sorted_obs[-1]
-                # Guard against stale telemetry: trend only valid if latest obs <= 90m old
-                if now_ts - t_last <= 5400:
+                # Guard against stale or invalid future telemetry: trend only valid if latest obs <= 90m old
+                if -300 <= now_ts - t_last <= 5400:
                     for t_prev, temp_prev in reversed(sorted_obs[:-1]):
                         dt_hr = (t_last - t_prev) / 3600.0
                         if 0.3 <= dt_hr <= 1.5:
@@ -371,12 +370,13 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
     src, off, tz, dawn, lastlight = city_cfg
     is_low = event["title"].startswith("Lowest")
     is_f = event["city"] in US_F
-    obs_m = obs * 9 / 5 + 32 if is_f else obs
     margin_base = 3.6 if is_f else 2.0     # 2.0C / 3.6F standard margin (p <= 0.70)
     margin_strict = 5.4 if is_f else 3.0   # 3.0C / 5.4F strict margin for high-price NOs (>0.70)
     out = []
 
     def mk(rule, side, q, r):
+        if r.get("yes_bid") is None:
+            return None
         px = max(0.001, float(1 - r["yes_bid"]))
         if px < PRICE_FLOOR or px > PRICE_CEILING:
             return None
@@ -426,7 +426,7 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
                             m = mk("R3_high_dead_above", "NO", q_no, r)
                             if m: out.append(m)
                 # R5 dead-below (MONOTONIC: daily high can never decrease)
-                mono_buf = 1.0 if is_f else 0.6
+                mono_buf = 1.1 if is_f else 0.6
                 if r["hi"] <= runmax_m - mono_buf:
                     q_no = 0.97 if no_ask > 0.70 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
@@ -435,21 +435,34 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
     return out
 
 def official_outcome(det):
-    """If the market itself has resolved (closed + outcomePrices), return bucket_hit (bool)
-    from the official result; else None. Settle strictly on official exchange ground truth."""
+    """If the market itself has officially resolved on UMA, return bucket_hit (bool); else None."""
     try:
         slug = det.get("slug")
         if not slug:
-            t = det.get("title", "").replace("?", "").strip()
-            t = re.sub(r"[^a-zA-Z0-9\s-]", "", t).strip().lower()
-            slug = re.sub(r"\s+", "-", t) + "-2026"
+            t = (det.get("title") or det.get("key", "").split("|")[0]).replace("?", "").strip()
+            if not t: return None
+            y_match = re.search(r"\b(20\d\d)\b", t)
+            year_str = y_match.group(1) if y_match else str(datetime.now(timezone.utc).year)
+            clean_t = re.sub(r"[^a-zA-Z0-9\s-]", "", t).strip().lower()
+            slug = re.sub(r"\s+", "-", clean_t)
+            if not slug.endswith(year_str):
+                slug = f"{slug}-{year_str}"
+        
         evg = get(f"https://gamma-api.polymarket.com/events?slug={slug}")
         if isinstance(evg, list): evg = evg[0] if evg else None
         if not evg or not evg.get("closed"): return None
+
+        det_token = str(det.get("token") or "")
+        det_b = (det.get("bucket") or "").strip().replace("\ufffd", "°")
+
         for m in evg.get("markets") or []:
+            m_tokens = [str(tok) for tok in (m.get("clobTokenIds") or [])]
             b_title = (m.get("groupItemTitle") or "").strip().replace("\ufffd", "°")
-            det_b = (det.get("bucket") or "").strip().replace("\ufffd", "°")
-            if b_title == det_b:
+            
+            token_match = bool(det_token and det_token in m_tokens)
+            title_match = bool(det_b and (b_title == det_b))
+
+            if token_match or title_match:
                 op = m.get("outcomePrices")
                 if op is None: return None
                 prices = json.loads(op) if isinstance(op, str) else op
@@ -457,9 +470,14 @@ def official_outcome(det):
                 try:
                     num_prices = [float(p) for p in prices if p is not None]
                 except (ValueError, TypeError): return None
-                # Guard against transitional zeroed prices before UMA settlement finalization
-                if sum(num_prices) < 0.90 or sum(num_prices) > 1.10:
+
+                # Require settlement finality: sum near 1.0 and binary finality (>= 0.95)
+                if sum(num_prices) < 0.95 or sum(num_prices) > 1.05:
                     return None
+                if max(num_prices) < 0.95:
+                    # Transitional/pre-resolution traded prices still present
+                    return None
+
                 outcomes = m.get("outcomes") or ["Yes", "No"]
                 if isinstance(outcomes, str): outcomes = json.loads(outcomes)
                 yi = next((i for i, o in enumerate(outcomes) if str(o).lower() == "yes"), 0) if outcomes else 0
@@ -521,14 +539,14 @@ def cycle(events_cache):
             end = datetime.fromisoformat((e["endDate"] or "").replace("Z", "+00:00"))
         except Exception: continue
         hrs = (end - now).total_seconds() / 3600
-        if not (-14 < hrs < 48): continue
+        if not (-30 < hrs < 48): continue
         try:
             local = now.astimezone(ZoneInfo(tz))
         except Exception:
             local = now + timedelta(hours=off)
         local_hour = local.hour + local.minute / 60.0
         # CRITICAL: only act inside the event's own local calendar day
-        tld = target_local_date(e["title"])
+        tld = target_local_date(e["title"], ref_dt=local)
         if tld is None or (local.year, local.month, local.day) != tld:
             continue
         is_low = e["title"].startswith("Lowest")
