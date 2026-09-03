@@ -31,32 +31,34 @@ RUNLOG = os.path.join(DATA, "run.log")
 
 # city -> (source, utc_off, iana_tz, dawn_local, last_light_local)  [August approximations]
 MAP = {
-    # Asian & Global cities (Restored & Verified)
-    "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
-    "Seoul": ("RKSI", 9, "Asia/Seoul", 5.7, 18.7), "Busan": ("RKPK", 9, "Asia/Seoul", 5.8, 18.8),
-    "Tokyo": ("RJTT", 9, "Asia/Tokyo", 5.5, 18.4), "Shanghai": ("ZSPD", 8, "Asia/Shanghai", 5.5, 18.3),
-    "Beijing": ("ZBAA", 8, "Asia/Shanghai", 5.5, 18.9), "Taipei": ("RCSS", 8, "Asia/Taipei", 5.5, 18.2),
-    "Chongqing": ("ZUCK", 8, "Asia/Shanghai", 6.0, 19.3), "Wuhan": ("ZHHH", 8, "Asia/Shanghai", 5.8, 19.0),
-    "Chengdu": ("ZUUU", 8, "Asia/Shanghai", 6.3, 19.5), "Shenzhen": ("ZGSZ", 8, "Asia/Shanghai", 6.1, 18.9),
-    "Guangzhou": ("ZGGG", 8, "Asia/Shanghai", 6.1, 18.9), "Singapore": ("WSSS", 8, "Asia/Singapore", 7.0, 19.1),
-    "Kuala Lumpur": ("WMKK", 8, "Asia/Kuala_Lumpur", 7.1, 19.2), "Manila": ("RPLL", 8, "Asia/Manila", 5.7, 18.2),
-    "Karachi": ("OPKC", 5, "Asia/Karachi", 6.0, 18.9), "Jeddah": ("OEJN", 3, "Asia/Riyadh", 5.9, 18.7),
-    "Tel Aviv": ("LLBG", 3, "Asia/Jerusalem", 6.0, 19.2),
-    "Cape Town": ("FACT", 2, "Africa/Johannesburg", 7.2, 18.3), "Wellington": ("NZWN", 12, "Pacific/Auckland", 7.1, 17.4),
-    "Mexico City": ("MMMX", -6, "America/Mexico_City", 7.1, 19.9),
-    "Sao Paulo": ("SBGR", -3, "America/Sao_Paulo", 6.3, 17.8),
-    "Buenos Aires": ("SAEZ", -3, "America/Argentina/Buenos_Aires", 7.3, 18.3),
+    # Asian & Global cities — disabled (telemetry latency / municipal station divergence vs METAR)
+    # "Hong Kong": ("hko", 8, "Asia/Hong_Kong", 6.0, 18.8),
+    # "Seoul": ("RKSI", 9, "Asia/Seoul", 5.7, 18.7), "Busan": ("RKPK", 9, "Asia/Seoul", 5.8, 18.8),
+    # "Tokyo": ("RJTT", 9, "Asia/Tokyo", 5.5, 18.4), "Shanghai": ("ZSPD", 8, "Asia/Shanghai", 5.5, 18.3),
+    # "Beijing": ("ZBAA", 8, "Asia/Shanghai", 5.5, 18.9), "Taipei": ("RCSS", 8, "Asia/Taipei", 5.5, 18.2),
+    # "Chongqing": ("ZUCK", 8, "Asia/Shanghai", 6.0, 19.3), "Wuhan": ("ZHHH", 8, "Asia/Shanghai", 5.8, 19.0),
+    # "Chengdu": ("ZUUU", 8, "Asia/Shanghai", 6.3, 19.5), "Shenzhen": ("ZGSZ", 8, "Asia/Shanghai", 6.1, 18.9),
+    # "Guangzhou": ("ZGGG", 8, "Asia/Shanghai", 6.1, 18.9), "Singapore": ("WSSS", 8, "Asia/Singapore", 7.0, 19.1),
+    # "Kuala Lumpur": ("WMKK", 8, "Asia/Kuala_Lumpur", 7.1, 19.2), "Manila": ("RPLL", 8, "Asia/Manila", 5.7, 18.2),
+    # "Karachi": ("OPKC", 5, "Asia/Karachi", 6.0, 18.9), "Jeddah": ("OEJN", 3, "Asia/Riyadh", 5.9, 18.7),
+    # "Tel Aviv": ("LLBG", 3, "Asia/Jerusalem", 6.0, 19.2),
+    # "Cape Town": ("FACT", 2, "Africa/Johannesburg", 7.2, 18.3), "Wellington": ("NZWN", 12, "Pacific/Auckland", 7.1, 17.4),
+    # "Mexico City": ("MMMX", -6, "America/Mexico_City", 7.1, 19.9),
+    # "Sao Paulo": ("SBGR", -3, "America/Sao_Paulo", 6.3, 17.8),
+    # "Buenos Aires": ("SAEZ", -3, "America/Argentina/Buenos_Aires", 7.3, 18.3),
 
-    # European cities
+    # European cities (Verified METAR alignment with official resolution)
     "London": ("EGLC", 1, "Europe/London", 5.9, 20.2), "Paris": ("LFPB", 2, "Europe/Paris", 6.5, 20.8),
     "Amsterdam": ("EHAM", 2, "Europe/Amsterdam", 6.4, 20.7), "Warsaw": ("EPWA", 2, "Europe/Warsaw", 5.5, 19.8),
     "Helsinki": ("EFHK", 3, "Europe/Helsinki", 5.4, 20.9), "Madrid": ("LEMD", 2, "Europe/Madrid", 7.2, 20.9),
     "Milan": ("LIMC", 2, "Europe/Rome", 6.3, 20.2), "Munich": ("EDDM", 2, "Europe/Berlin", 6.2, 20.2),
     "Rome": ("LIRF", 2, "Europe/Rome", 6.2, 20.1), "Frankfurt": ("EDDF", 2, "Europe/Berlin", 6.1, 20.3),
-    "Vienna": ("LOWW", 2, "Europe/Vienna", 5.8, 20.0), "Istanbul": ("LTFM", 3, "Europe/Istanbul", 6.1, 19.9),
-    "Ankara": ("LTAC", 3, "Europe/Istanbul", 6.1, 19.7), "Moscow": ("UUWW", 3, "Europe/Moscow", 5.3, 19.9),
+    "Vienna": ("LOWW", 2, "Europe/Vienna", 5.8, 20.0),
+    # "Istanbul": ("LTFM", 3, "Europe/Istanbul", 6.1, 19.9),
+    # "Ankara": ("LTAC", 3, "Europe/Istanbul", 6.1, 19.7),
+    # "Moscow": ("UUWW", 3, "Europe/Moscow", 5.3, 19.9),
 
-    # US cities
+    # US cities (Verified METAR / ASOS alignment with NWS resolution)
     "NYC": ("KLGA", -4, "America/New_York", 6.1, 19.5), "Miami": ("KMIA", -4, "America/New_York", 6.8, 19.5),
     "Atlanta": ("KATL", -4, "America/New_York", 6.9, 20.1), "Boston": ("KBOS", -4, "America/New_York", 5.9, 19.3),
     "Philadelphia": ("KPHL", -4, "America/New_York", 6.1, 19.4), "Washington DC": ("KDCA", -4, "America/New_York", 6.2, 19.5),
@@ -75,6 +77,8 @@ CYCLE_SEC = 120
 EVENT_CACHE_SEC = 600
 # Sizing card for high-confidence dead-bucket NOs
 SIZE_LOCKED = 15.0   # >=90% confidence states
+PRICE_FLOOR = 0.50   # Hard floor: reject all sub-50c lottery/adverse selection traps
+PRICE_CEILING = 0.88 # Upper price limit
 
 def say(msg):
     line = f"[{datetime.now(timezone.utc).isoformat(timespec='seconds')}] {msg}"
@@ -374,6 +378,8 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
 
     def mk(rule, side, q, r):
         px = max(0.001, float(1 - r["yes_bid"]))
+        if px < PRICE_FLOOR or px > PRICE_CEILING:
+            return None
         avail = float(r.get("yes_bid_sz", 0)) * 0.9
         card_tier = 15.0 if px <= 0.70 else (12.0 if px <= 0.85 else 8.0)
         eff_px = px + fee(px)
@@ -394,11 +400,14 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
             # R2 dead-below: progressive margin based on price
             if r.get("yes_bid") is not None:
                 no_ask = 1 - r["yes_bid"]
+                if no_ask < PRICE_FLOOR or no_ask > PRICE_CEILING:
+                    continue
                 req_margin = margin_strict if no_ask > 0.70 else margin_base
                 if r["hi"] <= runmin_m - req_margin:
                     q_no = 0.97 if no_ask > 0.70 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
-                        out.append(mk("R2_low_dead_below", "NO", q_no, r))
+                        m = mk("R2_low_dead_below", "NO", q_no, r)
+                        if m: out.append(m)
 
         # High-side contracts: R3 dead-above & R5 dead-below in afternoon window
         trend_ok_high = (trend is None) or (trend <= 0.3)
@@ -406,19 +415,23 @@ def detectors(event, city_cfg, local_hour, obs, precip, book, runmax=None, runmi
         if (not is_low) and runmax is not None and in_afternoon:
             if r.get("yes_bid") is not None:
                 no_ask = 1 - r["yes_bid"]
+                if no_ask < PRICE_FLOOR or no_ask > PRICE_CEILING:
+                    continue
                 # R3 dead-above after peak heating window
                 if trend_ok_high:
                     req_margin = margin_strict if no_ask > 0.70 else margin_base
                     q_no = 0.97 if no_ask > 0.70 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
                         if r["lo"] >= runmax_m + req_margin:
-                            out.append(mk("R3_high_dead_above", "NO", q_no, r))
+                            m = mk("R3_high_dead_above", "NO", q_no, r)
+                            if m: out.append(m)
                 # R5 dead-below (MONOTONIC: daily high can never decrease)
                 mono_buf = 1.0 if is_f else 0.6
                 if r["hi"] <= runmax_m - mono_buf:
                     q_no = 0.97 if no_ask > 0.70 else 0.92
                     if q_no - no_ask - fee(no_ask) > 0.04:
-                        out.append(mk("R5_high_dead_below", "NO", q_no, r))
+                        m = mk("R5_high_dead_below", "NO", q_no, r)
+                        if m: out.append(m)
     return out
 
 def official_outcome(det):

@@ -203,12 +203,23 @@ class TestWeatherEngine(unittest.TestCase):
     def test_base_live_rules_and_safeguards(self):
         """Verify lotto rule enablement and live rule set integrity including R5."""
         cfg = env()
-        self.assertEqual(cfg.get("ALLOW_LOTTOS"), "true")
+        self.assertEqual(cfg.get("ALLOW_LOTTOS"), "false")
         self.assertIn("R2_low_dead_below", BASE_LIVE_RULES)
         self.assertIn("R3_high_dead_above", BASE_LIVE_RULES)
         self.assertIn("R5_high_dead_below", BASE_LIVE_RULES)
         self.assertNotIn("R1_low_lotto", BASE_LIVE_RULES)
         self.assertNotIn("R4_high_lotto", BASE_LIVE_RULES)
+
+    def test_price_floor_rejects_sub_50c_lottos(self):
+        """Verify detectors strictly reject sub-50c lottery/adverse selection contracts."""
+        from scripts.supervisor import PRICE_FLOOR
+        self.assertEqual(PRICE_FLOOR, 0.50)
+        event = {"title": "Highest temperature in Paris on August 20?", "city": "Paris"}
+        cfg = MAP["Paris"]
+        # Extreme yes_bid = 0.999 -> no_ask = 0.001 (the exact lotto pattern observed in logs)
+        book = [{"bucket": "35°C", "lo": 34.5, "hi": 35.5, "val": 35, "yes_bid": 0.999, "yes_bid_sz": 1000}]
+        dets = detectors(event, cfg, local_hour=18.0, obs=26.0, precip=False, book=book, runmax=26.0, trend=0.0)
+        self.assertEqual(len(dets), 0, "Sub-50c contracts must be rejected by PRICE_FLOOR")
 
     def test_parse_filled_shares(self):
         """Verify parsing of actual filled shares from CLOB FAK responses."""
@@ -397,7 +408,7 @@ class TestWeatherEngine(unittest.TestCase):
         }
         # Mock weather showing station at 14.5C (dist = 14.5 - 15.5 = -1.0 < 0.7 -> guard triggers)
         # Mock orderbook with bid size = 10 (partial exit: 10 out of 20 shares)
-        with patch("scripts.live_trader.get") as mock_get:
+        with patch("scripts.live_trader.get") as mock_get, patch("scripts.live_trader.jlog"):
             def side_effect(url, **kwargs):
                 if "aviationweather" in url:
                     return [{"icaoId": "LFPB", "temp": 14.5}]

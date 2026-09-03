@@ -29,6 +29,7 @@ DEFAULT_MAX_OPEN = 15
 DEFAULT_MAX_TRADES_DAY = 30
 DEFAULT_MAX_COST_DAY = 300.0
 DEFAULT_ALERT_MAX_AGE_SEC = 600
+PRICE_FLOOR = 0.50   # Hard floor: reject all sub-50c lottery/adverse selection traps
 PRICE_CEILING = 0.88
 PX_TOL = 0.03
 EDGE_MIN = 0.030
@@ -43,7 +44,7 @@ def env():
     cfg = {"LIVE_ENABLED": "false", "PRIVATE_KEY": "", "FUNDER": "", "DRY_RUN": "true", "CHAIN_ID": "137",
            "MAX_TOTAL_EXPOSURE_USD": str(DEFAULT_MAX_TOTAL_EXPOSURE_USD), "CARD": str(DEFAULT_CARD),
            "MAX_OPEN": str(DEFAULT_MAX_OPEN), "MAX_TRADES_DAY": str(DEFAULT_MAX_TRADES_DAY),
-           "MAX_COST_DAY": str(DEFAULT_MAX_COST_DAY), "ALLOW_LOTTOS": "true",
+           "MAX_COST_DAY": str(DEFAULT_MAX_COST_DAY), "ALLOW_LOTTOS": "false",
            "ALERT_MAX_AGE_SEC": str(DEFAULT_ALERT_MAX_AGE_SEC)}
     if os.path.exists(ENVF):
         try:
@@ -355,6 +356,7 @@ def process(cfg):
     for det in read_new_detections(state):
         key = det.get("key")
         if not key or det.get("rule") not in BASE_LIVE_RULES or det.get("side") != "NO": continue
+        if det.get("px", 0.0) < PRICE_FLOOR or det.get("px", 0.0) > PRICE_CEILING: continue
         if key in state["processed"]: continue
 
         det_ts_str = det.get("ts")
@@ -379,7 +381,7 @@ def process(cfg):
         fb = fresh_book(det)
         if not fb or fb[0] is None: continue
         px_now, sz_now, tokens, yi = fb
-        if px_now <= 0 or px_now > PRICE_CEILING: continue
+        if px_now < PRICE_FLOOR or px_now > PRICE_CEILING: continue
 
         # Inherit q from detector to maintain exact margin coupling without artificial inflation
         q = det.get("q")
