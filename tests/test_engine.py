@@ -17,6 +17,25 @@ from scripts.live_trader import (
 
 class TestWeatherEngine(unittest.TestCase):
 
+    def setUp(self):
+        import tempfile
+        import scripts.live_trader as lt
+        self.tmp_dir = tempfile.mkdtemp()
+        self.orig_state = lt.STATE
+        self.orig_orders = lt.ORDERS
+        self.orig_closures = lt.LIVE_CLOSURES
+        lt.STATE = os.path.join(self.tmp_dir, "test_state.json")
+        lt.ORDERS = os.path.join(self.tmp_dir, "test_orders.jsonl")
+        lt.LIVE_CLOSURES = os.path.join(self.tmp_dir, "test_closures.jsonl")
+
+    def tearDown(self):
+        import shutil
+        import scripts.live_trader as lt
+        lt.STATE = self.orig_state
+        lt.ORDERS = self.orig_orders
+        lt.LIVE_CLOSURES = self.orig_closures
+        shutil.rmtree(self.tmp_dir, ignore_errors=True)
+
     def test_bucket_parse_comprehensive(self):
         """Test bucket_parse against standard, unicode dash, decimal, negative, and phrase variations."""
         cases = [
