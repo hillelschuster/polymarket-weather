@@ -442,7 +442,7 @@ class TestWeatherEngine(unittest.TestCase):
         }
         # Mock weather showing station at 14.5C (dist = 14.5 - 15.5 = -1.0 < 0.7 -> guard triggers)
         # Mock orderbook with bid size = 10 (partial exit: 10 out of 20 shares)
-        with patch("scripts.live_trader.get") as mock_get, patch("scripts.live_trader.jlog"):
+        with patch("scripts.live_trader.get") as mock_get, patch("scripts.live_trader.jlog"), patch("scripts.live_trader.jsave"):
             def side_effect(url, **kwargs):
                 if "aviationweather" in url:
                     return [{"icaoId": "LFPB", "temp": 14.5}]
